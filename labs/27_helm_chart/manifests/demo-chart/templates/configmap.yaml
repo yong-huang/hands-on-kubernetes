@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "demo-chart.fullname" . }}-config
+  labels:
+    {{- include "demo-chart.labels" . | nindent 4 }}
+data:
+  APP_MODE: {{ .Values.config.appMode | quote }}
+  LOG_LEVEL: {{ .Values.config.logLevel | quote }}
+  {{- range $key, $val := .Values.config.features }}
+  {{ $key }}: {{ $val | quote }}
+  {{- end }}

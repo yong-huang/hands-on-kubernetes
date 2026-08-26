@@ -1,0 +1,107 @@
+# =============================================================================
+# HPA (Horizontal Pod Autoscaler) 演示清单
+# 包含三部分: 1) CPU 密集型测试应用 Deployment  2) Service (供压测访问)
+#             3) HPA (autoscaling/v2)
+# 关键前提: Pod 必须设置 resources.requests.cpu, 否则 HPA 无法计算
+#           CPU 利用率百分比 (利用率 = 实际用量 / requests)
+# =============================================================================
+---
+# ----------------------------- 1. 被扩缩的目标应用 -----------------------------
+apiVersion: v1
+kind: Service                    # ★ 必须有 Service, 压测 Pod 才能通过
+metadata:                        #   DNS 名 cpu-stress-app 访问到应用
+  name: cpu-stress-app
+spec:
+  selector:
+    app: cpu-stress-app
+  ports:
+    - port: 8080
+      targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cpu-stress-app            # HPA 的 scaleTargetRef 指向它
+  labels:
+    app: cpu-stress-app
+spec:
+  replicas: 1                     # HPA 接管后此值会被控制器改写
+  selector:
+    matchLabels:
+      app: cpu-stress-app
+  template:
+    metadata:
+      labels:
+        app: cpu-stress-app       # 必须与 selector.matchLabels 一致
+    spec:
+      containers:
+        - name: app
+          # busybox httpd + CGI: 每个请求都在【本 Pod 内】执行一段 CPU 循环,
+          # 这样压测流量会真实抬高目标应用的 CPU 利用率, 触发 HPA 扩容
+          # (纯静态 httpd 几乎不耗 CPU, HPA 看到的永远是 0%)
+          image: busybox:1.36
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              mkdir -p /www/cgi-bin
+              printf '#!/bin/sh\ni=0; while [ $$i -lt 300000 ]; do i=$$((i+1)); done\necho busy-done\n' > /www/cgi-bin/spin
+              chmod +x /www/cgi-bin/spin
+              echo ok > /www/index.html
+              exec httpd -f -p 8080 -h /www
+          ports:
+            - containerPort: 8080
+          resources:
+            requests:             # ★ HPA 百分比计算的分母, 必须显式设置
+              cpu: 100m           # 0.1 核; 利用率 50% 即实际用量 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 128Mi
+---
+# ----------------------------- 2. HPA (autoscaling/v2) -----------------------------
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: cpu-stress-app-hpa
+spec:
+  scaleTargetRef:                 # 扩缩容目标 (也可指向 StatefulSet)
+    apiVersion: apps/v1
+    kind: Deployment
+    name: cpu-stress-app
+  minReplicas: 1                  # 副本数下限 (缩容不会低于 1)
+  maxReplicas: 10                 # 副本数上限 (扩容不会超过 10)
+  metrics:                        # 多条指标取"需要的最大副本数" (最大值优先)
+    - type: Resource              # 资源指标: 由 metrics-server 提供
+      resource:
+        name: cpu
+        target:
+          type: Utilization       # 利用率百分比 = 用量 / requests
+          averageUtilization: 50  # 目标: 平均 CPU 利用率 50%
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 60  # 内存目标 60% (内存不易释放, 通常设高些)
+    # 其他指标类型:
+    #   Pods    —— 自定义每 Pod 指标, 如 QPS (需 Prometheus Adapter)
+    #   Object  —— 外部对象指标, 如 Ingress 的 requests-per-second
+    #   External —— 集群外部指标, 如消息队列堆积长度
+  behavior:                       # v2 新增: 精细控制扩缩容行为 (抖动抑制)
+    scaleUp:                      # 扩容要快, 尽快消化流量峰值
+      stabilizationWindowSeconds: 0   # 扩容不做稳定等待, 立即执行
+      selectPolicy: Max           # 多个策略并存时取扩得最多的
+      policies:
+        - type: Percent
+          value: 100              # 每 15 秒最多翻倍 (100% 增长)
+          periodSeconds: 15
+        - type: Pods
+          value: 4                # 或每 15 秒最多加 4 个 Pod
+          periodSeconds: 15
+    scaleDown:                    # 缩容要慢, 防止流量回升导致反复抖动
+      stabilizationWindowSeconds: 300   # ★ 稳定窗口: 需连续 5 分钟低负载才缩
+      selectPolicy: Min           # 多个策略并存时取缩得最少的 (保守)
+      policies:
+        - type: Percent
+          value: 25               # 每 15 秒最多缩 25%
+          periodSeconds: 15

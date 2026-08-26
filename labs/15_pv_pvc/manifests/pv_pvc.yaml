@@ -1,0 +1,115 @@
+# =============================================================================
+# PV / PVC 静态存储演示
+# 覆盖: PersistentVolume(集群资源) -> PersistentVolumeClaim(用户请求) -> Pod 挂载
+# 关系: 管理员创建 PV(供给存储), 用户创建 PVC(申请存储), 控制器负责二者绑定
+# 注意: kind 集群里 hostPath 路径位于 kind 节点容器内部, 对演示完全够用
+# =============================================================================
+---
+# ============================== 1. PersistentVolume ==========================
+# PV 是集群级资源(不属于任何 namespace), 代表一块由管理员预备好的存储
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv-demo                     # PV 名称全局唯一(无 namespace)
+  labels:
+    app: pv-demo                    # 可选: 供 PVC 的 selector 精确挑选(不用也可)
+spec:
+  capacity:
+    storage: 1Gi                    # 容量声明: PVC 请求量必须 <= 该值
+  accessModes:
+    - ReadWriteOnce                 # RWO: 单节点读写(同一时刻只挂到一个 node)
+  persistentVolumeReclaimPolicy: Retain
+  # ---- 回收策略对比(删除 PVC 后 PV 何去何从) ----
+  # Retain:  PV 变为 Released, 数据保留, 需管理员手动删 PV 并清数据后才能复用(最安全)
+  # Delete:  PV 和底层存储一起被删除(动态供给默认值, 需要 CSI 插件支持)
+  # Recycle: 已废弃(旧版会 rm -rf /* 后回到 Available), 现在用动态供给替代
+  storageClassName: manual
+  # ---- 静态绑定的关键: PVC 的 storageClassName 必须与之完全一致 ----
+  # 若 PVC 留空 storageClassName, 则会匹配集群的默认 StorageClass(动态供给)
+  hostPath:
+    path: /data/pv-demo             # kind 环境下位于 kind 节点容器内的路径
+    type: DirectoryOrCreate         # 目录不存在则自动创建
+
+---
+# ============================== 2. PersistentVolumeClaim =====================
+# PVC 是 namespace 级资源, 代表用户对存储的"申请单"
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pvc-demo
+spec:
+  accessModes:
+    - ReadWriteOnce                 # 请求 RWO: 只能绑定 accessModes 为其超集的 PV
+  resources:
+    requests:
+      storage: 1Gi                  # 请求 1Gi: 只能绑定 capacity >= 1Gi 的 PV
+  storageClassName: manual
+  # ---- 静态绑定条件(三者同时满足才可能绑上) ----
+  # 1. PV capacity >= PVC 请求量
+  # 2. PV accessModes 包含 PVC 请求的模式
+  # 3. storageClassName 一致(manual <-> manual)
+  # 满足后 PV: Available -> Bound, 并记录 claimRef 指向该 PVC
+  # volumeName: pv-demo             # 可选: 强制绑定指定 PV(一般让控制器自动挑选)
+
+---
+# ============================== 3. Pod 挂载 PVC ==============================
+# Pod 不直接用 PV, 而是通过 PVC 间接引用 —— 计算与存储解耦
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pv-demo-pod
+  labels:
+    app: pv-demo
+spec:
+  containers:
+    - name: busybox
+      image: busybox:1.36           # kind 节点已预载, 无需拉取
+      command: ["/bin/sh", "-c"]
+      args:
+        - |
+          echo "pod started at $(date)"
+          while true; do
+            # 每秒向持久卷追加一行时间戳, 用于验证"Pod 删除重建后数据还在"
+            echo "hello at $(date)" >> /data/hello.log
+            sleep 1
+          done
+      volumeMounts:
+        - name: data                # 对应 spec.volumes 里的名字
+          mountPath: /data          # 容器内的挂载点
+  volumes:
+    - name: data
+      persistentVolumeClaim:
+        claimName: pvc-demo         # 引用 PVC, 而非直接写 PV 名
+  restartPolicy: Always
+
+---
+# ============================== 4. 带节点亲和性的第二个 PV ====================
+# hostPath/local 类型的 PV 只在特定节点上存在, 必须用 nodeAffinity
+# 告诉调度器"只能把用这个 PV 的 Pod 调度到数据所在的节点"
+# (此处为真实可 apply 的示例; 若你的集群没有对应标签, 它会一直 Pending,
+#   演示主流程用上面的 pv-demo 即可)
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv-demo-topo
+spec:
+  capacity:
+    storage: 2Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: manual
+  hostPath:
+    path: /data/pv-demo-topo
+    type: DirectoryOrCreate
+  nodeAffinity:
+    # ---- PV 拓扑约束: 限制使用该 PV 的 Pod 只能落在满足条件的节点 ----
+    # 调度器在绑定 PVC 前会过滤: Pod 资源请求 + PV 的 nodeAffinity 一起决定去哪个节点
+    # local 卷(生产常用)必须写 nodeAffinity, 否则 Pod 可能被调度到没有数据的节点
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: kubernetes.io/os
+              operator: In
+              values:
+                - linux             # kind 节点默认满足此条件, 可直接 apply 成功

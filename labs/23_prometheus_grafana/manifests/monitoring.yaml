@@ -1,0 +1,97 @@
+# =============================================================================
+# Prometheus + Grafana 监控栈 (kube-prometheus-stack 精简自建版)
+# 组成: 1) demo 应用 + PodMonitor 指标采集
+#       2) ServiceMonitor 定义(监控 Nginx/应用)
+#       3) 告警规则: 高错误率 / Pod 重启
+#       4) Grafana 数据源自动配置
+# 注: 生产推荐 helm install kube-prometheus-stack 一键装全栈;
+#     这里拆开关键对象, 展示 Operator 模式下"声明式定义监控"
+# =============================================================================
+---
+# 1. 被监控的示例应用: 暴露 /metrics (Prometheus 文本协议)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: metrics-demo
+  namespace: monitoring-demo
+spec:
+  replicas: 2
+  selector: {matchLabels: {app: metrics-demo}}
+  template:
+    metadata:
+      labels: {app: metrics-demo}
+      annotations:
+        prometheus.io/scrape: "true"          # 注解方式(给 annotation 发现型抓取器)
+        prometheus.io/port: "8080"
+    spec:
+      containers:
+        - name: app
+          image: registry.k8s.io/prometheus-dummy-exporter:v0.1.0
+          args: ["--metric-name=demo_requests_total", "--metric-value=100",
+                 "--port=8080"]
+          ports: [{containerPort: 8080, name: http}]
+---
+# 2. ServiceMonitor: Prometheus Operator 的抓取规则 CRD
+#    Operator 会把所有匹配的 SM 渲染进 Prometheus 配置并热加载
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: metrics-demo
+  namespace: monitoring-demo
+  labels:
+    release: prometheus                       # 必须匹配 operator 的 serviceMonitorSelector
+spec:
+  selector:
+    matchLabels: {app: metrics-demo}
+  endpoints:
+    - port: http                              # 对应 Service 的端口名
+      interval: 15s
+      path: /metrics
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: metrics-demo
+  namespace: monitoring-demo
+  labels: {app: metrics-demo}
+spec:
+  selector: {app: metrics-demo}
+  ports: [{name: http, port: 8080, targetPort: http}]
+---
+# 3. PrometheusRule: 告警与录制规则也是 CRD
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: metrics-demo-alerts
+  namespace: monitoring-demo
+spec:
+  groups:
+    - name: demo.rules
+      rules:
+        - alert: HighRequestLatency
+          expr: histogram_quantile(0.99, rate(http_request_duration_seconds_bucket[5m])) > 1
+          for: 5m                             # 持续5分钟才触发, 防抖动
+          labels: {severity: warning}
+          annotations:
+            summary: "P99 延迟超过 1s ({{ $labels.pod }})"
+        - record: job:http_error_rate:5m
+          expr: sum(rate(http_requests_total{status=~"5.."}[5m]))
+                / sum(rate(http_requests_total[5m]))
+---
+# 4. Grafana 数据源: 通过 label 自动被 Grafana sidecar 拾取
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasource-prometheus
+  namespace: monitoring
+  labels:
+    grafana_datasource: "1"                   # sidecar 扫描此标签
+data:
+  datasource.yaml: |
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        url: http://prometheus-kube-prometheus-prometheus:9090
+        access: proxy
+        isDefault: true

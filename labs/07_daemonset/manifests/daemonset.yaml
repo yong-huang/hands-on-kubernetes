@@ -1,0 +1,122 @@
+# =============================================================================
+# DaemonSet 示例: 每个节点恰好运行一个 Pod 的守护进程类负载
+# 文档 1: ServiceAccount 占位 (真实日志采集器如 Fluent Bit 需要 RBAC)
+# 文档 2: 日志采集 DaemonSet (hostPath 挂载节点日志目录, 容忍控制面污点)
+# 文档 3: nodeAffinity 版 DaemonSet (只调度到带 disktype=ssd 标签的节点)
+# =============================================================================
+---
+# ---------- 文档 1: ServiceAccount 占位 ----------
+# 日志/监控类 DaemonSet 通常需要自定义 ServiceAccount 并绑定 RBAC
+# (如读取节点指标、Pod 元数据). 本演示未实际使用, 仅作占位说明.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: log-collector
+  namespace: default
+---
+# ---------- 文档 2: 日志采集 DaemonSet ----------
+# 目标: 集群每个节点跑一个日志采集 Agent, 读取节点上的容器日志文件
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: log-collector
+  namespace: default
+  labels:
+    app: log-collector
+spec:
+  selector:                      # 标签选择器, 认领自己的 Pod (创建后不可改)
+    matchLabels:
+      app: log-collector
+  template:                      # Pod 模板, 改它 = 触发滚动更新
+    metadata:
+      labels:
+        app: log-collector
+    spec:
+      # --- 容忍度: 让 Pod 也能调度到 control-plane / master 节点 ---
+      # 控制面节点默认打有 node-role.kubernetes.io/control-plane:NoSchedule 污点,
+      # 日志采集这类节点级 Agent 通常需要"全覆盖", 因此显式容忍:
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane   # 精确容忍控制面污点
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master          # 兼容旧版本 master 污点
+          effect: NoSchedule
+        - operator: Exists                            # 容忍一切污点 (含 NoExecute)
+          effect: NoExecute
+      # --- nodeSelector 示例: 只调度到带指定标签的节点 ---
+      # (本演示保持注释, 让 Agent 覆盖所有节点; 需要选择性覆盖时打开)
+      # nodeSelector:
+      #   node-type: worker
+      serviceAccountName: log-collector   # 使用上面的 ServiceAccount
+      containers:
+        - name: collector
+          # 生产环境用 fluent/fluent-bit 等镜像; 这里用 busybox tail 模拟采集
+          image: busybox:1.36
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              echo "collecting logs on $(hostname) ..."
+              tail -F /var/log/messages /var/logContainers/*/*-json.log 2>/dev/null
+          resources:                # DaemonSet 每个节点都跑, 必须限制资源
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          volumeMounts:
+            - name: varlog          # 节点系统日志目录
+              mountPath: /var/log
+              readOnly: true
+            - name: dockerlog       # 容器运行时日志目录 (kubelet 写入的 *-json.log)
+              mountPath: /var/logContainers
+              readOnly: true
+      volumes:
+        - name: varlog
+          hostPath:                 # hostPath 把"节点本身"的目录挂进 Pod
+            path: /var/log          # Agent 因此能看到同节点所有容器的日志
+        - name: dockerlog
+          hostPath:
+            # 注意: 容器运行时日志目录因运行时而异!
+            #   Docker 节点:      /var/lib/docker/containers (不存在于 kind 节点)
+            #   containerd 节点:  /var/lib/containerd (kind/kubeadm 默认)
+            # 用 DirectoryOrCreate: 目录不存在时由 kubelet 创建, 避免挂载失败
+            path: /var/lib/containerd
+            type: DirectoryOrCreate
+      terminationGracePeriodSeconds: 10
+---
+# ---------- 文档 3: nodeAffinity 版 DaemonSet ----------
+# 目标: 只在带 disktype=ssd 标签的节点上运行 (如 SSD 节点才需要的本地缓存 Agent)
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: ssd-cache-agent
+  namespace: default
+  labels:
+    app: ssd-cache-agent
+spec:
+  selector:
+    matchLabels:
+      app: ssd-cache-agent
+  template:
+    metadata:
+      labels:
+        app: ssd-cache-agent
+    spec:
+      # --- nodeAffinity: 比 nodeSelector 更丰富的节点选择 (支持权重/多种匹配) ---
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:   # 硬性要求 (类似 nodeSelector)
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: disktype
+                    operator: In                            # In / NotIn / Exists / Gt / Lt
+                    values:
+                      - ssd
+      containers:
+        - name: cache-agent
+          image: busybox:1.36
+          command: ["sleep", "3600"]        # 占位进程: 真实场景为本地缓存/预热 Agent
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi

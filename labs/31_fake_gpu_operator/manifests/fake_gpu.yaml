@@ -1,0 +1,114 @@
+# =============================================================================
+# Fake GPU Operator: 在无 GPU 的机器上模拟 nvidia.com/gpu 资源
+# 原理: 真实链路是 Device Plugin DaemonSet 通过 gRPC socket 向 kubelet 上报设备;
+#       模拟版用 status-updater 直接改 Node 的 capacity/allocatable 字段,
+#       调度器视角完全一致 —— 扩展资源只认数字, 不关心来源
+# =============================================================================
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: gpu-demo
+---
+# 1. RBAC: 允许 updater 改节点状态(真实 operator 也是这么上报的)
+apiVersion: v1
+kind: ServiceAccount
+metadata: {name: fake-gpu-updater, namespace: gpu-demo}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata: {name: fake-gpu-updater}
+rules:
+  - apiGroups: [""]
+    resources: [nodes]
+    verbs: [get, list, watch, patch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata: {name: fake-gpu-updater}
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: ClusterRole,
+          name: fake-gpu-updater}
+subjects:
+  - {kind: ServiceAccount, name: fake-gpu-updater, namespace: gpu-demo}
+---
+# 2. Device Plugin 模拟器(DaemonSet): 给每个节点"插上" 8 张假 GPU
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: fake-gpu-plugin
+  namespace: gpu-demo
+spec:
+  selector: {matchLabels: {app: fake-gpu-plugin}}
+  template:
+    metadata:
+      labels: {app: fake-gpu-plugin}
+    spec:
+      serviceAccountName: fake-gpu-updater
+      tolerations: [{operator: Exists}]
+      containers:
+        - name: updater
+          image: bitnami/kubectl:1.29
+          env:
+            - name: FAKE_GPUS_PER_NODE
+              value: "8"
+            - name: NODE_NAME
+              valueFrom: {fieldRef: {fieldPath: spec.nodeName}}
+          command: ["sh", "-c",
+            "NODE=${NODE_NAME:-$(hostname)};
+             while true; do
+               kubectl patch node $NODE --subresource=status --type=json \\
+                 -p=\"[{\\\"op\\\":\\\"add\\\",\\\"path\\\":\\\"/status/capacity/nvidia.com~1gpu\\\",\\\"value\\\":\\\"${FAKE_GPUS_PER_NODE}\\\"},\"
+                    \"{\\\"op\\\":\\\"add\\\",\\\"path\\\":\\\"/status/allocatable/nvidia.com~1gpu\\\",\\\"value\\\":\\\"${FAKE_GPUS_PER_NODE}\\\"}]\" >/dev/null;
+               sleep 15;        # 定时补写, 防止被真实设备状态覆盖
+             done"]
+---
+# 3. 团队命名空间配额: 最多申请 4 张卡 (超出的任务只能 Pending)
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: team-gpu-quota
+  namespace: gpu-demo
+spec:
+  hard:
+    requests.nvidia.com/gpu: "4"     # 团队 GPU 总额度
+    limits.nvidia.com/gpu: "4"
+---
+# 4. AI 训练任务: 申请 GPU 资源 (扩展资源的 requests==limits 强制相等)
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: train-job-small
+  namespace: gpu-demo
+spec:
+  template:
+    metadata:
+      labels: {job: train-small}
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: trainer
+          image: busybox:1.36
+          command: ["sh", "-c", "echo 'training on 1 fake GPU'; sleep 30"]
+          resources:
+            requests: {nvidia.com/gpu: 1}   # 调度器按此过滤节点
+            limits:   {nvidia.com/gpu: 1}
+---
+# 5. 大任务: 要 6 张卡 -> 单节点只有 8 张但配额只剩 3 -> 卡在配额/Pending
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: train-job-big
+  namespace: gpu-demo
+spec:
+  template:
+    metadata:
+      labels: {job: train-big}
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: trainer
+          image: busybox:1.36
+          command: ["sh", "-c", "echo 'training on 6 fake GPUs'; sleep 30"]
+          resources:
+            requests: {nvidia.com/gpu: 6}
+            limits:   {nvidia.com/gpu: 6}

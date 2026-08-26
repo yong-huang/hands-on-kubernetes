@@ -1,0 +1,115 @@
+# =============================================================================
+# Kubernetes Job & CronJob 学习示例
+# Job: 跑完即退的一次性批处理任务 (如计算、数据转换、备份)
+# CronJob: 按 cron 表达式周期性创建 Job (如每小时备份、每天报表)
+# 与 Deployment 的本质区别: Job 追求"成功结束", Deployment 追求"永不结束"
+# =============================================================================
+
+# ----------------------------- 示例 1: 一次性 Job -----------------------------
+# 计算 pi 到 2000 位: 容器执行完 perl 命令正常退出 (exit 0), Job 即完成
+apiVersion: batch/v1            # Job/CronJob 属于 batch 组, v1 稳定版
+kind: Job                       # 资源类型: Job
+metadata:
+  name: pi                      # Job 名称
+  labels:
+    app: pi                     # 给 Job 自身打标签, 便于筛选
+spec:
+  completions: 1                # 需要"成功完成"的 Pod 总数: 1 个
+                                # (completions=N 会串行/并行跑 N 个 Pod)
+  parallelism: 1                # 同一时刻最多并行的 Pod 数: 1 个
+                                # parallelism < completions 时任务分批跑
+  backoffLimit: 4               # 失败重试上限: 累计 4 个 Pod 失败后 Job 标记 Failed
+                                # 重试间隔指数退避 (10s, 20s, 40s ...)
+  activeDeadlineSeconds: 60     # Job 整体最长运行 60 秒, 超时强制终止并标记 Failed
+                                # 优先级高于 backoffLimit (还没重试完就可能被截断)
+  template:                     # Pod 模板: Job 按此模板创建 Pod
+    metadata:
+      labels:
+        app: pi                 # Pod 标签
+    spec:
+      restartPolicy: Never      # 容器失败时"不重启", 由 Job 新建 Pod 重试
+                                # Job 的 restartPolicy 只能是 Never 或 OnFailure
+      containers:
+        - name: pi              # 容器名
+          image: perl:5.34      # perl 镜像, 体积小且自带 bignum 计算
+          command: ["perl", "-Mbignum=bpi", "-wle", "print bpi(2000)"]
+                                # 打印 pi 到 2000 位后退出, exit code = 0
+---
+# ----------------------------- 示例 2: 工作队列 Job ---------------------------
+# 多任务并行模式: completions=6 共 6 个任务, parallelism=2 每批最多 2 个并行
+# 典型场景: 消息队列里堆积了 6 条待处理消息, 两个 worker 同时消费
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: work-queue              # 批处理 Job 名称
+  labels:
+    app: work-queue
+spec:
+  completions: 6                # 共需 6 个 Pod 成功跑完 (6 个"槽位")
+  parallelism: 2                # 同时最多 2 个 Pod 在跑, 共分约 3 批
+                                # 想加速: kubectl scale job 临时调大 (仅限扩)
+  backoffLimit: 6               # 允许累计 6 次失败重试 (每批 1 次)
+  template:
+    metadata:
+      labels:
+        app: work-queue
+    spec:
+      restartPolicy: OnFailure  # 容器失败时"在原 Pod 内重启容器"重试
+                                # 与 Never 的区别: OnFailure 复用 Pod, 重启计数
+                                # 记在容器上; Never 则整个 Pod 标记 Failed 换新 Pod
+      containers:
+        - name: worker
+          image: busybox:1.36   # 轻量镜像, 模拟一个工作任务单元
+          command: ["/bin/sh", "-c"]
+          args:
+            - |-
+                echo "processing item ${HOSTNAME}"   # 打印任务标识 (Pod 名)
+                sleep 20                              # 模拟 20 秒的处理耗时
+---
+# ----------------------------- 示例 3: CronJob 定时备份 -----------------------
+# 模拟每小时整点的数据库备份: 真实环境把 mysqldump 换成实际命令/脚本
+apiVersion: batch/v1            # CronJob 同样属于 batch/v1
+kind: CronJob                   # 资源类型: CronJob
+metadata:
+  name: db-backup               # CronJob 名称
+  labels:
+    app: db-backup
+spec:
+  schedule: "0 * * * *"         # cron 表达式: 分 时 日 月 周 -> 每小时整点触发
+                                # 注意: 分钟和小时用的是控制器所在时区 (通常 UTC)
+  concurrencyPolicy: Forbid     # 上一次 Job 还没跑完时新调度怎么办:
+                                #   Allow (默认): 允许并发, 新旧 Job 同时跑
+                                #   Forbid: 跳过本次调度 (任务可能耗时>周期时用)
+                                #   Replace: 杀掉正在跑的旧 Job, 换新 Job 上
+  startingDeadlineSeconds: 300  # 错过调度点后 300 秒内仍可补启动, 超期则跳过
+                                # 例如控制器挂了 10 分钟, 错过的那次不会再补
+  successfulJobsHistoryLimit: 3 # 保留最近 3 个成功 Job 的记录 (供查日志), 其余删除
+  failedJobsHistoryLimit: 1     # 保留最近 1 个失败 Job 的记录, 便于排查
+  suspend: false                # true = 暂停所有后续调度 (停止 CronJob 的开关)
+  jobTemplate:                  # Job 模板: 每次调度时按它创建一个 Job
+    spec:
+      backoffLimit: 2           # 单次备份最多重试 2 次
+      activeDeadlineSeconds: 300  # 单次备份最长 5 分钟, 防止 mysqldump 挂死
+      template:                 # 即 Job.spec.template, 结构与普通 Job 相同
+        metadata:
+          labels:
+            app: db-backup
+        spec:
+          restartPolicy: OnFailure  # 备份脚本失败: 原地重启容器重试
+                                   # (备份是幂等的, 重跑一次无害)
+          containers:
+            - name: backup
+              image: mysql:8.0       # 官方 mysql 镜像自带 mysqldump 客户端
+              command: ["/bin/sh", "-c"]
+              args:
+                - |-
+                    echo "backup placeholder: mysqldump -h \$DB_HOST -u \$DB_USER"
+                    # 真实环境替换为下面这行 (凭据建议走 Secret 注入):
+                    #   mysqldump -h"$DB_HOST" -u"$DB_USER" -p"$DB_PASS" \
+                    #     --all-databases | gzip > /backup/db-$(date +%F-%H).sql.gz
+                    sleep 10   # 模拟备份耗时, 让演示时能看到 Running 状态
+              env:
+                - name: DB_HOST       # 备份数据库地址 (演示用占位值)
+                  value: "mysql.default.svc"
+                - name: DB_USER       # 备份账号
+                  value: "backup_user"

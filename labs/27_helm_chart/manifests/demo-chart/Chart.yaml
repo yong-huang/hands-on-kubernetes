@@ -1,0 +1,6 @@
+apiVersion: v2
+name: demo-chart
+description: 一个微服务应用的标准 Helm Chart (Deployment+Service+ConfigMap+Ingress)
+type: application
+version: 0.1.0          # Chart 版本(模板包本身)
+appVersion: "1.16.0"    # 应用版本(打进镜像 tag, 与 chart 版本解耦)

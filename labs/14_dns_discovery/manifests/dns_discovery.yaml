@@ -1,0 +1,106 @@
+# =============================================================================
+# Kubernetes DNS 与服务发现演示
+# 核心知识点:
+#   1. 普通 ClusterIP Service: DNS 返回一个虚拟 IP (VIP)
+#   2. Headless Service (clusterIP: None): DNS 返回所有就绪 Pod 的真实 IP
+#   3. Pod 级 DNS: 需要 hostname + subdomain 字段 (StatefulSet 自动生成)
+#   4. dnsPolicy / dnsConfig: 自定义 Pod 的 DNS 解析行为
+#
+# FQDN 结构: <service>.<namespace>.svc.cluster.local
+#   例如本文件中的 web-h 服务: web-h.default.svc.cluster.local
+# =============================================================================
+---
+# ----------------------------- 1. Headless Service -----------------------------
+# clusterIP: None 表示不分配 VIP, DNS 查询该服务名时直接返回后端 Pod IP 列表.
+# 配合 StatefulSet 使用时, 每个 Pod 还会获得额外的稳定域名:
+#   <pod-name>.<service-name>.<ns>.svc.cluster.local
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-h                    # FQDN: web-h.default.svc.cluster.local
+  labels:
+    app: web
+spec:
+  clusterIP: None                # Headless 的关键: 不需要 VIP, 也省掉 kube-proxy 转发规则
+  selector:
+    app: web                     # 选中下面 StatefulSet 的两个 Pod
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+---
+# ----------------------------- 2. StatefulSet -----------------------------
+# StatefulSet 的 Pod 名是有序且稳定的 (web-0, web-1), 重建后名字不变.
+# serviceName 指向 Headless Service 后, 每个 Pod 会得到 Pod 级 DNS 记录:
+#   web-0.web-h.default.svc.cluster.local -> web-0 的 Pod IP
+#   web-1.web-h.default.svc.cluster.local -> web-1 的 Pod IP
+# 注意: StatefulSet 会自动为 Pod 设置 hostname=<pod-name>, subdomain=<serviceName>,
+# 这正是生成 Pod DNS 记录的两个必要条件 (普通 Pod 必须手动声明, 见下方 demo).
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: web
+spec:
+  serviceName: web-h             # 关联 Headless Service, 是 Pod DNS 记录的域名后缀
+  replicas: 2                    # web-0 与 web-1, 依次有序创建
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      containers:
+        - name: busybox
+          image: busybox:1.36    # kind 节点上已预载, 无需拉取
+          command: ["sh", "-c", "hostname && sleep 3600"]
+          # hostname 会输出 web-0 / web-1, 体现稳定网络标识
+---
+# ----------------------------- 3. 普通 ClusterIP Service (对照组) -----------------------------
+# 与 web-h 选择同一批 Pod, 但分配 VIP: nslookup web 只返回一个 ClusterIP,
+# 而 nslookup web-h 返回全部 Pod IP —— 这是 Headless 与普通 Service 的本质区别.
+apiVersion: v1
+kind: Service
+metadata:
+  name: web                      # FQDN: web.default.svc.cluster.local
+  labels:
+    app: web
+spec:
+  selector:
+    app: web                     # 与 Headless Service 选中同一批 Pod
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+---
+# ----------------------------- 4. 自定义 dnsPolicy / dnsConfig (进阶演示) -----------------------------
+# 普通 Pod 想要自己的 DNS 记录, 必须同时设置:
+#   hostname: 自定义主机名     subdomain: 对应一个 Headless Service 名
+# 两者缺一不可, 否则 <hostname>.<subdomain>.<ns>.svc.cluster.local 不会生成.
+#
+# dnsConfig 可以覆盖/追加 resolv.conf 内容:
+#   nameservers  : 额外的 DNS 服务器 (与 dnsPolicy: None 配合时完全替换)
+#   searches     : 追加的搜索域, 解析短名时会逐个拼接尝试
+#   options      : 如 ndots:2, 降低外部域名多次查询的代价 (默认 ndots:5)
+apiVersion: v1
+kind: Pod
+metadata:
+  name: dns-custom               # stable host: myhost.web-h.default.svc.cluster.local
+spec:
+  hostname: myhost               # 条件 1: 自定义主机名
+  subdomain: web-h               # 条件 2: subdomain 必须是已存在的 Headless Service
+  dnsPolicy: ClusterFirst        # 集群内 DNS 优先 (默认值, 此处显式写出便于对照)
+  dnsConfig:                     # 在 ClusterFirst 基础上追加以下配置
+    nameservers:
+      - 8.8.8.8                  # 追加外部 DNS, 集群内查不到时兜底
+    searches:
+      - default.svc.cluster.local  # 追加搜索域
+    options:
+      - name: ndots
+        value: "2"               # 域名中点数 >= 2 就不再拼接搜索域, 减少无效查询
+  containers:
+    - name: busybox
+      image: busybox:1.36
+      command: ["sh", "-c", "cat /etc/resolv.conf && sleep 3600"]
+      # 打印 resolv.conf 可直观看到 dnsConfig 注入的结果

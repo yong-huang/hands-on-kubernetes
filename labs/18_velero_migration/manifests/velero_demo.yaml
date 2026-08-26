@@ -1,0 +1,92 @@
+# =============================================================================
+# Velero 有状态应用迁移演示: StatefulSet + 动态 PVC (volumeClaimTemplates)
+#
+# Velero 备份什么?
+#   1. K8s 对象 (API 层): Deployment/StatefulSet/Service/ConfigMap/PVC 定义...
+#      由 velero controller 直接 watch/导出, 不依赖存储类型
+#   2. PV 数据 (存储层): 两条路线
+#      a) 文件系统备份 (node agent, restic/kopia): 每个 node 上跑一个 DaemonSet,
+#         把 PVC 挂载路径下的文件打包上传 -- 通用性最好, kind/自建集群首选
+#      b) CSI 快照 (VolumeSnapshot): 调用存储驱动做块级快照 -- 依赖 CSI 支持,
+#         速度最快但通常只在同一存储系统内可用, 不适合跨集群迁移
+#
+# 恢复语义:
+#   - restore 时按原 YAML 重建对象; PVC 若已被动态供给删除, 会重新创建并回填数据
+#   - --namespace-mappings old:new 可把备份恢复到"新名字"的 namespace,
+#     这正是"迁移到新集群/新环境"的最常用姿势
+#   - --exclude-resources / label selector 可精细控制恢复范围
+# =============================================================================
+---
+# 演示用的 namespace (备份/恢复的最小单位)
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: velero-demo
+  labels:
+    app: velero-demo
+---
+# Headless Service: StatefulSet 的稳定网络身份 (web-0.web.velero-demo...)
+# Velero 会把 Service 对象一并备份, 恢复到新 namespace 时名字自动改写
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+  namespace: velero-demo
+  labels:
+    app: web
+spec:
+  clusterIP: None          # headless: DNS 直接解析到各 Pod IP
+  selector:
+    app: web
+  ports:
+    - name: http
+      port: 80
+---
+# StatefulSet: 2 副本, 每个副本一份独立 PVC (data-web-0 / data-web-1)
+# busybox 持续往 PVC 里追加带时间戳的日志 -- 备份/恢复后比对文件内容
+# 即可证明"数据真的被搬走了"
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: web
+  namespace: velero-demo
+spec:
+  serviceName: web          # 必须指向上面的 headless service
+  replicas: 2
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+        # 这个注解让 Velero node agent 明确备份该 Pod 的所有 PVC
+        # (install 时若带 --default-volumes-to-filesystem-backup 可省略)
+        backup.velero.io/backup-volumes: "data"
+    spec:
+      containers:
+        - name: web
+          image: busybox:1.36
+          command: ["sh", "-c"]
+          args:
+            - |
+              # 每 5 秒追加一行时间戳, 模拟有状态应用持续写数据
+              i=0
+              while true; do
+                echo "$(hostname) tick=$i $(date +%s)" >> /data/app.log
+                i=$((i+1))
+                sleep 5
+              done
+          volumeMounts:
+            - name: data      # 对应 volumeClaimTemplates 里的模板
+              mountPath: /data
+  # 核心字段: 每个 Pod 副本自动生成一个 PVC
+  # 副本重建仍绑定回自己的 PVC => 稳定存储身份
+  volumeClaimTemplates:
+    - metadata:
+        name: data           # 生成的 PVC 名: data-web-0, data-web-1
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 128Mi   # kind 默认 StorageClass(local-path)动态供给

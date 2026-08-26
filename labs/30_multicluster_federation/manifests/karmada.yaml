@@ -1,0 +1,91 @@
+# =============================================================================
+# Karmada 多集群联邦: 一份资源声明, 分发到多个成员集群
+# 核心对象: Cluster(成员注册) / PropagationPolicy(分发策略) / OverridePolicy
+#           (差异覆盖) / ResourceBinding(调度结果)
+# =============================================================================
+---
+# 1. 声明要分发的应用 (就是普通的 Deployment —— Karmada 不改写工作负载定义)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: geo-app
+  namespace: federation-demo
+spec:
+  replicas: 6                       # 总副本数, 由策略拆到各集群
+  selector: {matchLabels: {app: geo-app}}
+  template:
+    metadata:
+      labels: {app: geo-app}
+    spec:
+      containers:
+        - name: web
+          image: nginx:1.25
+          ports: [{containerPort: 80}]
+---
+# 2. PropagationPolicy: 谁来跑、跑多少份
+apiVersion: policy.karmada.io/v1alpha1
+kind: PropagationPolicy
+metadata:
+  name: geo-app-propagation
+  namespace: federation-demo
+spec:
+  resourceSelectors:                # 选中哪些资源参与分发
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: geo-app
+  placement:
+    clusterAffinity:                # 静态指定目标集群
+      clusterNames: [member-us, member-ap]
+    replicaScheduling:              # 副本拆分策略
+      replicaSchedulingType: Divided        # 拆分而非每个集群全量复制
+      replicaDivisionPreference: Weighted    # 加权分配
+      weightPreference:
+        staticWeightList:
+          - targetCluster: {clusterNames: [member-us]}
+            weight: 4               # 6 副本 -> us 拿 4 个
+          - targetCluster: {clusterNames: [member-ap]}
+            weight: 2               #        ap 拿 2 个
+---
+# 3. OverridePolicy: 同一份声明, 各集群差异化(镜像源/副本/环境变量)
+apiVersion: policy.karmada.io/v1alpha1
+kind: OverridePolicy
+metadata:
+  name: geo-app-override
+  namespace: federation-demo
+spec:
+  resourceSelectors:
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: geo-app
+  overrideRules:
+    - targetCluster:
+        clusterNames: [member-ap]   # 亚太集群用就近镜像源
+    overriders:
+      imageOverrider:
+        - component: Registry
+          operator: replace
+          value: registry.ap.example.com
+    - targetCluster:
+        clusterNames: [member-us]
+    overriders:
+      imageOverrider:
+        - component: Tag
+          operator: replace
+          value: "1.25-us"          # 美区打专属 tag
+---
+# 4. 故障转移: 集群失联时自动迁移到候选集群
+apiVersion: policy.karmada.io/v1alpha1
+kind: PropagationPolicy
+metadata:
+  name: geo-app-failover
+  namespace: federation-demo
+spec:
+  resourceSelectors:
+    - {apiVersion: apps/v1, kind: Deployment, name: geo-app}
+  placement:
+    clusterAffinity:
+      clusterNames: [member-us, member-ap]
+    clusterTolerations:             # 成员集群不可达的容忍阈值
+      - key: cluster.karmada.io/not-ready
+        operator: Exists
+        tolerationSeconds: 60       # 失联 60s 后把它的份额迁去别家

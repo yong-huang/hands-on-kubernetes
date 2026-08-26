@@ -1,0 +1,151 @@
+# =============================================================================
+# Kubernetes RBAC (基于角色的访问控制) 演示清单
+# 四件套: Subject(SA/User/Group) + Role/ClusterRole + RoleBinding/ClusterRoleBinding
+# 核心思想: 最小权限原则 (least privilege) —— 没有显式授权 = 一律拒绝 (default-deny)
+# =============================================================================
+---
+# ----------------------------- Namespace -----------------------------
+# 所有 namespaced 演示资源都放在这里, 方便一键清理
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: rbac-demo
+---
+# ----------------------------- 身份 1: dev-viewer -----------------------------
+# ServiceAccount 是"进程身份": 给 CI Runner / Pod 内应用调用 K8s API 用的
+# (对比: User/Group 是"人的身份", 由外部认证体系提供, 无法通过 kubectl 创建)
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: dev-viewer          # 只读观察者: 能看 pods/log/services/deployments
+  namespace: rbac-demo
+---
+# Role 是 namespace 级的权限集合: 只在 rbac-demo 内生效, 出了这个 ns 就没有权限
+# 注意 apiGroups: "" 表示核心 API 组 (pods/services),
+# "apps" 组才有 deployments —— 这是新手最常见的漏配点
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: pod-reader
+  namespace: rbac-demo
+rules:
+  - apiGroups: [""]                 # 核心 API 组 (v1)
+    resources: ["pods"]             # pods 本体
+    verbs: ["get", "list", "watch"] # 只读三件套, 没有 create/delete/update
+  - apiGroups: [""]
+    resources: ["pods/log"]         # 子资源(subresource): pods 的日志接口
+    verbs: ["get"]                  # kubectl logs 走的就是 GET /pods/{name}/log
+  - apiGroups: [""]
+    resources: ["services"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]             # apps 组: deployments/replicasets/statefulsets
+    resources: ["deployments"]
+    verbs: ["get", "list", "watch"]
+---
+# RoleBinding 把"身份"和"权限"接起来: 没有Binding的Role等于没写
+# subjects 支持三种 kind: ServiceAccount / User / Group
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: dev-viewer-read-pods
+  namespace: rbac-demo             # Binding 的 ns 决定了 Role 的生效范围
+subjects:
+  - kind: ServiceAccount
+    name: dev-viewer
+    namespace: rbac-demo           # SA 是 namespaced 资源, 必须写对 namespace
+roleRef:                           # roleRef 创建后不可修改(immutable), 要换只能删了重建
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role                       # 也可写 ClusterRole: 实现跨 ns 复用规则但限本 ns 生效
+  name: pod-reader
+---
+# ----------------------------- 身份 2: deployer -----------------------------
+# 第二个身份演示"权限分离": dev-viewer 只读, deployer 能改 deployments
+# 两者权限互不重叠 —— 这就是 RBAC 做隔离的方式
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: deployer                # 部署者: 能创建/更新 deployments
+  namespace: rbac-demo
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: app-deployer
+  namespace: rbac-demo
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["create", "update", "patch", "get", "list"]   # 能改, 但不能删(delete)
+  # 注意: deployer 没有 pods 权限 —— Deployment 创建的 Pod 由系统(serviceaccount default
+  # 之类的控制器身份)完成, deployer 自己 get pods 会 Forbidden
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: deployer-deploy-apps
+  namespace: rbac-demo
+subjects:
+  - kind: ServiceAccount
+    name: deployer
+    namespace: rbac-demo
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: app-deployer
+---
+# ----------------------------- 演示用工作负载 -----------------------------
+# 一个简单 Deployment, 供 dev-viewer 观察 / 拉日志
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: demo-app
+  namespace: rbac-demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: demo-app
+  template:
+    metadata:
+      labels:
+        app: demo-app
+    spec:
+      containers:
+        - name: busybox
+          image: busybox:1.36
+          # 每 2 秒打一行日志, 模拟真实服务, 供 kubectl logs 验证 pods/log 权限
+          command: ["sh", "-c", "while true; do echo \"$(date) hello from demo-app\"; sleep 2; done"]
+---
+# ----------------------------- 复用内置 ClusterRole (示例, 默认注释) -----------------------------
+# K8s 自带了 view/edit/admin 等 ClusterRole, 可以直接绑定而不用自己写规则:
+#
+# apiVersion: rbac.authorization.k8s.io/v1
+# kind: ClusterRoleBinding        # 集群级 Binding: 权限生效于所有 namespace!
+# metadata:
+#   name: dev-viewer-view-clusterwide
+# subjects:
+#   - kind: ServiceAccount
+#     name: dev-viewer
+#     namespace: rbac-demo
+# roleRef:
+#   apiGroup: rbac.authorization.k8s.io
+#   kind: ClusterRole
+#   name: view                    # 内置只读角色 (可以 get/list 几乎所有资源, 但不含 secrets)
+#
+# ⚠️ 警告: ClusterRoleBinding 是集群范围的授权, dev-viewer 将能读所有 ns 的资源。
+# 更安全的做法是用 RoleBinding 引用 ClusterRole:
+#   (ns 级 Binding + 集群级 Role) => 规则复用, 但只在 Binding 所在 ns 生效:
+#
+# apiVersion: rbac.authorization.k8s.io/v1
+# kind: RoleBinding
+# metadata:
+#   name: dev-viewer-built-in-view
+#   namespace: rbac-demo
+# subjects:
+#   - kind: ServiceAccount
+#     name: dev-viewer
+#     namespace: rbac-demo
+# roleRef:
+#   apiGroup: rbac.authorization.k8s.io
+#   kind: ClusterRole              # 引用 ClusterRole
+#   name: view                     # 但生效范围仅限 rbac-demo —— 推荐姿势

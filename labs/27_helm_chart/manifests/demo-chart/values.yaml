@@ -1,0 +1,36 @@
+# ============================ 全局默认值 ============================
+replicaCount: 2
+
+image:
+  repository: nginx
+  tag: ""                # 空则回退到 .Chart.AppVersion —— 模板里 default 的用法
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 80
+
+config:
+  appMode: production
+  logLevel: info
+  features:              # range 遍历演示 -> 渲染成 KEY=VALUE 列表
+    FEATURE_A: "on"
+    FEATURE_B: "off"
+
+ingress:
+  enabled: true          # 条件渲染演示
+  className: nginx
+  host: demo.example.com
+  path: /
+
+resources:
+  requests: {cpu: 100m, memory: 128Mi}
+  limits: {memory: 256Mi}
+
+probes:
+  livenessPath: /
+  readinessPath: /
+
+# 子 chart 演示位 (Chart.yaml 里 dependencies 声明后可覆盖子值)
+# redis:
+#   architecture: standalone

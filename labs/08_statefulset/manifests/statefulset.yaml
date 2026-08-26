@@ -1,0 +1,130 @@
+# =============================================================================
+# Kubernetes StatefulSet 学习示例
+# 核心三保证: 稳定网络标识 / 独立持久存储 / 有序部署与删除
+# 场景: 模拟 MySQL 主从集群 (web-0 为主库, web-1/2 通过 initContainer 从上一成员同步)
+# =============================================================================
+
+# ----------------------------- 1. Headless Service ---------------------------
+# StatefulSet 必须配一个 Headless Service (clusterIP: None):
+#   - 普通 Service: 通过 ClusterIP + kube-proxy 做负载均衡, 请求随机落到某个 Pod
+#   - Headless Service: 没有 ClusterIP, DNS 直接解析出每个 Pod 的独立 A 记录
+#     => 每个 Pod 拥有稳定的域名: <pod-name>.<svc-name>.<ns>.svc.cluster.local
+#   - 正是这种"按 Pod 名寻址"的能力, 让主从复制/选主成为可能
+#     (客户端要连"主库 web-0", 而不是"随便一个实例")
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql-h              # Headless Service 名称, 会出现在每个 Pod 的域名里
+  labels:
+    app: mysql
+spec:
+  clusterIP: None            # 关键字段: None = Headless, 不分配虚拟 IP
+  ports:
+    - port: 3306             # MySQL 端口 (演示用, 容器只是占位)
+      name: mysql
+  selector:
+    app: mysql               # 场景: StatefulSet 的 Pod 必须带这个标签
+---
+# ----------------------------- 2. StatefulSet --------------------------------
+apiVersion: apps/v1          # StatefulSet 与 Deployment 同属 apps/v1
+kind: StatefulSet
+metadata:
+  name: web                  # Pod 名 = <StatefulSet名>-<序号>: web-0 / web-1 / web-2
+                             # 对比 Deployment: Pod 名带随机后缀 (web-7d9f6b8-x2k9p),
+                             # 重建后名字变化 => 无稳定身份
+  labels:
+    app: mysql
+spec:
+  serviceName: mysql-h       # 声明关联的 Headless Service (注意: 本例演示用, 名叫 mysql-h)
+                             # kube-controller 依赖它为每个 Pod 注册 DNS 记录
+  replicas: 3                # 期望副本数, 会按序号 0,1,2 依次创建
+  podManagementPolicy: OrderedReady   # Pod 管理策略 (默认值):
+                             #   OrderedReady: 严格串行 —— web-0 Ready 之前不创建 web-1,
+                             #     适合主从场景 (从库启动前主库必须就绪)
+                             #   Parallel: 并行创建/删除, 忽略序号依赖, 启动更快
+                             #     适合副本间无依赖的场景 (如分布式缓存预热)
+                             # 注意: 该字段只影响"创建/删除", 不影响滚动更新顺序
+  updateStrategy:            # 滚动更新策略 (从序号最大的开始, 与 Deployment 相反)
+    type: RollingUpdate
+    rollingUpdate:
+      partition: 0           # 分区序号: 只更新序号 >= partition 的 Pod
+                             #   partition=0   => 全部更新 (常态)
+                             #   partition=2   => 金丝雀发布, 只更新 web-2, 验证后再降为 0
+  selector:                  # 标签选择器, 认领自己的 Pod (创建后不可改, 同 Deployment)
+    matchLabels:
+      app: mysql
+  template:                  # Pod 模板 (与 Deployment 相同的结构)
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      initContainers:        # initContainer: 在主容器启动前完成"数据克隆"
+                             # 模拟 MySQL 从库冷启动: web-N 从上一成员 web-(N-1) 同步
+        - name: clone-data
+          image: busybox:1.36
+          command:           # 序号 N > 0 的 Pod 从上一个成员拷贝数据; web-0 跳过 (它是主库)
+            - sh
+            - -c
+            - |
+              ORDINAL=${HOSTNAME##*-}          # 从 Pod 名 web-N 提取序号 N
+              if [ "${ORDINAL}" = "0" ]; then
+                echo "[init] I am web-0 (primary), skip clone"
+                exit 0
+              fi
+              PREV=web-$((ORDINAL-1)).mysql-h.$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace).svc.cluster.local
+              echo "[init] cloning data from ${PREV} (simulated)"
+              # 真实场景: xtrabackup / rsync 从上一成员拉取全量数据
+              mkdir -p /var/lib/mysql
+              cp -a /var/lib/mysql-previous/. /var/lib/mysql/ 2>/dev/null || true
+          volumeMounts:
+            - name: data               # 挂载自己的 PVC (见底部 volumeClaimTemplates)
+              mountPath: /var/lib/mysql
+              subPath: mysql           # ★ datadir 用子目录, 与 prev/ 隔离,
+                                       #   否则 MySQL 检测到目录非空会拒绝初始化
+            - name: data
+              mountPath: /var/lib/mysql-previous
+              subPath: prev            # (演示占位: 实际由 sidecar/NFS 提供上一成员数据)
+      containers:
+        - name: mysql                   # MySQL 容器占位 (演示 DNS/存储语义, 非真实主从)
+          image: mysql:8.0
+          ports:
+            - containerPort: 3306
+              name: mysql
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              value: "root-password-demo"     # 仅演示; 生产应使用 Secret 注入
+            - name: POD_NAME
+              valueFrom:                     # 通过 fieldRef 拿到自己的稳定 Pod 名
+                fieldRef:
+                  fieldPath: metadata.name   # web-0 / web-1 / web-2 (身份标识)
+            - name: MYSQL_MASTER_HOST       # "上一个成员"的稳定域名:
+              value: "mysql-h"              # 指向 Headless Service,
+                                            # 通过 DNS 按名寻址 web-(N-1).mysql-h
+          volumeMounts:
+            - name: data                   # 每个 Pod 独占自己的 PVC
+              mountPath: /var/lib/mysql    # 数据目录: web-0 用 data-web-0, 互不干扰
+              subPath: mysql               # ★ 与 initContainer 保持一致
+          readinessProbe:                  # 就绪探针: OrderedReady 靠它决定是否启动下一个
+            exec:
+              command: ["sh", "-c", "echo ok"]
+            initialDelaySeconds: 5
+            periodSeconds: 3
+  # ------------------------- volumeClaimTemplates 深入 -----------------------
+  # 这是 StatefulSet 与 Deployment 最大的差异之一:
+  #   - Deployment: 只能在 template 里引用同一个 PVC => 所有副本共享存储 (或手工建 N 个)
+  #   - StatefulSet: 声明"模板", 控制器为每个 Pod 生成专属 PVC:
+  #       PVC 名 = <模板名>-<Pod名>  =>  data-web-0 / data-web-1 / data-web-2
+  #     Pod 重建后 (哪怕调度到别的节点) 仍通过同名 PVC 重新绑回原来的 PV
+  #     => 数据不丢, 这就是"稳定持久化标识"
+  #   - PVC 生命周期: 删除 Pod / 缩容 / 删除 StatefulSet 都【不会】删除 PVC,
+  #     必须手工 kubectl delete pvc —— 防止误操作丢数据 (也意味着要自己清理)
+  #   - 缩容再扩容: web-2 删掉后 data-web-2 仍在, 新建的 web-2 会复用旧数据
+  volumeClaimTemplates:
+    - metadata:
+        name: data                     # 模板名, 会拼进 PVC 名: data-web-<N>
+      spec:
+        accessModes: ["ReadWriteOnce"] # RWO: 只能被单节点以读写方式挂载
+                                      # (每 Pod 独占一块盘, 天然要求 RWO)
+        resources:
+          requests:
+            storage: 1Gi               # 每个 Pod 独享 1Gi (本地 path/provisioner 演示够用)

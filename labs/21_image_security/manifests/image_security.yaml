@@ -1,0 +1,111 @@
+# =============================================================================
+# 镜像安全与漏洞扫描演示清单
+# 组成: 1) demo 应用 (故意用老镜像, 供 Trivy 扫出漏洞)
+#       2) VulnerabilityReport 示例 (Trivy Operator 扫描产物 CRD, 节选结构)
+#       3) Kyverno 准入策略: 阻止高危漏洞 / 未签名镜像进入集群
+# =============================================================================
+---
+# 1. 演示命名空间 + 故意带漏洞的旧版应用
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: imgsec-demo
+  labels:
+    pod-security.kubernetes.io/enforce: baseline
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vulnerable-app
+  namespace: imgsec-demo
+  labels: {app: vulnerable-app}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: vulnerable-app}}
+  template:
+    metadata:
+      labels: {app: vulnerable-app}
+    spec:
+      containers:
+        - name: app
+          image: nginx:1.14.2            # 老版本, 已知含多个 CVE
+          ports: [{containerPort: 80}]
+          resources:
+            requests: {cpu: 50m, memory: 64Mi}
+            limits: {memory: 128Mi}
+---
+# 2. Trivy Operator 扫描产物示例: VulnerabilityReport (节选字段)
+#    真实报告由 trivy-operator 自动生成, 这里手工展示其数据结构
+apiVersion: aquasecurity.github.io/v1alpha1
+kind: VulnerabilityReport
+metadata:
+  name: deployment-vulnerable-app-nginx
+  namespace: imgsec-demo
+  labels:
+    resource-spec-vendor: trivy-operator
+report:
+  artifact: {repository: library/nginx, tag: "1.14.2"}
+  summary:
+    criticalCount: 3
+    highCount: 11
+    mediumCount: 27
+    lowCount: 8
+    unknownCount: 0
+  vulnerabilities:
+    - vulnerabilityID: CVE-2019-9511
+      severity: HIGH
+      title: HTTP/2 Rapid Reset
+      fixedVersion: "1.25.3"
+    - vulnerabilityID: CVE-2021-23017
+      severity: HIGH
+      title: DNS resolver off-by-one
+      fixedVersion: "1.21.0"
+---
+# 3a. Kyverno 策略: 拒绝含 Critical 漏洞的镜像 (依据 Trivy 报告标签)
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: block-critical-vuln-images
+spec:
+  validationFailureAction: Enforce       # 违规直接拒绝
+  background: false                      # 仅准入时校验 (依赖扫描结果需后台模式)
+  rules:
+    - name: deny-critical-vulnerabilities
+      match:
+        any:
+          - resources: {kinds: [Pod]}
+      preconditions: {}
+      # 生产中常用 cosign-reporter/trivy-operator 的 label 联动;
+      # 这里演示最直接的形态: 校验镜像 tag 不允许使用已知漏洞大版本
+      validate:
+        message: "镜像存在 Critical 漏洞, 禁止部署"
+        pattern:
+          spec:
+            containers:
+              - image: "!*nginx:1.14.*"
+---
+# 3b. Kyverno 策略: 强制镜像签名校验 (cosign verify)
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: verify-image-signatures
+spec:
+  validationFailureAction: Enforce
+  webhookTimeoutSeconds: 30
+  rules:
+    - name: check-signature
+      match:
+        any:
+          - resources: {kinds: [Pod]}
+      exclude:
+        any:
+          - namespaces: ["kube-system", "trivy-system", "kyverno"]
+      verifyImages:
+        - imageReferences: ["registry.example.com/*"]
+          attestors:
+            - entries:
+                - keys:
+                    publicKeys: |-
+                      -----BEGIN PUBLIC KEY-----
+                      MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE...
+                      -----END PUBLIC KEY-----

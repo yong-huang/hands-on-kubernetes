@@ -1,0 +1,72 @@
+# =============================================================================
+# 自定义资源定义: Database (声明式描述"我要一个数据库")
+# Controller 读取它并负责把现实世界拉齐到声明的状态 (Reconcile Loop)
+# =============================================================================
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: databases.demo.example.com      # 复数.组名 格式, 决定了 API 路径
+spec:
+  group: demo.example.com
+  scope: Namespaced                      # 命名空间级资源(也可 Cluster)
+  names:
+    plural: databases                    # kubectl get databases
+    singular: database                   # 单数
+    kind: Database                       # YAML 里 kind 字段
+    shortNames: ["db"]                   # kubectl get db
+  versions:
+    - name: v1alpha1                     # alpha -> beta -> GA 的版本演进
+      served: true                       # API server 是否对外提供该版本
+      storage: true                      # 只能有一个 storage 版本(etcd 存储格式)
+      schema:
+        openAPIV3Schema:                 # 强校验: 写错的 CR 直接被 apiserver 拒绝
+          type: object
+          properties:
+            spec:
+              type: object
+              required: [engine, size]   # 必填字段
+              properties:
+                engine:                  # 支持的数据库引擎
+                  type: string
+                  enum: [postgres, mysql]
+                size:                    # 存储大小, 带 pattern 校验
+                  type: string
+                  pattern: '^\d+Gi$'
+                replicas:
+                  type: integer
+                  minimum: 1
+                  maximum: 5
+                  default: 1
+                version:                 # 数据库小版本
+                  type: string
+                  default: "16"
+            status:                      # Controller 回写的实际状态
+              type: object
+              properties:
+                phase:                   # Pending/Provisioning/Running/Error
+                  type: string
+                endpoint:
+                  type: string
+                conditions:              # 标准条件列表(与 K8s 惯例对齐)
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      type: {type: string}
+                      status: {type: string}
+                      reason: {type: string}
+      subresources:
+        status: {}                       # 启用 /status 子资源: spec 与 status 分权
+---
+# 一个具体的声明: 用户只需要写这些
+apiVersion: demo.example.com/v1alpha1
+kind: Database
+metadata:
+  name: orders-db
+  namespace: crd-demo
+spec:
+  engine: postgres
+  size: 10Gi
+  replicas: 1
+  version: "16"

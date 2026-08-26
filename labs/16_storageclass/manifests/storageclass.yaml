@@ -1,0 +1,67 @@
+# =============================================================================
+# Kubernetes StorageClass 动态供给演示
+# 对比 15_pv_pvc 的静态供给: 这里不手动创建任何 PV,
+# PVC 通过 StorageClass 触发 provisioner (rancher local-path) 自动创建 PV 并绑定
+# =============================================================================
+---
+# -----------------------------------------------------------------------------
+# 1. 自定义 StorageClass: fast-local
+#    kind 集群自带 provisioner rancher.io/local-path (无 CSI, 但动态供给可用)
+# -----------------------------------------------------------------------------
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: fast-local            # PVC 通过 spec.storageClassName: fast-local 引用
+  # annotation: "storageclass.kubernetes.io/is-default-class: \"true\""
+  # ↑ 默认 StorageClass 的开关: PVC 的 storageClassName 留空(或省略)时,
+  #   控制器会用带此 annotation 的 SC 为它动态供给; 集群内不应出现两个默认 SC
+provisioner: rancher.io/local-path   # 供给器: 负责真正创建/删除卷的组件
+# parameters:                  # 传给 provisioner 的参数(因 provisioner 而异):
+#   type: gp3                  #   AWS EBS CSI: 卷类型 gp2/gp3
+#   iops: "3000"               #   gp3 可定制 IOPS/吞吐
+#   fsType: ext4               #   文件系统类型
+#   type: pd-balanced          #   GCE PD: pd-balanced/pd-ssd
+# volumeBindingMode 决定"什么时候"触发供给与绑定:
+#   Immediate        - PVC 创建后立刻供给并绑定 (不管 Pod 调度到哪,
+#                      云上可能把卷建在错误可用区, Pod 起不来)
+#   WaitForFirstConsumer - 延迟到第一个使用该 PVC 的 Pod 调度后再供给,
+#                      卷会落在 Pod 所在的节点/可用区 (拓扑正确), 推荐
+volumeBindingMode: WaitForFirstConsumer
+reclaimPolicy: Delete          # 删 PVC 时连 PV 与数据一起删 (动态供给默认值; Retain 可改)
+# allowVolumeExpansion: true   # 允许在线扩容 PVC (取决于 CSI 驱动支持)
+# mountOptions:                # 挂载选项, 如 NFS 的 ["hard", "nfsvers=4.1"]
+---
+# -----------------------------------------------------------------------------
+# 2. PVC: 显式指定 storageClassName, 不需要写任何 PV 相关字段
+# -----------------------------------------------------------------------------
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pvc-dynamic
+spec:
+  accessModes:
+    - ReadWriteOnce           # local-path 只支持单节点读写
+  resources:
+    requests:
+      storage: 500Mi          # 动态供给会按此精确建卷, 不像静态绑定那样"就大不就小"
+  storageClassName: fast-local  # 指向上面定义的 SC; 留空 = 集群默认 SC
+---
+# -----------------------------------------------------------------------------
+# 3. Pod: busybox 循环写标记文件, 验证数据落在动态创建的 PV 上
+# -----------------------------------------------------------------------------
+apiVersion: v1
+kind: Pod
+metadata:
+  name: sc-demo-pod
+spec:
+  volumes:
+    - name: data
+      persistentVolumeClaim:
+        claimName: pvc-dynamic   # Pod 只引用 PVC, 不感知 PV 与底层存储
+  containers:
+    - name: busybox
+      image: busybox:1.36             # kind 节点已预加载
+      command: ["sh", "-c", "while true; do echo \"dynamic-$(date)\" >> /data/marker.log; sleep 10; done"]
+      volumeMounts:
+        - name: data
+          mountPath: /data

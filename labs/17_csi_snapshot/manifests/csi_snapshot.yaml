@@ -1,0 +1,95 @@
+# =============================================================================
+# CSI 快照与还原演示 (VolumeSnapshot / VolumeSnapshotClass / dataSource)
+#
+# 重要前提 (诚实声明):
+#   CSI 快照接口由 CSI 驱动自己实现 (ControllerPublishVolume 之外的
+#   CreateSnapshot/DeleteSnapshot gRPC 接口), snapshot-controller 只负责
+#   监听 VolumeSnapshot CR 并"转发"给驱动。
+#   kind 默认 StorageClass "standard" 的 provisioner 是 rancher.io/local-path,
+#   它没有实现快照接口 —— 因此本文件里的 VolumeSnapshot 对象可以创建成功
+#   (CRD 层面合法), 但 status 永远不会变成 readyToUse: true。
+#
+# 支持快照的常见驱动 (driver 字段必须与之匹配):
+#   EBS (ebs.csi.aws.com) / Cinder (cinder.csi.openstack.org) /
+#   Portworx (pxd.openstorage.org) / Longhorn (driver.longhorn.io) /
+#   Ceph RBD (rbd.csi.ceph.com) ...
+#   kind local-path: 不支持 (无 CSI 快照接口)
+# =============================================================================
+---
+# ----------------------------- 1. 源数据: PVC + 写数据的 Pod -----------------------------
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: snap-source            # 被快照的源卷
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 1Gi
+  # kind 上留空 = 默认 SC "standard" (local-path); 生产环境换成支持快照的 SC
+  storageClassName: standard
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: snap-source-pod
+spec:
+  restartPolicy: Never
+  containers:
+    - name: writer
+      image: busybox:1.36      # 已由 scripts/load_images.sh 预载到各节点
+      command: ["sh", "-c", "echo 'data-before-snapshot' > /data/marker.txt && sleep 3600"]
+      volumeMounts:
+        - { name: data, mountPath: /data }
+  volumes:
+    - name: data
+      persistentVolumeClaim:
+        claimName: snap-source # Pod -> PVC -> PV -> 存储后端
+---
+# ----------------------------- 2. VolumeSnapshotClass: 快照的"配方" -----------------------------
+# 类比 StorageClass 之于 PVC: VolumeSnapshotClass 告诉 snapshot-controller
+# 用哪个 CSI 驱动、什么参数来创建快照。
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshotClass
+metadata:
+  name: snapclass-demo
+  # deletionPolicy: Delete — 删 VolumeSnapshot 时连底层存储快照一起删
+  #                 Retain — 只删 K8s 对象, 存储后端快照保留 (需手动清理)
+deletionPolicy: Delete
+driver: rancher.io/local-path  # !! 必须与供给源 PVC 的 CSI 驱动一致 !!
+                              # local-path 未实现快照接口 -> 快照不会 ready
+# parameters:                  # 驱动私有参数, 如 EBS 的加密/标签
+#   type: snap
+---
+# ----------------------------- 3. VolumeSnapshot: 指向 PVC 的快照请求 -----------------------------
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshot
+metadata:
+  name: snap-demo
+spec:
+  volumeSnapshotClassName: snapclass-demo
+  source:
+    persistentVolumeClaimName: snap-source   # 对"当前这一刻"的 PVC 数据拍快照
+# status (由 controller 填写, 只读):
+#   readyToUse: true            — 快照可用 (local-path 上永远不会到这一步)
+#   boundVolumeSnapshotContentName — 绑定的集群级快照内容对象
+#   restoreSize: 1Gi            — 还原时新 PVC 至少要这么大
+---
+# ----------------------------- 4. 还原: dataSource 指向快照的新 PVC -----------------------------
+# 注意: 还原永远是"从快照创建新 PVC", 不能把快照灌回原 PVC (原地覆盖)。
+#       且要求 readyToUse: true —— 在 local-path 上这个 PVC 会一直 Pending,
+#       这里保留 manifest 仅作讲解 (snapshot.sh verify 会打印并说明)。
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: snap-restored          # 还原出的新卷
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 1Gi             # 必须 >= 快照的 restoreSize
+  storageClassName: standard   # 通常与源 PVC 相同的 SC
+  dataSource:                  # 关键字段: 数据来自快照 (也支持 PVC 克隆/快照内容)
+    kind: VolumeSnapshot       # 另两种: PersistentVolumeClaim (克隆), VolumeSnapshotContent
+    name: snap-demo
+    apiGroup: snapshot.storage.k8s.io   # kind 为 VolumeSnapshot 时必须写 apiGroup

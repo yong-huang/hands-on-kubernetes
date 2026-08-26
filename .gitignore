@@ -1,0 +1,17 @@
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Helm 打包产物
+*.tgz
+
+# 编辑器
+.idea/
+.vscode/
+
+# 工具会话文件
+.zcode/

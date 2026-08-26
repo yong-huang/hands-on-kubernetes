@@ -1,0 +1,44 @@
+# =============================================================================
+# 排障练习素材: 一个"生病"的 Pod
+# 症状设计: distroless 镜像(无 shell) + CrashLoopBackOff, 常规 exec 进不去
+# 用 kubectl debug 的三种姿势来诊断它 (见 debug.sh)
+# =============================================================================
+apiVersion: v1
+kind: Pod
+metadata:
+  name: broken-app
+  namespace: debug-demo
+  labels: {app: broken-app}
+spec:
+  shareProcessNamespace: false     # 默认不共享 PID, --target 后临时容器可见原进程
+  containers:
+    - name: app
+      image: gcr.io/distroless/static:nonroot   # 无 shell / 无 busybox
+      command: ["/broken-binary"]                # 不存在 -> 启动即崩
+      resources:
+        requests: {memory: 32Mi}
+        limits: {memory: 64Mi}
+---
+# 对照组: NetworkPolicy 断掉全部出站(含 DNS), 用临时容器抓包定位网络故障
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: deny-egress-all
+  namespace: debug-demo
+spec:
+  podSelector:
+    matchLabels: {app: net-victim}
+  policyTypes: [Egress]
+  egress: []                       # 出站全禁 -> nslookup 超时即复现
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: net-victim
+  namespace: debug-demo
+  labels: {app: net-victim}
+spec:
+  containers:
+    - name: app
+      image: busybox:1.36          # 有 shell, 但网络不通
+      command: ["sh", "-c", "sleep 3600"]

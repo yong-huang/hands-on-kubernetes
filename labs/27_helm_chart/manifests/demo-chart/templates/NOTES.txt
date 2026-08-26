@@ -1,0 +1,11 @@
+感谢安装 {{ .Release.Name }}!
+
+1. 获取访问地址:
+{{- if .Values.ingress.enabled }}
+   http://{{ .Values.ingress.host }}  (需解析到集群 Ingress 入口)
+{{- else }}
+   kubectl port-forward svc/{{ include "demo-chart.fullname" . }} {{ .Values.service.port }}:{{ .Values.service.port }}
+{{- end }}
+
+2. 检查部署状态:
+   kubectl get pods -l app.kubernetes.io/instance={{ .Release.Name }}

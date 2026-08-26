@@ -1,0 +1,188 @@
+# =============================================================================
+# Kubernetes NetworkPolicy 演示: 默认拒绝 + 白名单放行 + DNS 放行
+# 文档分两组, 脚本用标签分段 apply, 便于演示"隔离前 vs 隔离后":
+#   kubectl apply -f network_policy.yaml -l tier=workload   # 只部署工作负载
+#   kubectl apply -f network_policy.yaml -l tier=policy     # 只应用隔离策略
+# 重要: NetworkPolicy 由 CNI 插件执行, kind 默认的 kindnet 不支持!
+#       策略对象能创建成功(API server 只做格式校验), 但没有任何隔离效果
+# =============================================================================
+---
+# ==================== 组1: 工作负载 (tier=workload) ====================
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: demo-netpol
+  labels:
+    ns: demo-netpol          # 打上标签, 供 namespaceSelector 跨命名空间选择用
+    tier: workload
+---
+# backend: 被保护的服务 (nginx), 只希望 frontend 访问它
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: demo-netpol
+  labels:
+    app: backend             # NetworkPolicy 靠这个标签"选中"它
+    tier: workload
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend         # 必须与 selector 一致, 策略匹配也用它
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.25
+          ports:
+            - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend              # 集群内 DNS: backend.demo-netpol.svc.cluster.local
+  namespace: demo-netpol
+  labels:
+    tier: workload
+spec:
+  selector:
+    app: backend
+  ports:
+    - port: 80               # Service 端口
+      targetPort: 80         # 容器端口 (NetworkPolicy 的 port 指的是它)
+---
+# frontend: 合法客户端, 死循环 wget backend, 便于随时 exec 观察连通性
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: demo-netpol
+  labels:
+    app: frontend
+    tier: workload
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend       # 白名单就认这个标签
+    spec:
+      containers:
+        - name: busybox
+          image: busybox:1.36
+          command: ["/bin/sh", "-c"]
+          args:
+            - >
+              while true; do
+                wget -qO- --timeout=2 http://backend >/dev/null &&
+                echo "[frontend] wget backend OK" ||
+                echo "[frontend] wget backend TIMEOUT";
+                sleep 5;
+              done
+---
+# ==================== 组2: 网络策略 (tier=policy) ====================
+# 策略1: 默认拒绝 (default-deny) —— 零信任第一步
+# 语义: 选中命名空间内所有 Pod, policyTypes 只声明 Ingress,
+#       且不写 ingress 字段 => 入站流量全部拒绝, 之后再按需打洞放行
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: demo-netpol
+  labels:
+    tier: policy
+spec:
+  podSelector: {}            # 空 selector = 选中本命名空间内【所有】Pod
+  policyTypes:
+    - Ingress                # 只管入站; 不写 Egress 就不限制出站
+---
+# 策略2: 只允许 frontend 访问 backend 的 80 端口 (白名单打洞)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-frontend-to-backend
+  namespace: demo-netpol
+  labels:
+    tier: policy
+spec:
+  podSelector:
+    matchLabels:
+      app: backend           # 策略作用于 backend Pod —— 它是"被访问方"
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:       # 三种来源选择器之一: 同命名空间内标签匹配
+            matchLabels:
+              app: frontend  # 只放行 frontend Pod (evil Pod 没有此标签, 被拦)
+      ports:
+        - protocol: TCP
+          port: 80           # 只放行 80 端口, 其余端口依然被策略1拒绝
+# =============================================================================
+# 可选: Egress 方向的完整隔离示例 (需要时去掉注释, 三个策略需一起启用!)
+# 坑: 一旦对某 Pod 存在 Egress 类型策略, 它的出站流量默认全拒绝,
+#     连 kube-dns 的 53 端口也会被拦 —— DNS 解析失败, 服务名全变不可达!
+#
+# --- 策略3(可选): 默认拒绝所有出站 ---
+# apiVersion: networking.k8s.io/v1
+# kind: NetworkPolicy
+# metadata:
+#   name: default-deny-egress
+#   namespace: demo-netpol
+# spec:
+#   podSelector: {}          # 所有 Pod 出站全拒绝
+#   policyTypes:
+#     - Egress
+# ---
+# --- 策略4(可选): 放行 DNS (出站方向最经典的坑!) ---
+# apiVersion: networking.k8s.io/v1
+# kind: NetworkPolicy
+# metadata:
+#   name: allow-dns-egress
+#   namespace: demo-netpol
+# spec:
+#   podSelector: {}                          # 所有 Pod 都要能查 DNS
+#   policyTypes:
+#     - Egress
+#   egress:
+#     - to:
+#         - namespaceSelector:               # 按命名空间选: kube-system
+#             matchLabels:
+#               kubernetes.io/metadata.name: kube-system
+#           podSelector:                     # 再按 Pod 选: kube-dns
+#             matchLabels:
+#               k8s-app: kube-dns
+#       ports:                               # DNS 同时用 UDP 和 TCP 53
+#         - protocol: UDP
+#           port: 53
+#         - protocol: TCP
+#           port: 53
+# ---
+# --- 策略5(可选): 放行 frontend 出站访问 backend ---
+# apiVersion: networking.k8s.io/v1
+# kind: NetworkPolicy
+# metadata:
+#   name: allow-egress-to-backend
+#   namespace: demo-netpol
+# spec:
+#   podSelector:
+#     matchLabels:
+#       app: frontend       # 作用于 frontend Pod —— 它是"发起方"
+#   policyTypes:
+#     - Egress
+#   egress:
+#     - to:
+#         - podSelector:
+#             matchLabels:
+#               app: backend
+#       ports:
+#         - protocol: TCP
+#           port: 80
+# =============================================================================

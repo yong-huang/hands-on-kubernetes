@@ -1,0 +1,88 @@
+# =============================================================================
+# Kubernetes Deployment 学习示例
+# Deployment 管理 ReplicaSet, ReplicaSet 管理 Pod —— 三层 ownership 关系
+# 主要职责: 自愈(副本维持) / 扩缩容 / 滚动更新 / 回滚
+# =============================================================================
+
+# ----------------------------- 示例 1: RollingUpdate -------------------------
+# 默认策略: 逐个替换 Pod, 滚动更新期间服务不中断
+apiVersion: apps/v1          # Deployment 属于 apps 组, v1 版本 (稳定版)
+kind: Deployment             # 资源类型: Deployment
+metadata:
+  name: nginx-rolling        # Deployment 名称, 同一 namespace 内唯一
+  labels:
+    app: nginx-rolling       # 给 Deployment 自身打的标签 (便于筛选)
+spec:
+  replicas: 3                # 期望副本数: 始终维持 3 个健康 Pod
+  revisionHistoryLimit: 5    # 保留最近 5 个 ReplicaSet 历史版本, 供回滚使用
+  minReadySeconds: 5         # Pod 就绪后至少存活 5 秒才被认为是 "可用"
+                             # 防止刚就绪就崩溃导致更新误判成功
+  strategy:
+    type: RollingUpdate      # 滚动更新策略 (默认值), 旧新版本共存平滑过渡
+    rollingUpdate:
+      maxSurge: 1            # 更新过程中最多允许超出期望副本数 1 个
+                             # (可写绝对数或百分比, 默认 25%)
+                             # 越大更新越快, 但占用资源越多
+      maxUnavailable: 0      # 更新过程中最多允许 0 个 Pod 不可用
+                             # 设为 0 + maxSurge>=1 => 先扩新再缩旧, 容量永不下降
+  selector:                  # 标签选择器: Deployment 通过它"认领"自己的 Pod
+    matchLabels:
+      app: nginx-rolling     # 必须匹配 template.labels, 创建后不可修改
+  template:                  # Pod 模板: ReplicaSet 按此模板批量创建 Pod
+    metadata:
+      labels:
+        app: nginx-rolling   # Pod 标签, 必须被上方 selector 匹配
+    spec:
+      containers:
+        - name: nginx                    # 容器名, 同一 Pod 内唯一
+          image: nginx:1.25              # 镜像及版本 tag
+          ports:
+            - containerPort: 80          # 容器监听端口, 仅声明性信息
+          resources:                     # 资源配额: 影响调度与 QoS 等级
+            requests:                    # 调度依据: 至少保证这么多资源
+              cpu: 100m                  # 100 毫核 = 0.1 个 CPU
+              memory: 128Mi              # 128 Mebibyte
+            limits:                      # 上限: 超过内存限制会被 OOMKill
+              cpu: 250m
+              memory: 256Mi
+          livenessProbe:                 # 存活探针: 失败则重启容器 (自愈)
+            httpGet:
+              path: /                    # 探测路径
+              port: 80
+            initialDelaySeconds: 10      # 启动后等 10 秒再开始探测
+            periodSeconds: 5             # 每 5 秒探测一次
+            failureThreshold: 3          # 连续失败 3 次判定失败
+          readinessProbe:                # 就绪探针: 未就绪的 Pod 不接流量
+            httpGet:                     # 滚动更新靠它判断新 Pod 能否接流量
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 3
+---
+# ----------------------------- 示例 2: Recreate ------------------------------
+# 重建策略: 先杀掉全部旧 Pod, 再创建新 Pod —— 更新期间会有服务中断
+# 适用于: 不支持多版本共存的场景 (如两个副本会争抢同一数据卷/外部资源)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-recreate      # 第二个 Deployment, 用于对比
+  labels:
+    app: nginx-recreate
+spec:
+  replicas: 3               # 同样 3 副本
+  strategy:
+    type: Recreate          # 重建策略: 没有 maxSurge/maxUnavailable 参数
+                            # 缺点: 更新窗口内服务完全不可用 (downtime)
+  selector:
+    matchLabels:
+      app: nginx-recreate
+  template:
+    metadata:
+      labels:
+        app: nginx-recreate
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.25
+          ports:
+            - containerPort: 80

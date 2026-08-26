@@ -1,0 +1,143 @@
+# =============================================================================
+# Ingress 演示清单: 域名路由 + 路径路由
+# 前提: 集群已安装 Ingress Controller (nginx), 见 ingress.sh 的 controller 步骤
+# 注意: Ingress 资源只是"路由规则", 真正干活的是 Ingress Controller (nginx)
+# =============================================================================
+---
+# ---------- 1. 后端 A: web-a (nginx, 首页内容为 "web-a") ----------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-a
+  labels: {app: web-a}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: web-a}
+  template:
+    metadata:
+      labels: {app: web-a}          # Service 和 Ingress 都通过这个标签找 Pod
+    spec:
+      containers:
+        - name: web
+          image: nginx:1.25-alpine   # 轻量 nginx, 已通过 scripts/load_images.sh 预载
+          command: ["/bin/sh", "-c"]
+          args:
+            # 覆盖首页内容, 让 curl 能区分打到的是哪个后端
+            - echo "<h1>web-a</h1>" > /usr/share/nginx/html/index.html &&
+              exec nginx -g "daemon off;"
+          ports:
+            - containerPort: 80
+---
+apiVersion: v1
+kind: Service                      # ClusterIP 即可, 流量统一从 Ingress 进
+metadata:
+  name: web-a
+spec:
+  selector: {app: web-a}
+  ports:
+    - port: 80                     # Service 端口
+      targetPort: 80               # 容器端口
+---
+# ---------- 2. 后端 B: web-b (同构, 首页内容为 "web-b") ----------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-b
+  labels: {app: web-b}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: web-b}
+  template:
+    metadata:
+      labels: {app: web-b}
+    spec:
+      containers:
+        - name: web
+          image: nginx:1.25-alpine
+          command: ["/bin/sh", "-c"]
+          args:
+            - echo "<h1>web-b</h1>" > /usr/share/nginx/html/index.html &&
+              exec nginx -g "daemon off;"
+          ports:
+            - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-b
+spec:
+  selector: {app: web-b}
+  ports:
+    - port: 80
+      targetPort: 80
+---
+# ---------- 3. 域名路由: 不同 Host 转发到不同后端 ----------
+# 测试: curl -H "Host: a.example.com" http://<controller地址>/
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: host-routing
+  annotations:
+    # 这些注解是给 nginx controller 看的 (不同 Controller 注解不同)
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  ingressClassName: nginx           # ★ 指定用哪个 Controller (可以是多个)
+  rules:
+    - host: a.example.com           # 虚拟主机: 域名 A
+      http:
+        paths:
+          - path: /
+            pathType: Prefix        # Prefix 前缀匹配 / Exact 精确匹配
+            backend:
+              service:
+                name: web-a         # 域名 A 的流量 -> web-a
+                port: {number: 80}
+    - host: b.example.com           # 域名 B
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web-b         # 域名 B 的流量 -> web-b
+                port: {number: 80}
+---
+# ---------- 4. 路径路由: 同一域名按 URL 路径分流 ----------
+# 测试: curl -H "Host: example.com" http://<controller地址>/a 和 /b
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: path-routing
+  annotations:
+    # ★ 不加 rewrite-target 时, /a 会原样转发给后端 (后端 nginx 没有 /a 路径 -> 404)
+    #   加上后重写为 /, 后端收到的是 /
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: example.com
+      http:
+        paths:
+          - path: /a                # example.com/a/** -> web-a
+            pathType: Prefix
+            backend:
+              service:
+                name: web-a
+                port: {number: 80}
+          - path: /b                # example.com/b/** -> web-b
+            pathType: Prefix
+            backend:
+              service:
+                name: web-b
+                port: {number: 80}
+# =============================================================================
+# TLS 补充 (未启用, 生产建议 cert-manager 自动签发):
+#   spec:
+#     tls:
+#       - hosts: [a.example.com]
+#         secretName: a-tls         # kubectl create secret tls a-tls --cert=... --key=...
+#     rules: ...
+# Controller 在 443 做 TLS 终止, 到后端 Pod 走明文 (或配置后端 TLS)
+# =============================================================================

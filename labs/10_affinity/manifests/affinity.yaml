@@ -1,0 +1,148 @@
+# =============================================================================
+# Kubernetes 亲和性与拓扑打散调度示例 (多文档 YAML)
+# 覆盖: podAntiAffinity (硬性/软性) / nodeAffinity / topologySpreadConstraints
+#
+# required vs preferred 语义区别:
+#   requiredDuringScheduling...  硬性约束: 不满足就 Pending, 绝不妥协
+#   preferredDuringScheduling... 软性偏好: 尽量满足, 不满足时退而求其次
+# 注意: 亲和性只在"调度时"生效, 已运行的 Pod 不会因拓扑变化被驱逐
+# =============================================================================
+---
+# ---------- 1. 硬性 podAntiAffinity: 同一应用的副本必须分散到不同节点 ----------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-antiaffinity-required
+spec:
+  replicas: 3                      # 3 副本要求至少 3 个节点, 否则有副本 Pending
+  selector:
+    matchLabels:
+      app: web-required
+  template:
+    metadata:
+      labels:
+        app: web-required          # 反亲和规则通过这个标签识别"自己人"
+    spec:
+      # 3 副本 × 硬反亲和要求 3 个可调度节点; kind 的控制面节点带污点,
+      # 必须容忍它, 否则第 3 个副本永远 Pending (toleration 与 antiAffinity 配合)
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+      affinity:
+        podAntiAffinity:
+          # 硬性: 每个节点最多只允许 1 个该标签的 Pod, 节点不够直接 Pending
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: app
+                    operator: In
+                    values: ["web-required"]
+              # topologyKey 定义"拓扑域": 同一个 hostname = 同一个节点
+              # 即: 不允许和匹配的 Pod 落在同一个节点上
+              topologyKey: kubernetes.io/hostname
+      containers:
+        - name: nginx
+          image: nginx:1.25
+          resources:
+            requests: {cpu: 50m, memory: 64Mi}
+---
+# ---------- 2. 软性 podAntiAffinity: 尽量打散, 节点不够时允许挤一挤 ----------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-antiaffinity-preferred
+spec:
+  replicas: 3                      # 即使只有 1 个节点, 3 个副本也都能跑起来
+  selector:
+    matchLabels:
+      app: web-preferred
+  template:
+    metadata:
+      labels:
+        app: web-preferred
+    spec:
+      affinity:
+        podAntiAffinity:
+          # 软性: 调度器打分时优先选择没有同类 Pod 的节点
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100          # 权重 1-100, 多条规则时按权重求和比总分
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values: ["web-preferred"]
+                topologyKey: kubernetes.io/hostname
+      containers:
+        - name: nginx
+          image: nginx:1.25
+          resources:
+            requests: {cpu: 50m, memory: 64Mi}
+---
+# ---------- 3. nodeAffinity: 按节点标签选节点 (先 label node 再演示) ----------
+apiVersion: v1
+kind: Pod
+metadata:
+  name: on-ssd-node
+spec:
+  affinity:
+    nodeAffinity:
+      # 硬性: 必须调度到 disktype=ssd 的节点, 否则一直 Pending
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: disktype
+                operator: In
+                values: ["ssd"]
+      # 软性: 多个满足硬性条件的节点里, 优先选 zone=east (权重越高越优先)
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 80               # 东区机房: 网络更近, 权重高
+          preference:
+            matchExpressions:
+              - key: zone
+                operator: In
+                values: ["east"]
+        - weight: 20               # 西区作为备选
+          preference:
+            matchExpressions:
+              - key: zone
+                operator: In
+                values: ["west"]
+  containers:
+    - name: nginx
+      image: nginx:1.25
+---
+# ---------- 4. topologySpreadConstraints: 按 maxSkew 精确控制均匀度 ----------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-spread
+spec:
+  replicas: 4                      # 3 节点放 4 副本: 分布只能是 2/1/1, 不能是 3/1/0
+  selector:
+    matchLabels:
+      app: web-spread
+  template:
+    metadata:
+      labels:
+        app: web-spread
+    spec:
+      # 与 web-antiaffinity-required 同理: 需要全部 3 个节点可调度 (含控制面)
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+      topologySpreadConstraints:
+        - maxSkew: 1               # 任意两个拓扑域的副本数差不能超过 1
+          topologyKey: kubernetes.io/hostname   # 按节点维度打散
+          whenUnsatisfiable: DoNotSchedule       # 硬性: 违反就 Pending
+          # whenUnsatisfiable: ScheduleAnyway    # 软性: 违反也调度, 但打分更低
+          labelSelector:
+            matchLabels:
+              app: web-spread      # 只统计 (并约束) 本应用自己的 Pod
+      containers:
+        - name: nginx
+          image: nginx:1.25
+          resources:
+            requests: {cpu: 50m, memory: 64Mi}

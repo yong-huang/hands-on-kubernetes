@@ -1,0 +1,140 @@
+# =============================================================================
+# 分布式追踪: Jaeger 全链路采集
+# 组成: 1) Jaeger all-in-one 实例 (实验用; 生产用 Operator + ES/Cassandra 存储)
+#       2) 三层微服务 demo (front -> order -> payment), OTel SDK 上报
+#       3) Istio 场景的 Tracing 配置 (mesh 级自动埋点)
+# 核心概念: Trace(一次请求全程) = 多个 Span(一次调用), Span 间 parent/child
+# =============================================================================
+---
+# 1. Jaeger all-in-one: collector + query + 内存存储 一体
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jaeger
+  namespace: tracing-demo
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: jaeger}}
+  template:
+    metadata:
+      labels: {app: jaeger}
+    spec:
+      containers:
+        - name: jaeger
+          image: jaegertracing/all-in-one:1.54
+          env:
+            - {name: COLLECTOR_OTLP_ENABLED, value: "true"}   # 开放 OTLP 协议入口
+          ports:
+            - {name: ui,       containerPort: 16686}   # 查询 UI
+            - {name: otlp-grpc, containerPort: 4317}   # OTLP gRPC 上报
+            - {name: jaeger-thrift, containerPort: 14268}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jaeger-query
+  namespace: tracing-demo
+spec:
+  selector: {app: jaeger}
+  ports: [{name: ui, port: 16686, targetPort: ui}]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jaeger-collector
+  namespace: tracing-demo
+spec:
+  selector: {app: jaeger}
+  ports: [{name: otlp, port: 4317, targetPort: otlp-grpc}]
+---
+# 2. 三层微服务: 请求链 front -> order -> payment, 每跳都上报 span
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: svc-front
+  namespace: tracing-demo
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: svc-front}}
+  template:
+    metadata:
+      labels: {app: svc-front}
+      annotations:
+        instrumentation.opentelemetry.io/inject-python: "true"  # 自动注入 OTel SDK
+    spec:
+      containers:
+        - name: app
+          image: busybox:1.36
+          command: ["sh", "-c",
+            "while true; do wget -qO- http://svc-order:80/order 2>/dev/null; sleep 5; done"]
+---
+apiVersion: v1
+kind: Service
+metadata: {name: svc-order, namespace: tracing-demo}
+spec:
+  selector: {app: svc-order}
+  ports: [{port: 80, targetPort: 8080}]
+---
+# order 服务: 收到请求后调用 payment, 并把 traceparent 头透传下去 —— 链路得以延续
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: svc-order
+  namespace: tracing-demo
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: svc-order}}
+  template:
+    metadata:
+      labels: {app: svc-order}
+      annotations:
+        instrumentation.opentelemetry.io/inject-python: "true"
+    spec:
+      containers:
+        - name: app
+          image: curlimages/curl:8.5.0
+          command: ["sh", "-c",
+            "while true; do nc -l -p 8080 -e sh -c 'echo HTTP/1.1 200; echo;
+             curl -s http://svc-payment:80/pay >/dev/null'; done"]
+---
+apiVersion: v1
+kind: Service
+metadata: {name: svc-payment, namespace: tracing-demo}
+spec:
+  selector: {app: svc-payment}
+  ports: [{port: 80, targetPort: 8080}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: svc-payment
+  namespace: tracing-demo
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: svc-payment}}
+  template:
+    metadata:
+      labels: {app: svc-payment}
+      annotations:
+        instrumentation.opentelemetry.io/inject-python: "true"
+    spec:
+      containers:
+        - name: app
+          image: busybox:1.36
+          command: ["sh", "-c", "while true; do nc -l -p 8080 -e sh -c 'sleep 0.05;
+                   echo HTTP/1.1 200; echo'; done"]
+---
+# 3. Istio 场景: mesh 代理自动上报 span, 应用只需透传 B3/W3C 头
+#    (若集群装有 istiod, 此 Telemetry API 打开 tracing 采样)
+apiVersion: telemetry.istio.io/v1alpha1
+kind: Telemetry
+metadata:
+  name: mesh-default-tracing
+  namespace: istio-system
+spec:
+  accessLogging:
+    - disabled: false
+  tracing:
+    - randomSamplingPercentage: 10        # 生产常用 1~10% 采样率
+      providers:
+        - name: otel                       # 指向上一步部署的 OTLP collector

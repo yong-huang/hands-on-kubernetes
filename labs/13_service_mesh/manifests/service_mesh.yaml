@@ -1,0 +1,187 @@
+# =============================================================================
+# Service Mesh (Istio) 金丝雀发布演示
+# 组成: Namespace(sidecar 自动注入) + 两个版本的 Deployment + Service
+#       + DestinationRule(subset 划分) + VirtualService(90/10 权重路由)
+# 前置: istio.sh install 先装好 Istio (istioctl install --set profile=demo)
+# =============================================================================
+---
+# -----------------------------------------------------------------------------
+# 1. Namespace: 打上 istio-injection=enabled 标签后, 该命名空间内新建的 Pod
+#    会被 Istio 的 MutatingWebhookConfiguration 自动注入 envoy sidecar 容器
+#    (Pod 里从 1 个容器变成 2 个: 业务容器 + istio-proxy)
+# -----------------------------------------------------------------------------
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: canary-demo
+  labels:
+    istio-injection: enabled        # 开关: 删掉此标签即可停止注入(仅对新 Pod 生效)
+---
+# -----------------------------------------------------------------------------
+# 2. 稳定版本 v1: 承接绝大部分流量
+#    关键标签: app=canary-web (Service 选择器认领) + version=v1 (subset 划分依据)
+# -----------------------------------------------------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: canary-web-v1
+  namespace: canary-demo
+spec:
+  replicas: 2                       # v1 稳定版: 2 副本
+  selector:
+    matchLabels:
+      app: canary-web
+      version: v1
+  template:
+    metadata:
+      labels:
+        app: canary-web             # Service 按 app 标签把 v1/v2 都收进来
+        version: v1                 # DestinationRule 的 subset 按此标签区分版本
+    spec:
+      containers:
+        - name: web
+          image: busybox:1.36       # 镜像已通过 scripts/load_images.sh 预载到节点
+          command: ["sh", "-c"]
+          # busybox 内置 httpd: 前台运行, /var/www 为根目录, 首页输出版本号
+          args:
+            - echo "web-v1" > /var/www/index.html;
+              httpd -f -p 8080 -h /var/www
+          ports:
+            - containerPort: 8080
+          readinessProbe:           # 就绪后才能接流量, 金丝雀切换更平滑
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 2
+---
+# -----------------------------------------------------------------------------
+# 3. 金丝雀版本 v2: 只承接小比例流量, 验证无误后再逐步放大权重
+# -----------------------------------------------------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: canary-web-v2
+  namespace: canary-demo
+spec:
+  replicas: 2                       # v2 金丝雀版: 2 副本
+  selector:
+    matchLabels:
+      app: canary-web
+      version: v2
+  template:
+    metadata:
+      labels:
+        app: canary-web
+        version: v2
+    spec:
+      containers:
+        - name: web
+          image: busybox:1.36
+          command: ["sh", "-c"]
+          args:
+            - echo "web-v2" > /var/www/index.html;
+              httpd -f -p 8080 -h /var/www
+          ports:
+            - containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 2
+---
+# -----------------------------------------------------------------------------
+# 4. Service: 只做"服务名 -> Pod 集合"的收敛, 不区分版本
+#    注意: 流量在 v1/v2 之间怎么分, 由下面的 VirtualService 决定,
+#    K8s Service 本身的负载均衡(kube-proxy 轮询)已被 mesh 接管
+# -----------------------------------------------------------------------------
+apiVersion: v1
+kind: Service
+metadata:
+  name: canary-web
+  namespace: canary-demo
+spec:
+  selector:
+    app: canary-web                 # v1/v2 的 Pod 都匹配
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+---
+# -----------------------------------------------------------------------------
+# 5. DestinationRule: 定义"目的地策略", 核心是 subset (子集)
+#    subset = 按 Pod 标签筛选出的一组 endpoint, 是权重路由的分流目标
+# -----------------------------------------------------------------------------
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: canary-web
+  namespace: canary-demo
+spec:
+  host: canary-web                  # 目标服务 (同命名空间可省 FQDN)
+  subsets:
+    - name: v1
+      labels:
+        version: v1                 # 匹配 version=v1 的 Pod
+    - name: v2
+      labels:
+        version: v2                 # 匹配 version=v2 的 Pod
+---
+# -----------------------------------------------------------------------------
+# 6. VirtualService: 流量路由规则 —— 金丝雀的核心
+#    90% 流量到稳定版 v1, 10% 到金丝雀 v2; 想放量改权重即可, 秒级生效
+#    (istiod watch 该资源 -> 推送给各 Pod 的 envoy sidecar -> 即刻切换)
+# -----------------------------------------------------------------------------
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: canary-web
+  namespace: canary-demo
+spec:
+  hosts:
+    - canary-web                    # 对访问 canary-web 的流量生效
+  http:
+    - name: canary-weighted
+      route:
+        - destination:
+            host: canary-web
+            subset: v1              # 引用 DestinationRule 里定义的 subset
+          weight: 90                # 90% -> 稳定版
+        - destination:
+            host: canary-web
+            subset: v2
+          weight: 10                # 10% -> 金丝雀版
+# -----------------------------------------------------------------------------
+# 备选方案 A: 镜像流量 (mirror) —— 把 v1 的实时流量复制一份给 v2
+# 真实用户永远只收到 v1 的响应, v2 的响应被丢弃; 适合"零风险"验证新版本
+# (把上面 http 段整体替换为:
+#   http:
+#     - route:
+#         - destination:
+#             host: canary-web
+#             subset: v1
+#       mirror:
+#         host: canary-web
+#         subset: v2                # 复制的流量打到 v2, 响应被丢弃
+#       mirror_percentage:
+#         value: 100.0              # 镜像 100% 流量 (默认即为 100%)
+# )
+# -----------------------------------------------------------------------------
+# 备选方案 B: 按请求头路由 —— 内部白名单灰度, 不放真实用户流量到 v2
+# (在 route 之前加 match 段:
+#   http:
+#     - match:
+#         - headers:
+#             x-canary:
+#               exact: "true"       # 带 x-canary: true 头的请求进 v2
+#       route:
+#         - destination:
+#             host: canary-web
+#             subset: v2
+#     - route:                      # 其余流量走默认规则
+#         - destination:
+#             host: canary-web
+#             subset: v1
+# )
+# 测试: kubectl run test --rm -it --image=busybox:1.36 --restart=Never -- \
+#        wget -qO- --header "x-canary: true" http://canary-web:8080/
+# -----------------------------------------------------------------------------

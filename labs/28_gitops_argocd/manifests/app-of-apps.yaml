@@ -1,0 +1,64 @@
+# =============================================================================
+# ArgoCD Application 示例: app-of-apps 模式
+# 一个 YAML 里包含两个 Application:
+#   1. guestbook   —— 指向公共示例仓库, 自动同步到 guestbook 命名空间
+#   2. root        —— (注释形态) app-of-apps 的 "根应用", 用来批量管理其他应用
+# 安装好 ArgoCD 后: kubectl apply -f app-of-apps.yaml -n argocd
+# =============================================================================
+---
+# ---------- 应用 1: guestbook (ArgoCD 官方公共示例仓库, 无需认证) ----------
+apiVersion: argoproj.io/v1alpha1
+kind: Application                    # ArgoCD 的核心 CRD: 描述 "Git 里什么 = 集群里什么"
+metadata:
+  name: guestbook
+  namespace: argocd                  # Application 资源必须创建在 argocd 命名空间
+spec:
+  project: default                   # ArgoCD 项目(权限隔离用), default 不限制
+
+  # ---- 来源: Git 仓库中的期望状态 ----
+  source:
+    repoURL: https://github.com/argoproj/argocd-example-apps.git  # 公共示例仓库
+    targetRevision: HEAD             # 跟踪默认分支最新提交
+    path: guestbook                  # 只监视仓库里 guestbook/ 这个子目录
+
+  # ---- 目标: 同步到哪个集群 / 命名空间 ----
+  destination:
+    server: https://kubernetes.default.svc   # in-cluster: 从集群内部访问 API Server
+    namespace: guestbook                     # 目标命名空间(由 CreateNamespace 自动建)
+
+  # ---- 同步策略: automated = Pull 模型的核心 ----
+  syncPolicy:
+    automated:
+      prune: true          # Git 里删了资源, 集群里也跟着删(否则只删不建)
+      selfHeal: true       # 有人手改了集群资源(如 kubectl scale), 自动改回 Git 版本
+    syncOptions:
+      - CreateNamespace=true   # 目标 namespace 不存在时自动创建
+
+  # ---- 可选: 只让 ArgoCD 管理这些资源, 忽略 rollout.yaml 等 ----
+  # ignoreDifferences:
+  #   - group: apps
+  #     kind: Deployment
+  #     jsonPointers: ["/spec/replicas"]   # HPA 会改副本数, 告诉 ArgoCD 别当漂移
+---
+# ---------- 应用 2: root (app-of-apps 模式, 注释示意) ----------
+# 思路: 把 "要部署哪些应用" 本身也声明成一个 Git 目录 + 一个根 Application。
+# 根应用只监视一个装满子 Application YAML 的目录(path: apps/),
+# 于是 "git commit 增删一个子应用文件" = "集群里增删一个应用" —— 用 Git 管理一切。
+# apiVersion: argoproj.io/v1alpha1
+# kind: Application
+# metadata:
+#   name: root                        # 根应用: 管理其他 Application 的 Application
+#   namespace: argocd
+# spec:
+#   project: default
+#   source:
+#     repoURL: https://github.com/<you>/<your-manifests>.git
+#     targetRevision: main
+#     path: apps                      # 该目录下每个 *.yaml 都是一个子 Application
+#   destination:
+#     server: https://kubernetes.default.svc
+#     namespace: argocd               # 子 Application 也必须落在 argocd 命名空间
+#   syncPolicy:
+#     automated:
+#       prune: true                   # 删掉 apps/xxx.yaml = 自动删除对应子应用
+#       selfHeal: true
