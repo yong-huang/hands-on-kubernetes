@@ -33,8 +33,6 @@ arrows = [((2.85, 8.3), (3.65, 8.3)), ((6.35, 8.3), (7.15, 8.3)),
           ((5.0, 7.5), (5.0, 5.8)), ((4.0, 4.55), (2.0, 2.8)),
           ((6.0, 4.55), (8.0, 2.8))]
 labels = ["pull", "query", "alert", "notify", "escalate"]
-for (x1, y1), (x2, y2), lb in zip(arrows[0], arrows[1], labels):
-    pass
 for i, ((p1, p2), lb) in enumerate(zip([(a[0], a[1]) for a in arrows], labels)):
     x1, y1 = arrows[i][0]; x2, y2 = arrows[i][1]
     ax1.annotate("", xy=(x2, y2), xytext=(x1, y1),
@@ -62,11 +60,9 @@ ax2.text(6.2, 4.4, "Prometheus Operator\nwatch 全部 CR 变化",
          ha="center", va="center", fontsize=10.5, color="white", fontweight="bold")
 ax2.add_patch(mpatches.FancyBboxPatch((0.6, 3.6), 3.0, 1.6,
               boxstyle="round,pad=0.1", fc="#d62728", ec="black"))
-ax2.text(2.1, 4.4, "prometheus-k8s\nStatefulSet (TSDB)",
-         ha="center", va="center", fontsize=10.5, color="white", fontweight="bold")
+ax2.text(2.1, 4.4, "prometheus-prometheus-kube-\nprometheus-prometheus\nStatefulSet (TSDB)",
+         ha="center", va="center", fontsize=8.5, color="white", fontweight="bold")
 
-for cx, cy in [(2.2, 7.7), (2.2, 5.5), (6.6, 6.6)]:
-    pass
 ax2.annotate("", xy=(4.35, 4.7), xytext=(2.2, 5.5),
              arrowprops=dict(arrowstyle="-|>", lw=1.6))
 ax2.annotate("", xy=(5.6, 4.9), xytext=(6.6, 6.6),

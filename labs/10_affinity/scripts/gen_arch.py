@@ -162,10 +162,11 @@ def panel_spread(ax):
             draw_pod(ax, px, y2 - 0.5, face='#e8a0a0', edge='#999')
         ax.text(x + node_w / 2, y2 - node_h / 2 + 0.3,
                 f'{cnt} pod(s)', fontsize=6.5, ha='center', color='#666')
-    # 4th pod would land on node-1 -> violation mark
-    draw_pod(ax, 0.7 + 2.35, y2 - 0.5, face=C_POD_NEW, label='new', edge=C_RED)
-    ax.text(2.0, y2 - 1.35, 'new pod cannot\ngo to node-1', fontsize=6.5,
-            ha='center', color=C_RED)
+    # new pod wants to land on node-1 -> violation mark
+    # (画在 node-1 下方, 避免与第 3 个红色 Pod 重叠)
+    draw_pod(ax, 1.7, 2.25, face=C_POD_NEW, label='new', edge=C_RED)
+    ax.text(3.1, 2.25, 'new pod cannot\ngo to node-1', fontsize=6.5,
+            ha='left', va='center', color=C_RED)
 
     # --- Decision flow strip ---
     draw_box(ax, 5, 0.9, 9.2, 1.3,

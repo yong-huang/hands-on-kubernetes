@@ -29,11 +29,25 @@ do_run() {
 }
 
 do_drift() {
-    step "drift" "模拟配置漂移: 手动把 STS 副本改成 2"
+    step "drift" "模拟配置漂移: 后台重启 controller, 手动把 STS 副本改成 2, 观察自愈"
+    # controller 后台常驻, 日志落文件方便观察调谐动作; 记下 PID 便于停止
+    CTL_LOG="/tmp/crd_controller.log"
+    python3 controller.py >"$CTL_LOG" 2>&1 &
+    CTL_PID=$!
+    echo "  controller 已后台运行 (pid=$CTL_PID, 日志: $CTL_LOG)"
+
     kubectl -n "$NS" patch sts orders-db --type=json \
         -p='[{"op":"replace","path":"/spec/replicas","value":2}]'
-    sleep 2
-    echo "  controller 下个循环会把它拉回 spec.replicas —— 自愈即调谐"
+    echo "  已手动把副本改成 2 (偏离 CR 声明的 replicas=1), 等待下个调谐循环..."
+
+    sleep 12
+    echo "--- controller 日志(漂移被拉回的证据) ---"
+    grep -E "drift|patched" "$CTL_LOG" | tail -2 || true
+    echo "--- 当前 STS 实际副本 ---"
+    kubectl -n "$NS" get sts orders-db \
+        -o jsonpath='{.spec.replicas}'; echo
+    echo "  ^ 回到 1 即自愈成功 —— 自愈即调谐"
+    echo "  停止 controller: kill $CTL_PID"
 }
 
 do_clean() {

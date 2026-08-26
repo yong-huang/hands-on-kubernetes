@@ -29,7 +29,7 @@ do_install() {
 }
 
 do_upgrade() {
-    step "upgrade" "改值升级: 副本 2->3, 开启 ingress (只提交差异)"
+    step "upgrade" "改值升级: 副本 2->3 (helm3 默认复用上次 release 的值, 这里 --reuse-values 显式表达意图)"
     helm upgrade "$RELEASE" "$CHART" \
         --set replicaCount=3 --set image.tag=1.25.3 --reuse-values --wait
     helm get values "$RELEASE"

@@ -21,15 +21,16 @@ do_deploy() {
 do_flow() {
     step "flow" "验证数据流: 生成器 -> Fluent Bit -> ES 索引"
     sleep 30                                   # 等 Flush 周期
+    # 注意: kubectl 没有 --silent/-q 这类旗标, 静默交给 curl 自己的 -s
     kubectl -n logging run curl --rm -it --restart=Never \
-        --image=curlimages/curl:8.5.0 --silent --rm -i -- \
+        --image=curlimages/curl:8.5.0 -- \
         -s "http://elasticsearch.logging.svc:9200/_cat/indices/k8s-logs-*?v" || true
     echo "  ^ 出现 k8s-logs-YYYY.MM.DD 索引即代表链路通"
 }
 
 do_search() {
     step "search" "直接查 ES: 最近 5 条 ERROR 日志"
-    kubectl -n logging run curlq --rm -q --restart=Never \
+    kubectl -n logging run curlq --rm -it --restart=Never \
         --image=curlimages/curl:8.5.0 -- \
         -s "http://elasticsearch.logging.svc:9200/k8s-logs-*/_search?q=log.level:ERROR&size=5&pretty" >/dev/null 2>&1 || \
     echo "  或在 Kibana Discover 里输入: log.level:ERROR AND kubernetes.namespace_name:\"logging-demo\""

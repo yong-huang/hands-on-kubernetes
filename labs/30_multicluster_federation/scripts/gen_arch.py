@@ -45,7 +45,7 @@ ax1.annotate("", xy=(1.9, 5.55), xytext=(2.2, 5.3),
              arrowprops=dict(arrowstyle="-|>", lw=1.5))
 
 # 成员集群
-members = [(2.2, 2.6, "member-us", "#d62728", "replicas=4\nnginx:1.25-us"),
+members = [(2.2, 2.6, "member-us", "#d62728", "replicas=4\nnginx:1.27"),
            (7.8, 2.6, "member-ap", "#e377c2", "replicas=2\n镜像源替换为\nregistry.ap...")]
 for cx, cy, name, c, detail in members:
     ax1.add_patch(mpatches.FancyBboxPatch((cx - 1.6, cy - 0.95), 3.2, 1.9,

@@ -65,10 +65,10 @@ do_spread() {
     kubectl get pods -l app=web-spread -o jsonpath=\
 '{range .items[*]}{.spec.nodeName}{"\n"}{end}' | sort | uniq -c
 
-    step "spread" "扩到 6 副本: 超过节点数*2 时 maxSkew 无法满足, 观察 Pending"
-    kubectl scale deployment/web-spread --replicas=6
+    step "spread" "扩到 7 副本: 3 节点最多放 2/2/2=6 个, 第 7 个违反 maxSkew=1 -> Pending"
+    kubectl scale deployment/web-spread --replicas=7
     sleep 3
-    kubectl get pods -l app=web-spread -o wide | head -10
+    kubectl get pods -l app=web-spread -o wide | head -12
 
     step "spread" "describe 查看 FailedScheduling 事件 (违反 maxSkew=1)"
     kubectl describe pod -l app=web-spread | grep -A3 -B1 "FailedScheduling" || true

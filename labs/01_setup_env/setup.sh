@@ -27,7 +27,7 @@ check_deps() {
     # kind 的节点本质是 Docker 容器, Docker 是硬依赖
     for cmd in docker kubectl kind; do
         if ! command -v "${cmd}" >/dev/null 2>&1; then
-            echo "[error] 未找到 ${cmd}, 请先安装" && exit 1
+            echo "[error] 未找到 ${cmd}, 请先安装 (kind/kubectl 可运行 ../00_setup_kind/setup_kind.sh)" && exit 1
         fi
     done
     echo "docker  : $(docker  --version)"

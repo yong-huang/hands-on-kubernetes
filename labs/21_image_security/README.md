@@ -54,12 +54,24 @@ verifyImages:
 
 ### 4. 灰度路径：Audit → Enforce
 
+清单里的拦截策略（`block-critical-vuln-images`）以 `validationFailureAction: Audit` 安装（`tier=policy` 分层，deploy 阶段只装应用），`image_security.sh policy` 步骤先以 Audit 模式观察，`deny` 步骤再 `kubectl patch` 切到 Enforce，现场演示 `nginx:1.14.x` 新 Pod 被准入拒绝。注意该策略按**镜像 tag**拦截（tag 即已知漏洞版本的指纹，模拟"依据报告拦截"）；生产环境应改为真正依据 trivy-operator 生成的 `VulnerabilityReport` 数据做门禁（如 policy-reporter 联动，或在 CI 查询报告后再放行部署）。
+
 ```yaml
-validationFailureAction: Enforce   # 先 Audit 观察再切
-exclude: [kube-system, trivy-system, kyverno]
+validate:
+  foreach:
+    - list: "request.object.spec.containers"
+      deny:
+        conditions:
+          any:
+            - key: "{{ regex_match('^nginx:1\\.14\\..*', element.image) }}"
+              operator: Equals
+              value: true
+exclude:
+  any:
+    - namespaces: ["kube-system", "kyverno", "trivy-system"]
 ```
 
-直接对全集群开 Enforce 会误伤系统组件（它们常拉取未签名的基础设施镜像）。正确姿势是先 `Audit` 收集违规面，确认豁免清单后再切换强制模式。
+注意不要用 `"!*nginx:1.14.*"` 这类取反通配——Kyverno pattern 不支持该语法；deny 规则 + JMESPath 条件（`regex_match`）才是正确写法。直接对全集群开 Enforce 会误伤系统组件（它们常拉取未签名的基础设施镜像），所以策略必须带 namespace exclude，并先 `Audit` 收集违规面、确认豁免清单后再切换强制模式。
 
 ---
 

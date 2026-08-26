@@ -68,13 +68,13 @@ do_load() {
 
     step "load" "观察 HPA 扩容 (15s 一个周期; CPU 超过 50% 就扩副本)"
     kubectl get hpa "${HPA}" -n "${NAMESPACE}" -w --request-timeout=120s || true
-    # 期望现象: REPLICAS 从 1 涨到接近 10; PRESS: CPU% / requests 逼近 50%
+    # 期望现象: REPLICAS 从 1 涨到接近 10; TARGETS 列 (CPU%/requests) 向 50% 收敛
 }
 
 # ----------------------------- 4. 撤掉负载, 观察缩容 -----------------------------
 do_unload() {
     step "unload" "删除压测 Pod, 负载归零"
-    kubectl delete pod load-gen spinner-1 spinner-2 --ignore-not-found -n "${NAMESPACE}" --wait=false
+    kubectl delete pod load-gen --ignore-not-found -n "${NAMESPACE}" --wait=false
 
     step "unload" "观察缩容: 需先熬过 300s 稳定窗口 (防抖动)"
     kubectl get hpa "${HPA}" -n "${NAMESPACE}" -w --request-timeout=360s || true
@@ -86,7 +86,7 @@ do_unload() {
 do_clean() {
     step "clean" "删除本演示创建的所有资源 (HPA 与应用一并清掉)"
     kubectl delete -f manifests/hpa.yaml --wait=true
-    kubectl delete pod load-gen spinner-1 spinner-2 --ignore-not-found -n "${NAMESPACE}" || true
+    kubectl delete pod load-gen --ignore-not-found -n "${NAMESPACE}" || true
     kubectl get deploy,hpa,pods -l "${LABEL}" -n "${NAMESPACE}" || true
 }
 

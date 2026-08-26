@@ -112,7 +112,7 @@ http:
 
 ## 国内网络注意（镜像预载清单）
 
-Istio 本体和 sidecar 都以容器镜像交付，而 kind 节点内 containerd 无法直连 docker.io，必须先在宿主机拉取再导入（参见 `../.././load_images.sh` 的通用流程）：
+Istio 本体和 sidecar 都以容器镜像交付，而 kind 节点内 containerd 无法直连 docker.io，必须先在宿主机拉取再导入（参见 `../../scripts/load_images.sh` 的通用流程）：
 
 ```bash
 ISTIO_VERSION=1.23.0
@@ -123,7 +123,7 @@ docker pull docker.m.daocloud.io/istio/proxyv2:${ISTIO_VERSION}
 docker tag  docker.m.daocloud.io/istio/pilot:${ISTIO_VERSION}   docker.io/istio/pilot:${ISTIO_VERSION}
 docker tag  docker.m.daocloud.io/istio/proxyv2:${ISTIO_VERSION} docker.io/istio/proxyv2:${ISTIO_VERSION}
 # 3. 导入所有 kind 节点（sidecar 镜像每个节点都要有！）
-../.././load_images.sh istio/pilot:${ISTIO_VERSION} istio/proxyv2:${ISTIO_VERSION}
+../../scripts/load_images.sh istio/pilot:${ISTIO_VERSION} istio/proxyv2:${ISTIO_VERSION}
 ```
 
 - `pilot` = istiod 控制面镜像（demo profile 下 1 个副本）

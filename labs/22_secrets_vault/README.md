@@ -34,7 +34,7 @@ spec:
         secretPath: "database/creds/demo-app"
 ```
 
-它不是 Secret 本身，而是告诉 CSI 驱动"去哪取、取什么"。注意 `database/creds/*` 前缀——这不是 KV 存储路径，而是**动态引擎**：每次读取都会触发 Vault 现场在 PostgreSQL 里 `CREATE ROLE` 一个新账号。静态路径 `secret/data/*` 则只是读预存值。
+它不是 Secret 本身，而是告诉 CSI 驱动"去哪取、取什么"。注意 `database/creds/*` 前缀——这不是 KV 存储路径，而是**动态引擎**：每次读取都会触发 Vault 现场在 PostgreSQL 里 `CREATE ROLE` 一个新账号（演示用 PostgreSQL 部署在 `vault-demo` 命名空间，管理员账号由 `vault_setup.sh config` 步骤写入引擎配置）。静态路径 `secret/data/*` 则只是读预存值。
 
 ### 2. K8s Auth：Pod 身份换 Vault Token
 
@@ -52,7 +52,7 @@ CSI 驱动拿 Pod 的 ServiceAccount projected token 去 Vault 换取短期 Vaul
 vault write database/roles/demo-app default_ttl=1h max_ttl=24h ...
 ```
 
-每份凭证绑定租约：到期前自动续租、超过 max_ttl 强制作废、Pod 删除时 CSI 驱动主动 revoke。效果是数据库里存在大量短命账号，任何一个泄漏都只在 TTL 窗口内有效。这与静态 Secret"一次生成、永不轮换"形成本质区别。
+每份凭证绑定租约：超过 TTL/max_ttl 即作废、Pod 删除时 CSI 驱动主动 revoke。注意 CSI 驱动**不会**替挂载中的动态 Secret 续租——TTL 到期后文件里保持陈旧值，Pod 重建时才重新签发新凭证。效果是数据库里存在大量短命账号，任何一个泄漏都只在 TTL 窗口内有效。这与静态 Secret"一次生成、永不轮换"形成本质区别。
 
 ### 4. secretObjects 双通道
 
@@ -72,7 +72,7 @@ secretObjects:
 
 上图两面板：
 - **左图 双路径对比**：左侧红色链路是传统静态 Secret（Git → etcd → 永不轮换）的反面教材；右侧蓝色链路是 CSI 动态注入四步（挂载 → K8s Auth → 动态生成 → 文件入容器），底部强调 Pod 销毁即回收
-- **右图 租约生命周期**：申请 → 创建租约 → 自动续租 → 强制过期/revoke 的时间线；下方演示同一 Deployment 三次重建拿到三个不同的临时账号
+- **右图 租约生命周期**：申请 → 创建租约 → 到期后文件保持陈旧值、Pod 重建时重新签发 → 强制过期/revoke 的时间线；下方演示同一 Deployment 三次重建拿到三个不同的临时账号
 
 ---
 

@@ -28,7 +28,7 @@
 kubectl debug broken-app -it --image=busybox:1.36 --target=app -- sh
 ```
 
-临时容器是加进 `spec.ephemeralContainers` 的特殊容器：与业务容器共享 network/IPC/UTS 命名空间（所以同 IP、能抓包），但**没有 ports/probes/env 配置权**、不能重启。它不是修复手段而是诊断手段——看完病就随 Pod 一起消失。
+临时容器是加进 `spec.ephemeralContainers` 的特殊容器：与业务容器共享 network/IPC/UTS 命名空间（所以同 IP、能抓包），但**不能声明 ports/probes/lifecycle/resources**（env 是允许的）、不能重启。它不是修复手段而是诊断手段——看完病就随 Pod 一起消失。
 
 ### 2. `--target`：共享 PID 命名空间是关键
 

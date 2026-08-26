@@ -1,8 +1,13 @@
 # =============================================================================
 # 镜像安全与漏洞扫描演示清单
-# 组成: 1) demo 应用 (故意用老镜像, 供 Trivy 扫出漏洞)
+# 组成: 1) demo 应用 (故意用老镜像, 供 Trivy 扫出漏洞)          [tier=app]
 #       2) VulnerabilityReport 示例 (Trivy Operator 扫描产物 CRD, 节选结构)
-#       3) Kyverno 准入策略: 阻止高危漏洞 / 未签名镜像进入集群
+#       3) Kyverno 准入策略: 阻止高危漏洞 / 未签名镜像进入集群   [tier=policy]
+#
+# 分层标签 (与 lab 12/17 相同的套路): 脚本按步骤 `kubectl apply -l tier=...`
+# 分批生效 —— 先部署应用观察 Trivy 报告, 再以 Audit 模式上策略观察,
+# 最后脚本把策略切到 Enforce 演示真实拦截 (deploy 阶段不装策略,
+# 否则 vulnerable-app 自己就会被挡住, 演示自相矛盾)。
 # =============================================================================
 ---
 # 1. 演示命名空间 + 故意带漏洞的旧版应用
@@ -12,13 +17,16 @@ metadata:
   name: imgsec-demo
   labels:
     pod-security.kubernetes.io/enforce: baseline
+    tier: app
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: vulnerable-app
   namespace: imgsec-demo
-  labels: {app: vulnerable-app}
+  labels:
+    app: vulnerable-app
+    tier: app
 spec:
   replicas: 1
   selector: {matchLabels: {app: vulnerable-app}}
@@ -43,6 +51,7 @@ metadata:
   namespace: imgsec-demo
   labels:
     resource-spec-vendor: trivy-operator
+    tier: app
 report:
   artifact: {repository: library/nginx, tag: "1.14.2"}
   summary:
@@ -61,34 +70,49 @@ report:
       title: DNS resolver off-by-one
       fixedVersion: "1.21.0"
 ---
-# 3a. Kyverno 策略: 拒绝含 Critical 漏洞的镜像 (依据 Trivy 报告标签)
+# 3a. Kyverno 策略: 拒绝已知高危漏洞大版本的镜像
+#     以 Audit 模式安装 (脚本观察后再 patch 成 Enforce 演示真实拦截)。
+#     说明: "!*nginx:1.14.*" 这类"取反通配"在 Kyverno pattern 里是非法语法;
+#     正确写法是 deny 规则 + JMESPath 条件 (regex_match 是支持的内置函数)。
+#     本策略是"按 tag 拦截"的演示 (tag 即漏洞版本的指纹); 生产中应改为
+#     依据 trivy-operator 生成的 VulnerabilityReport 数据做门禁 (如配合
+#     policy-reporter 或在 CI 阶段查询报告后再放行部署)。
 apiVersion: kyverno.io/v1
 kind: ClusterPolicy
 metadata:
   name: block-critical-vuln-images
+  labels:
+    tier: policy
 spec:
-  validationFailureAction: Enforce       # 违规直接拒绝
-  background: false                      # 仅准入时校验 (依赖扫描结果需后台模式)
+  validationFailureAction: Audit         # 先 Audit 观察, deny 步骤会切 Enforce
+  background: false                      # deny 条件引用请求对象, 仅准入时校验
   rules:
     - name: deny-critical-vulnerabilities
       match:
         any:
           - resources: {kinds: [Pod]}
-      preconditions: {}
-      # 生产中常用 cosign-reporter/trivy-operator 的 label 联动;
-      # 这里演示最直接的形态: 校验镜像 tag 不允许使用已知漏洞大版本
+      # 系统命名空间豁免: 系统组件常拉取"未收编"的基础镜像, 不能被误伤
+      exclude:
+        any:
+          - namespaces: ["kube-system", "kyverno", "trivy-system"]
       validate:
-        message: "镜像存在 Critical 漏洞, 禁止部署"
-        pattern:
-          spec:
-            containers:
-              - image: "!*nginx:1.14.*"
+        message: "镜像 nginx:1.14.x 属于已知高危漏洞版本, 禁止部署"
+        foreach:
+          - list: "request.object.spec.containers"
+            deny:
+              conditions:
+                any:
+                  - key: "{{ regex_match('^nginx:1\\.14\\..*', element.image) }}"
+                    operator: Equals
+                    value: true
 ---
 # 3b. Kyverno 策略: 强制镜像签名校验 (cosign verify)
 apiVersion: kyverno.io/v1
 kind: ClusterPolicy
 metadata:
   name: verify-image-signatures
+  labels:
+    tier: policy
 spec:
   validationFailureAction: Enforce
   webhookTimeoutSeconds: 30

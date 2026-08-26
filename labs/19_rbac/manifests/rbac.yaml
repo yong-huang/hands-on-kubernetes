@@ -76,8 +76,9 @@ rules:
   - apiGroups: ["apps"]
     resources: ["deployments"]
     verbs: ["create", "update", "patch", "get", "list"]   # 能改, 但不能删(delete)
-  # 注意: deployer 没有 pods 权限 —— Deployment 创建的 Pod 由系统(serviceaccount default
-  # 之类的控制器身份)完成, deployer 自己 get pods 会 Forbidden
+  # 注意: deployer 没有 pods 权限 —— Deployment 创建的 Pod 由 kube-controller-manager
+  # 里的 Deployment 控制器以其自身身份(system:kube-controller-manager, 不是任何
+  # ServiceAccount)完成, deployer 自己 get pods 会 Forbidden
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding

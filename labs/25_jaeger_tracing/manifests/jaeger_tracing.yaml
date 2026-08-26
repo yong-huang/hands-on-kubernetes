@@ -1,8 +1,10 @@
 # =============================================================================
-# 分布式追踪: Jaeger 全链路采集
-# 组成: 1) Jaeger all-in-one 实例 (实验用; 生产用 Operator + ES/Cassandra 存储)
-#       2) 三层微服务 demo (front -> order -> payment), OTel SDK 上报
-#       3) Istio 场景的 Tracing 配置 (mesh 级自动埋点)
+# 分布式追踪: Jaeger 全链路采集 (OTel Operator 自动埋点版)
+# 组成: 1) Jaeger all-in-one 实验实例 (collector + query + 内存存储)
+#       2) OpenTelemetry Operator 的 Instrumentation CR (声明 python 自动埋点)
+#       3) 三个真实 Python 微服务 front -> order -> payment,
+#          代码放在 ConfigMap 里挂载, 由 operator 注入的 OTel python agent 埋点
+# 前提: 先执行 ./jaeger_tracing.sh install 安装 cert-manager + OTel Operator
 # 核心概念: Trace(一次请求全程) = 多个 Span(一次调用), Span 间 parent/child
 # =============================================================================
 ---
@@ -27,7 +29,6 @@ spec:
           ports:
             - {name: ui,       containerPort: 16686}   # 查询 UI
             - {name: otlp-grpc, containerPort: 4317}   # OTLP gRPC 上报
-            - {name: jaeger-thrift, containerPort: 14268}
 ---
 apiVersion: v1
 kind: Service
@@ -47,7 +48,97 @@ spec:
   selector: {app: jaeger}
   ports: [{name: otlp, port: 4317, targetPort: otlp-grpc}]
 ---
-# 2. 三层微服务: 请求链 front -> order -> payment, 每跳都上报 span
+# 2. Instrumentation CR: OTel Operator 据此向带注解的 Pod 注入 python agent
+#    (init 容器把 agent 拷到 /otel-auto-instrumentation 并设置 PYTHONPATH,
+#     sitecustomize 随解释器启动自动初始化 TracerProvider + OTLP 导出)
+apiVersion: opentelemetry.io/v1beta1
+kind: Instrumentation
+metadata:
+  name: demo-instrumentation
+  namespace: tracing-demo
+spec:
+  exporter:
+    endpoint: http://jaeger-collector.tracing-demo.svc.cluster.local:4317
+  propagators:
+    - tracecontext          # W3C traceparent 头传播
+    - baggage
+  python:
+    image: ghcr.io/open-telemetry/opentelemetry-operator/auto-instrumentation-python:1.33.0
+---
+# 3. 三个服务共用的 Python 代码 (ConfigMap 挂载, 避免自建镜像)
+#    - http.server 起服务; 入口手动 extract traceparent 挂 server span
+#    - 出站 urllib 调用: 自动埋点会建 client span 并透传 header
+#    - 前端自带定时客户端线程产生流量 (真实场景换成 curl/压测)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: demo-service-code
+  namespace: tracing-demo
+data:
+  server.py: |
+    import os
+    import threading
+    import time
+    import urllib.request
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+    # opentelemetry 包来自 operator 注入的 PYTHONPATH(/otel-auto-instrumentation),
+    # sitecustomize 已自动初始化 TracerProvider 与 OTLP 导出
+    from opentelemetry import trace
+    from opentelemetry.propagate import extract, inject
+
+    PORT = int(os.environ.get("PORT", "8080"))
+    DOWNSTREAM = os.environ.get("DOWNSTREAM", "")
+    NAME = os.environ.get("SERVICE_NAME", "svc")
+    tracer = trace.get_tracer("demo-service")
+
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            # 1) 提取上游 W3C traceparent, 把本服务的 span 挂到同一棵 trace 树上
+            ctx = extract(dict(self.headers))
+            with tracer.start_as_current_span(
+                    "GET " + self.path, context=ctx) as span:
+                span.set_attribute("http.method", self.command)
+                span.set_attribute("service.name", NAME)
+                body = "ok"
+                if DOWNSTREAM:
+                    # 2) 出站调用: urllib 自动埋点建 client span 并透传 header,
+                    #    当前 span 是它的 parent —— 链路得以延续
+                    req = urllib.request.Request(DOWNSTREAM)
+                    with urllib.request.urlopen(req, timeout=5) as resp:
+                        body = resp.read().decode()
+                payload = NAME + " <- " + body
+                data = payload.encode()
+                self.send_response(200)
+                self.send_header("Content-Type", "text/plain")
+                self.send_header("Content-Length", str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+
+        def log_message(self, *args):
+            pass  # 静默默认访问日志
+
+
+    def client_loop():
+        # 前端自带客户端: 定时请求自己, 制造可观测的调用链
+        time.sleep(8)
+        while True:
+            try:
+                urllib.request.urlopen(
+                    "http://127.0.0.1:%d/" % PORT, timeout=5).read()
+            except Exception as exc:
+                print("client error:", exc)
+            time.sleep(3)
+
+
+    if __name__ == "__main__":
+        if os.environ.get("START_CLIENT") == "1":
+            threading.Thread(target=client_loop, daemon=True).start()
+        ThreadingHTTPServer(("0.0.0.0", PORT), Handler).serve_forever()
+---
+# 4. 三层微服务: 请求链 front -> order -> payment, 每跳都有 span
+#    注解指向 Instrumentation CR 的名字, operator 在 Pod 创建时注入 agent
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -60,22 +151,33 @@ spec:
     metadata:
       labels: {app: svc-front}
       annotations:
-        instrumentation.opentelemetry.io/inject-python: "true"  # 自动注入 OTel SDK
+        instrumentation.opentelemetry.io/inject-python: "demo-instrumentation"
     spec:
       containers:
         - name: app
-          image: busybox:1.36
-          command: ["sh", "-c",
-            "while true; do wget -qO- http://svc-order:80/order 2>/dev/null; sleep 5; done"]
+          image: python:3.12-slim
+          workingDir: /app
+          command: ["python", "server.py"]
+          env:
+            - {name: SERVICE_NAME, value: "svc-front"}
+            - {name: DOWNSTREAM, value: "http://svc-order:80/order"}
+            - {name: START_CLIENT, value: "1"}   # 前端自带流量发生器
+          ports:
+            - {containerPort: 8080}
+          volumeMounts:
+            - {name: code, mountPath: /app, readOnly: true}
+      volumes:
+        - name: code
+          configMap: {name: demo-service-code}
 ---
 apiVersion: v1
 kind: Service
-metadata: {name: svc-order, namespace: tracing-demo}
+metadata: {name: svc-front, namespace: tracing-demo}
 spec:
-  selector: {app: svc-order}
+  selector: {app: svc-front}
   ports: [{port: 80, targetPort: 8080}]
 ---
-# order 服务: 收到请求后调用 payment, 并把 traceparent 头透传下去 —— 链路得以延续
+# order 服务: 收到请求后调用 payment, traceparent 由 agent 自动透传 —— 链路得以延续
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -88,20 +190,29 @@ spec:
     metadata:
       labels: {app: svc-order}
       annotations:
-        instrumentation.opentelemetry.io/inject-python: "true"
+        instrumentation.opentelemetry.io/inject-python: "demo-instrumentation"
     spec:
       containers:
         - name: app
-          image: curlimages/curl:8.5.0
-          command: ["sh", "-c",
-            "while true; do nc -l -p 8080 -e sh -c 'echo HTTP/1.1 200; echo;
-             curl -s http://svc-payment:80/pay >/dev/null'; done"]
+          image: python:3.12-slim
+          workingDir: /app
+          command: ["python", "server.py"]
+          env:
+            - {name: SERVICE_NAME, value: "svc-order"}
+            - {name: DOWNSTREAM, value: "http://svc-payment:80/pay"}
+          ports:
+            - {containerPort: 8080}
+          volumeMounts:
+            - {name: code, mountPath: /app, readOnly: true}
+      volumes:
+        - name: code
+          configMap: {name: demo-service-code}
 ---
 apiVersion: v1
 kind: Service
-metadata: {name: svc-payment, namespace: tracing-demo}
+metadata: {name: svc-order, namespace: tracing-demo}
 spec:
-  selector: {app: svc-payment}
+  selector: {app: svc-order}
   ports: [{port: 80, targetPort: 8080}]
 ---
 apiVersion: apps/v1
@@ -116,25 +227,26 @@ spec:
     metadata:
       labels: {app: svc-payment}
       annotations:
-        instrumentation.opentelemetry.io/inject-python: "true"
+        instrumentation.opentelemetry.io/inject-python: "demo-instrumentation"
     spec:
       containers:
         - name: app
-          image: busybox:1.36
-          command: ["sh", "-c", "while true; do nc -l -p 8080 -e sh -c 'sleep 0.05;
-                   echo HTTP/1.1 200; echo'; done"]
+          image: python:3.12-slim
+          workingDir: /app
+          command: ["python", "server.py"]
+          env:
+            - {name: SERVICE_NAME, value: "svc-payment"}   # 链路终点: 不再调用下游
+          ports:
+            - {containerPort: 8080}
+          volumeMounts:
+            - {name: code, mountPath: /app, readOnly: true}
+      volumes:
+        - name: code
+          configMap: {name: demo-service-code}
 ---
-# 3. Istio 场景: mesh 代理自动上报 span, 应用只需透传 B3/W3C 头
-#    (若集群装有 istiod, 此 Telemetry API 打开 tracing 采样)
-apiVersion: telemetry.istio.io/v1alpha1
-kind: Telemetry
-metadata:
-  name: mesh-default-tracing
-  namespace: istio-system
+apiVersion: v1
+kind: Service
+metadata: {name: svc-payment, namespace: tracing-demo}
 spec:
-  accessLogging:
-    - disabled: false
-  tracing:
-    - randomSamplingPercentage: 10        # 生产常用 1~10% 采样率
-      providers:
-        - name: otel                       # 指向上一步部署的 OTLP collector
+  selector: {app: svc-payment}
+  ports: [{port: 80, targetPort: 8080}]

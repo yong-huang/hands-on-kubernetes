@@ -55,8 +55,8 @@ def main():
     box(ax1, 7.8, 2.0, 3.0, 1.0, "Service web-b\n-> Pods", C4, fontsize=8)
 
     arrow(ax1, 5, 8.5, 5, 7.4, C1, "HTTP + Host header")
-    arrow(ax1, 3.4, 6.5, 2.5, 5.0, C3)
-    arrow(ax1, 6.6, 6.5, 7.5, 5.0, C3, "watch")
+    arrow(ax1, 3.4, 6.5, 2.5, 5.0, C3, "watch Ingress")
+    arrow(ax1, 6.6, 6.5, 7.5, 5.0, C3, "generate")
     arrow(ax1, 2.2, 3.85, 2.2, 2.5, C3, "host=a.com")
     arrow(ax1, 7.8, 3.85, 7.8, 2.5, C3, "host=b.com")
     ax1.text(5, 0.6, "Ingress = rules only; Controller does the work\n"

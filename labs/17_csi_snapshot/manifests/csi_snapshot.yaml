@@ -15,12 +15,22 @@
 #   Ceph RBD (rbd.csi.ceph.com) ...
 #   kind local-path: 不支持 (无 CSI 快照接口)
 # =============================================================================
+# 分层标签 (与 lab 12 相同的套路): 每段文档带 tier 标签, 脚本按步骤
+# `kubectl apply -l tier=xxx` 分批生效, 避免 deploy 阶段就把
+# VolumeSnapshot / 还原 PVC 一口气全 apply 进去 (还原 PVC 会在 kind 上
+# 永远 Pending, 干扰观察)。
+#   tier=app       — 源数据 PVC + Pod (deploy 步骤)
+#   tier=snapshot  — VolumeSnapshotClass + VolumeSnapshot (snapshot 步骤)
+#   tier=restore   — 从快照还原的新 PVC (restore 步骤, kind 上仅作演示)
+# =============================================================================
 ---
 # ----------------------------- 1. 源数据: PVC + 写数据的 Pod -----------------------------
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: snap-source            # 被快照的源卷
+  labels:
+    tier: app
 spec:
   accessModes: [ReadWriteOnce]
   resources:
@@ -33,6 +43,8 @@ apiVersion: v1
 kind: Pod
 metadata:
   name: snap-source-pod
+  labels:
+    tier: app
 spec:
   restartPolicy: Never
   containers:
@@ -53,6 +65,8 @@ apiVersion: snapshot.storage.k8s.io/v1
 kind: VolumeSnapshotClass
 metadata:
   name: snapclass-demo
+  labels:
+    tier: snapshot
   # deletionPolicy: Delete — 删 VolumeSnapshot 时连底层存储快照一起删
   #                 Retain — 只删 K8s 对象, 存储后端快照保留 (需手动清理)
 deletionPolicy: Delete
@@ -66,6 +80,8 @@ apiVersion: snapshot.storage.k8s.io/v1
 kind: VolumeSnapshot
 metadata:
   name: snap-demo
+  labels:
+    tier: snapshot
 spec:
   volumeSnapshotClassName: snapclass-demo
   source:
@@ -83,6 +99,8 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: snap-restored          # 还原出的新卷
+  labels:
+    tier: restore
 spec:
   accessModes: [ReadWriteOnce]
   resources:

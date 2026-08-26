@@ -36,20 +36,29 @@ do_config() {
     export VAULT_TOKEN="root"                       # dev 模式固定 root token
 
     # K8s 认证: 让 Pod 的 SA Token 可换 Vault token
+    # 注意: 本脚本在宿主机运行, 没有 KUBERNETES_SERVICE_* 环境变量,
+    # 从当前 kubeconfig 读取 API Server 地址 (kind 集群即控制面容器暴露的端口)
+    kubernetes_host="$(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}')"
     vault auth enable kubernetes 2>/dev/null || true
     vault write auth/kubernetes/config \
-        kubernetes_host="https://$KUBERNETES_SERVICE_HOST:$KUBERNETES_SERVICE_PORT"
+        kubernetes_host="$kubernetes_host"
     vault write auth/kubernetes/role/demo-app \
         bound_service_account_names=demo-app \
         bound_service_account_namespaces="$NS_APP" \
         policies=demo-app ttl=1h
 
     # 数据库动态引擎: 每次"租约"生成一组临时 DB 凭证(TTL 1h, 自动回收)
+    # 先部署演示用 PostgreSQL(清单里自带, 见 manifests/vault_secrets.yaml 末尾),
+    # 引擎要用管理员账号连上去执行 CREATE ROLE
+    kubectl apply -f manifests/vault_secrets.yaml >/dev/null
+    kubectl -n "$NS_APP" rollout status deploy/postgres --timeout=180s
+
     vault secrets enable database 2>/dev/null || true
     vault write database/config/my-postgres \
         plugin_name=postgresql-database-plugin \
         allowed_roles=demo-app \
-        connection_url="postgresql://{{username}}:{{password}}@postgres.default:5432/app?sslmode=disable"
+        username="vaultadmin" password="vaultadminpass" \
+        connection_url="postgresql://{{username}}:{{password}}@postgres.vault-demo.svc.cluster.local:5432/app?sslmode=disable"
     vault write database/roles/demo-app \
         db_name=my-postgres \
         creation_statements="CREATE ROLE \"{{name}}\" WITH LOGIN PASSWORD '{{password}}';" \

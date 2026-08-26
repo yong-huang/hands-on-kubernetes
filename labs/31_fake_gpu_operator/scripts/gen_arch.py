@@ -81,23 +81,31 @@ for cx, cy, txt, c in gate:
                   boxstyle="round,pad=0.08", fc=c, ec="black"))
     ax2.text(cx, cy, txt, ha="center", va="center", fontsize=8.8,
              color="white" if c != "#aec7e8" else "black")
-for y in (7.65, 5.55, 3.45):
+# 第1关之前的箭头: 两个任务都会提交
+ax2.annotate("", xy=(2.6, 7.65 - 0.75), xytext=(2.6, 7.65),
+             arrowprops=dict(arrowstyle="-|>", lw=1.6))
+# 第1关之后: 只有 train-small 能继续走到过滤/绑定 (虚线示意)
+for y in (5.55, 3.45):
     ax2.annotate("", xy=(2.6, y - 0.75), xytext=(2.6, y),
-                 arrowprops=dict(arrowstyle="-|>", lw=1.6))
+                 arrowprops=dict(arrowstyle="-|>", lw=1.4, ls="--",
+                                 color="#555"))
+ax2.text(1.05, 5.0, "train-big 在第1关即被拒\n(admission 拒绝, Pod 不创建),\n后面关卡只有 train-small 走",
+         ha="left", va="center", fontsize=7.8, color="#d62728")
 
 outcomes = [
     (6.9, 7.3, "train-small (1卡)", "#2ca02c",
      "配额内 + 有空闲卡\n-> Running, describe node\n可见 GPU 已分配 1/8"),
-    (6.9, 4.4, "train-big (6卡)", "#d62728",
-     "已用1+要6 > 额度4\n-> exceeded quota,\nPod 根本不创建"),
+    (6.9, 6.3, "train-big (6卡)", "#d62728",
+     "已用1+要6 > 额度4\n-> exceeded quota,\nPod 在第1关即被拒, 根本不创建"),
 ]
 for cx, cy, head, c, body in outcomes:
     ax2.add_patch(mpatches.FancyBboxPatch((cx - 2.0, cy - 0.5), 4.0, 1.0,
                   boxstyle="round,pad=0.07", fc=c, ec="black"))
     ax2.text(cx, cy + 0.18, head, ha="center", fontsize=9.5,
              color="white", fontweight="bold")
-    ax2.annotate("", xy=(4.6, cy), xytext=(cx - 2.0, cy),
-                 arrowprops=dict(arrowstyle="-|>", lw=1.4, ls="--"))
+    ax2.annotate("", xy=(4.55, cy), xytext=(cx - 2.0, cy),
+                 arrowprops=dict(arrowstyle="-|>", lw=1.4, ls="--",
+                                 color=c if c == "#d62728" else "black"))
 ax2.add_patch(mpatches.FancyBboxPatch((5.1, 1.6), 3.6, 1.5,
               boxstyle="round,pad=0.08", fc="#f5f5f5", ec="#999"))
 ax2.text(6.9, 2.72, "巡检命令", ha="center", fontsize=9, fontweight="bold")

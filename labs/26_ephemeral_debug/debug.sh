@@ -35,8 +35,11 @@ do_copy() {
     step "copy" "姿势2: 复制克隆 Pod 调试 (--copy-to, 原 Pod 保持原样)"
     kubectl -n "$NS" debug broken-app --image=ubuntu:22.04 \
         --copy-to=broken-app-debug --sleep-forever --command -- bash || true
+    # 打上 app=net-victim 标签: 让 deny-egress-all NetworkPolicy 也选中这个
+    # 调试 Pod, 与原 net-victim 配对演示"断网现场 + 抓包诊断"
     kubectl -n "$NS" run net-victim-dbg --rm -it --restart=Never \
-        --image=nicolaka/netshoot:v0.12 -- nslookup kubernetes.default || true
+        -l app=net-victim --image=nicolaka/netshoot:v0.12 -- \
+        nslookup kubernetes.default || true
     echo "  ^ netshoot 抓包/诊断工具箱: tcpdump dig traceroute mtr ..."
 }
 

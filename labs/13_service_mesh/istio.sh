@@ -45,7 +45,7 @@ do_install() {
     fi
     istioctl version
 
-    step "install" "kind 集群镜像预载 (Istio 组件 ~10 个镜像, 节点无法直连 docker.io)"
+    step "install" "kind 集群镜像预载 (demo profile 只需 2 个核心镜像, 节点无法直连 docker.io)"
     echo "Istio 需要的核心镜像 (istiod 用 pilot, sidecar/gateway 用 proxyv2):"
     echo "  docker pull ${MIRROR}/istio/pilot:${ISTIO_VERSION}"
     echo "  docker pull ${MIRROR}/istio/proxyv2:${ISTIO_VERSION}"

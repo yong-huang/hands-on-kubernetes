@@ -19,15 +19,15 @@ ArgoCD 就是这样一个运行在集群内的控制器，也是 CNCF 毕业项�
 ├── README.md    # 本文档
 ├── argocd.sh          # 演示脚本: install | app | status | sync | clean | all
 ├── manifests/
-│   └── app-of-apps.yaml   # Application CRD 示例: guestbook 应用 + app-of-apps 根应用(注释)
-└── argocd-install.yaml  # ArgoCD 安装清单(本地缓存, 优先于在线拉取)
+│   ├── app-of-apps.yaml   # Application CRD 示例: guestbook 应用 + app-of-apps 根应用(注释)
+│   └── argocd-install.yaml  # ArgoCD 官方安装清单(已 vendor 进仓库, 约 24500 行, 离线可用)
 ├── scripts/
 │   └── gen_arch.py        # 架构图生成脚本 (python3 scripts/gen_arch.py)
 └── images/
        └── gitops_arch.png    # GitOps 闭环 + Pull/Push 对比 + app-of-apps 示意图
 ```
 
-安装清单 `argocd-install.yaml`（约 7000 行）不放进仓库，由脚本下载或手动缓存到本目录。
+安装清单 `manifests/argocd-install.yaml`（约 24500 行）已直接 vendor 进仓库，安装优先使用本地文件，无需联网。
 
 ## 核心概念
 

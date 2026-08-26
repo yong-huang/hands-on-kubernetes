@@ -36,6 +36,10 @@ spec:
   placement:
     clusterAffinity:                # 静态指定目标集群
       clusterNames: [member-us, member-ap]
+    clusterTolerations:             # 成员集群不可达的容忍阈值(故障转移)
+      - key: cluster.karmada.io/not-ready
+        operator: Exists
+        tolerationSeconds: 60       # 失联 60s 后把它的份额迁去别家
     replicaScheduling:              # 副本拆分策略
       replicaSchedulingType: Divided        # 拆分而非每个集群全量复制
       replicaDivisionPreference: Weighted    # 加权分配
@@ -60,32 +64,19 @@ spec:
   overrideRules:
     - targetCluster:
         clusterNames: [member-ap]   # 亚太集群用就近镜像源
-    overriders:
-      imageOverrider:
-        - component: Registry
-          operator: replace
-          value: registry.ap.example.com
+      overriders:
+        imageOverrider:
+          - component: Registry
+            operator: replace
+            value: registry.ap.example.com
     - targetCluster:
         clusterNames: [member-us]
-    overriders:
-      imageOverrider:
-        - component: Tag
-          operator: replace
-          value: "1.25-us"          # 美区打专属 tag
+      overriders:
+        imageOverrider:
+          - component: Tag
+            operator: replace
+            value: "1.27"           # 美区打专属 tag(必须是真实存在的 tag, 否则 ImagePullBackOff)
 ---
-# 4. 故障转移: 集群失联时自动迁移到候选集群
-apiVersion: policy.karmada.io/v1alpha1
-kind: PropagationPolicy
-metadata:
-  name: geo-app-failover
-  namespace: federation-demo
-spec:
-  resourceSelectors:
-    - {apiVersion: apps/v1, kind: Deployment, name: geo-app}
-  placement:
-    clusterAffinity:
-      clusterNames: [member-us, member-ap]
-    clusterTolerations:             # 成员集群不可达的容忍阈值
-      - key: cluster.karmada.io/not-ready
-        operator: Exists
-        tolerationSeconds: 60       # 失联 60s 后把它的份额迁去别家
+# 注: 故障转移的容忍阈值(clusterTolerations)已合并进上面的 geo-app-propagation。
+# Karmada 同命名空间的 PropagationPolicy 对同一资源只允许一个 claim,
+# 拆成两个策略会导致第二个永远不生效。

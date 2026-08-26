@@ -20,7 +20,8 @@ spec:
                                 # parallelism < completions 时任务分批跑
   backoffLimit: 4               # 失败重试上限: 累计 4 个 Pod 失败后 Job 标记 Failed
                                 # 重试间隔指数退避 (10s, 20s, 40s ...)
-  activeDeadlineSeconds: 60     # Job 整体最长运行 60 秒, 超时强制终止并标记 Failed
+  activeDeadlineSeconds: 300    # Job 整体最长运行 300 秒, 超时强制终止并标记 Failed
+                                # 含拉取 perl 镜像的时间, 网络慢时 60s 不够用
                                 # 优先级高于 backoffLimit (还没重试完就可能被截断)
   template:                     # Pod 模板: Job 按此模板创建 Pod
     metadata:

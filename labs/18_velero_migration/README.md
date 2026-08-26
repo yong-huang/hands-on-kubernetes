@@ -59,7 +59,7 @@ metadata:
 
 ## 国内网络注意
 
-- **镜像**：`docker.io/velero/velero` 与 `velero/velero-plugin-for-aws` 都在 docker.io，kind 环境先 `docker pull` 再用仓库根 `./load_images.sh` 灌进节点；node agent 镜像同理。
+- **镜像**：`docker.io/velero/velero` 与 `velero/velero-plugin-for-aws` 都在 docker.io，kind 环境先 `docker pull` 再用仓库根的 `scripts/load_images.sh`（从本实验目录即 `../../scripts/load_images.sh`）灌进节点；node agent 镜像同理。
 - **CLI**：`brew install velero` 或 GitHub release 下载（darwin-amd64/arm64 tar.gz），release 下载慢可走代理但务必核对 checksum；CLI 版本与服务端保持一致（本项目按 v1.14）。
 - **对象存储**：国内用 OSS 的 S3 兼容端点或自建 MinIO（`--backup-location-config s3ForcePathStyle=true,s3Url=http://minio:9000`）。
 

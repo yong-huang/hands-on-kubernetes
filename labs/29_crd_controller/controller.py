@@ -4,9 +4,9 @@ Database CRD 的最小可用 Controller (kubernetes python client)
 
 Reconcile 循环: 对比 期望状态(spec) 与 实际状态(集群里有什么)
   1. 读 Database CR
-  2. 不存在对应 PVC      -> 创建 PVC (按 spec.size)
-  3. 不存在 StatefulSet  -> 创建 (engine/version/replicas 渲染镜像)
-  4. 就绪后回写 status    -> phase=Running, endpoint=svc dns
+  2. 不存在 headless Service -> 创建 (STS 的 serviceName 指向它)
+  3. 不存在 StatefulSet      -> 创建 (engine/version/replicas 渲染镜像)
+  4. 就绪后回写 status        -> phase=Running, endpoint=svc dns
 任何时刻重新运行都会收敛到同一结果 —— 幂等是 controller 的灵魂。
 """
 
@@ -46,13 +46,14 @@ CO, CORE, APPS = init_clients()
 # 期望状态渲染: CR spec -> 具体资源清单
 # ------------------------------------------------------------------
 
-def pvc_manifest(db_name: str, size: str) -> dict:
+def svc_manifest(db_name: str) -> dict:
+    """headless Service: STS 的 serviceName 必须指向一个真实存在的 Service,
+    Pod DNS (pod-0.<svc>) 和 status.endpoint 才可解析"""
     return {
-        "apiVersion": "v1", "kind": "PersistentVolumeClaim",
-        "metadata": {"name": f"{db_name}-data", "namespace": NS,
-                     "labels": {"app.kubernetes.io/managed-by": "db-operator"}},
-        "spec": {"accessModes": ["ReadWriteOnce"],
-                 "resources": {"requests": {"storage": size}}},
+        "apiVersion": "v1", "kind": "Service",
+        "metadata": {"name": db_name, "namespace": NS},
+        "spec": {"clusterIP": "None",          # headless: DNS 直接解析到 Pod IP
+                 "selector": {"db": db_name}},
     }
 
 
@@ -60,6 +61,13 @@ def sts_manifest(cr: dict) -> dict:
     name = cr["metadata"]["name"]
     spec = cr["spec"]
     image = {"postgres": "postgres", "mysql": "mysql"}[spec["engine"]]
+    # 引擎差异: 端口 / 数据目录 / root 密码环境变量各不相同
+    per_engine = {
+        "postgres": {"port": 5432, "data_dir": "/var/lib/postgresql/data",
+                     "password_env": "POSTGRES_PASSWORD"},
+        "mysql":    {"port": 3306, "data_dir": "/var/lib/mysql",
+                     "password_env": "MYSQL_ROOT_PASSWORD"},
+    }[spec["engine"]]
     return {
         "apiVersion": "apps/v1", "kind": "StatefulSet",
         "metadata": {"name": name, "namespace": NS},
@@ -72,15 +80,14 @@ def sts_manifest(cr: dict) -> dict:
                 "spec": {"containers": [{
                     "name": spec["engine"],
                     "image": f"{image}:{spec.get('version', '16')}",
-                    "ports": [{"containerPort": 5432 if spec["engine"]
-                               == "postgres" else 3306}],
+                    "ports": [{"containerPort": per_engine["port"]}],
                     "volumeMounts": [{"name": "data",
-                                      "mountPath": "/var/lib/postgresql/data"}],
-                    "env": [{"name": "POSTGRES_PASSWORD",
+                                      "mountPath": per_engine["data_dir"]}],
+                    "env": [{"name": per_engine["password_env"],
                              "value": "changeme"}],
                 }]},
             },
-            "volumeClaimTemplates": [{
+            "volumeClaimTemplates": [{     # 数据卷由 STS 的 VCT 自管, 无需单独建 PVC
                 "metadata": {"name": "data"},
                 "spec": {"accessModes": ["ReadWriteOnce"],
                          "resources": {"requests":
@@ -105,23 +112,24 @@ def reconcile(name: str) -> None:
     LOG(f"reconcile {name}: engine={cr['spec']['engine']} "
         f"size={cr['spec']['size']}")
 
-    # 1) 确保数据卷存在 (独立于 STS 的场景演示; STS 内置了 VCT)
-    pvcs = [p.metadata.name for p in CORE.list_namespaced_persistent_volume_claim(
-        NS).items]
-    if f"{name}-data" not in pvcs and not cr["spec"].get("useVct", True):
-        CORE.create_namespaced_persistent_volume_claim(
-            NS, body=pvc_manifest(name, cr["spec"]["size"]))
-        LOG(f"created PVC {name}-data")
+    # 1) 确保 headless Service 存在 (STS 的 serviceName 依赖它, 幂等创建)
+    try:
+        CORE.read_namespaced_service(name, NS)
+    except k8s.client.ApiException as e:
+        if e.status == 404:
+            CORE.create_namespaced_service(
+                NS, body=svc_manifest(name))
+            LOG(f"created headless Service {name}")
 
     # 2) 确保工作负载存在且规格匹配
     want = sts_manifest(cr)
     try:
-        have = APPS.read_namespaced_stateful_set(NS, name)
+        have = APPS.read_namespaced_stateful_set(name, NS)
         drift = (have.spec.replicas != want["spec"]["replicas"] or
-                 not have.spec.template.spec.containers[0]["image"].endswith(
+                 not have.spec.template.spec.containers[0].image.endswith(
                      cr["spec"].get("version", "")))
         if drift:                                   # 有漂移 -> 更新
-            APPS.patch_namespaced_stateful_set(NS, name, body=want)
+            APPS.patch_namespaced_stateful_set(name, NS, body=want)
             LOG(f"patched StatefulSet {name} (drift detected)")
     except k8s.client.ApiException as e:
         if e.status == 404:                          # 不存在 -> 创建
@@ -130,7 +138,7 @@ def reconcile(name: str) -> None:
 
     # 3) 回写状态
     try:
-        ready = APPS.read_namespaced_stateful_set_status(NS, name)
+        ready = APPS.read_namespaced_stateful_set_status(name, NS)
         n_ready = ready.status.ready_replicas or 0
         phase = ("Running" if n_ready == want["spec"]["replicas"]
                  else "Provisioning")

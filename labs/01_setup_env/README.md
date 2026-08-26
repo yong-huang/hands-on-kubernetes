@@ -70,7 +70,7 @@ kind 硬依赖 Docker daemon（节点就是容器）；`docker info` 探活比 `
 ### Step 2: 集群配置（heredoc 生成）
 
 ```bash
-cat > kind-config.yaml <<EOF
+cat > manifests/kind-config.yaml <<EOF
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 name: k8s-learn
@@ -86,7 +86,7 @@ EOF
 ### Step 3: 创建集群 + 切换 context
 
 ```bash
-kind create cluster --config kind-config.yaml --wait 120s
+kind create cluster --config manifests/kind-config.yaml --wait 120s
 kubectl config use-context kind-k8s-learn
 ```
 
@@ -102,7 +102,17 @@ kubectl wait --for=condition=Ready nodes --all --timeout=180s
 
 `kubectl wait` 是比 sleep 优雅得多的等待原语：轮询直到条件满足，立刻返回。
 
-### Step 5: 测试负载
+### Step 5: 预加载测试镜像（国内网络）
+
+```bash
+docker pull docker.m.daocloud.io/library/nginx:alpine
+docker tag  docker.m.daocloud.io/library/nginx:alpine nginx:alpine
+docker save nginx:alpine | docker exec --privileged -i <node> ctr --namespace=k8s.io images import -
+```
+
+kind 节点内直连 registry-1.docker.io 会 TLS 超时（国内网络）。改为：宿主机从镜像源拉取 → `docker save` + `ctr images import` 灌入每个节点。非 latest 标签的 `imagePullPolicy` 默认 IfNotPresent，节点有镜像就不会再拉。
+
+### Step 6: 测试负载
 
 ```bash
 kubectl create deployment nginx --image=nginx:alpine
@@ -122,7 +132,7 @@ kind delete cluster --name k8s-learn   # 或 ./setup.sh down
 
 ![setup](images/setup_arch.png)
 
-左图：kind 架构——kubectl 通过 context 连向宿主机 Docker 里的三个容器节点，control-plane 调度 Pod 到两个 worker。右图：setup.sh 的五步流程，从依赖检查到测试负载部署。
+左图：kind 架构——kubectl 通过 context 连向宿主机 Docker 里的三个容器节点，control-plane 调度 Pod 到两个 worker。右图：setup.sh 的六步流程，从依赖检查、生成配置、创建集群、验证、镜像预加载到测试负载部署。
 
 ## 6. 面试要点 / 常见问题
 

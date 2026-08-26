@@ -7,7 +7,7 @@
 set -euo pipefail
 
 # 统一切换到实验根目录, 使 manifests/ 等相对路径生效
-SCRIPT_
+cd "$(dirname "$0")"
 NS="${1:-default}"
 MANIFEST="manifests/pod.yaml"
 
@@ -54,8 +54,13 @@ step "sidecar Pod：分别看主容器和 sidecar 容器的日志（-c 指定容
 kubectl logs nginx-sidecar-pod -c nginx      -n "$NS" --tail=5 || true
 kubectl logs nginx-sidecar-pod -c log-tailer -n "$NS" --tail=5 || true
 
-step "跟踪式日志 (-f)，Ctrl+C 退出"
+step "跟踪式日志 (-f)，后台跟踪几秒后自动结束 (脚本里不便 Ctrl+C)"
 kubectl logs -f nginx-sidecar-pod -c log-tailer -n "$NS" --tail=3 &
+LOG_PID=$!
+sleep 5
+# 演示结束, 杀掉后台日志进程, 避免它一直挂着污染后续步骤的输出
+kill "${LOG_PID}" 2>/dev/null || true
+wait "${LOG_PID}" 2>/dev/null || true
 
 # ---------- 4. exec：进入容器执行命令 ----------
 header "4. kubectl exec"

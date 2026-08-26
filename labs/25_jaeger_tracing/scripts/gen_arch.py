@@ -48,9 +48,9 @@ ax1.set_xlim(0, 260); ax1.set_ylim(-1.4, len(spans))
 # ============================ Panel 2: 数据流与传播 ============================
 ax2.set_title("Jaeger 链路数据流: W3C traceparent 头透传是关键", fontsize=13)
 boxes = [
-    (1.7, 8.4, "client 发起请求\n生成 trace-id", "#aec7e8"),
-    (5.0, 8.4, "svc-front\nOTel SDK 建 span", "#1f77b4"),
-    (8.3, 8.4, "svc-order / payment\n透传 header 继续建 span", "#2ca02c"),
+    (1.7, 8.4, "client (front 内置流量线程)\n发起请求生成 trace-id", "#aec7e8"),
+    (5.0, 8.4, "svc-front\nOTel agent 建 span", "#1f77b4"),
+    (8.3, 8.4, "svc-order -> svc-payment\n逐跳透传 header 建 span", "#2ca02c"),
     (8.3, 5.2, "OTLP gRPC :4317\n批量异步上报", "#ff7f0e"),
     (5.0, 5.2, "Jaeger Collector\n校验/入库", "#d62728"),
     (1.7, 5.2, "存储 (内存/ES)\n按 trace-id 索引", "#9467bd"),
@@ -80,7 +80,7 @@ ax2.annotate("", xy=(6.85, 7.9), xytext=(5.6, 7.35),
 
 ax2.add_patch(mpatches.FancyBboxPatch((4.0, 0.4), 5.6, 1.3,
               boxstyle="round,pad=0.08", fc="#f5f5f5", ec="#999"))
-ax2.text(6.8, 1.05, "Istio 场景: sidecar 自动上报 span,\n应用只需透传头; Telemetry API 控制采样率(1~10%)",
+ax2.text(6.8, 1.05, "自动埋点: OTel Operator 注入 python agent (init 容器), 注解\ninstrumentation.opentelemetry.io/inject-python; 本实验全量采样, 生产常用 1~10%",
          ha="center", va="center", fontsize=8.8)
 
 ax2.set_xlim(-0.2, 10); ax2.set_ylim(0.2, 9.4); ax2.axis("off")

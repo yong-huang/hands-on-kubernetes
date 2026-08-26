@@ -109,4 +109,4 @@ topologySpreadConstraints:
 
 ## 总结
 
-调度约束只有两件事：**过滤（硬性）与打分（软性）**。nodeAffinity 管节点维度，pod(anti)Affinity 管 Pod 维度，topologySpreadConstraints 管数量均匀度；`required`/`DoNotSchedule` 不满足就 Pending，`preferred`/`ScheduleAnyway` 尽力而为。记住 `IgnoredDuringExecution`——这些规则只在调度瞬间生效，之后拓扑怎么变都不会动已运行的 Pod。配合 `affinity.sh` 里扩容到 6 副本触发 `FailedScheduling` 的演示，能直观看到"约束太硬，节点不够"时调度器的行为。
+调度约束只有两件事：**过滤（硬性）与打分（软性）**。nodeAffinity 管节点维度，pod(anti)Affinity 管 Pod 维度，topologySpreadConstraints 管数量均匀度；`required`/`DoNotSchedule` 不满足就 Pending，`preferred`/`ScheduleAnyway` 尽力而为。记住 `IgnoredDuringExecution`——这些规则只在调度瞬间生效，之后拓扑怎么变都不会动已运行的 Pod。配合 `affinity.sh` 里扩容到 7 副本触发 `FailedScheduling` 的演示（3 节点下 2/2/2 已是 maxSkew=1 的极限，第 7 个副本无处可放），能直观看到"约束太硬，节点不够"时调度器的行为。

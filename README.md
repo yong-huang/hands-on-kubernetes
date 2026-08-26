@@ -4,10 +4,11 @@ Kubernetes 动手学习系列：通过 **31 个可真实跑通的小项目**，�
 
 ## 环境要求
 
-- Docker（kind 以容器模拟节点）
-- kind + kubectl
+- Docker（kind 以容器模拟节点；未装 kind/kubectl 先跑 [labs/00_setup_kind](labs/00_setup_kind/README.md)）
+- kind ≥ 0.20、kubectl ≥ 1.28（节点镜像不锁定版本，使用 kind 默认）
 - 部分实验额外需要：helm（27）、istioctl（13）、velero CLI（18）、trivy/cosign（21）、karmadactl（30）等，见各实验 README
-- 国内网络建议先配置镜像加速；批量预载镜像到 kind 节点用公共脚本：
+
+**海外网络**：实验镜像均可从 docker.io 直接拉取，无需预载，可跳过 `load_images.sh`。国内网络建议先配置镜像加速；批量预载镜像到 kind 节点用公共脚本：
 
 ```bash
 scripts/load_images.sh [image1 image2 ...]   # 无参数时加载默认列表
@@ -34,6 +35,7 @@ hands-on-kubernetes/
 
 | # | 实验 | 主题 |
 |---|------|------|
+| 00 | [工具准备](labs/00_setup_kind/README.md) | 安装 kind + kubectl |
 | 01 | [环境搭建](labs/01_setup_env/README.md) | kind 本地集群：拓扑、CNI、验证 |
 | 02 | [Pod](labs/02_pod/README.md) | 最小调度单元、生命周期、探针 |
 | 03 | [Deployment](labs/03_deploy/README.md) | 自愈、扩缩容、滚动更新与回滚 |
@@ -84,3 +86,7 @@ cd labs/03_deploy
 ```
 
 所有实验都在 kind 集群（`k8s-learn`）上验证过；涉及外网镜像的实验，README 中均标注了用 `scripts/load_images.sh` 预载的方法。
+
+## License
+
+[MIT](LICENSE) — 实验代码与文档可自由使用、修改和分发。

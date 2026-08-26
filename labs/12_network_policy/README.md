@@ -120,7 +120,7 @@ spec:
 - **podSelector 选的是"受策略影响的 Pod"**，不是"允许访问的来源"——来源在 `ingress.from` 里写，初学者最容易搞反
 - `ports.port` 是 **Pod/容器端口**；即使通过 Service 访问，策略匹配的也是最终落到后端 Pod 的 targetPort
 - NetworkPolicy 是**命名空间级别**的对象，`from.podSelector` 只在**同命名空间**内选；跨命名空间必须配合 `namespaceSelector`
-- 策略叠加是并集：多条策略选中同一 Pod 时，任一条放行即放行，没有 deny 规则（K8s 原生没有"黑名单"，要黑名单得用 CNI 扩展如 Calico 的 `calico-plugin` 全局策略）
+- 策略叠加是并集：多条策略选中同一 Pod 时，任一条放行即放行，没有 deny 规则（K8s 原生没有"黑名单"，要黑名单得用 CNI 扩展策略，如 Calico 的 `GlobalNetworkPolicy`（projectcalico.org/v3，支持集群级策略与 deny 规则），或 Cilium 的 `CiliumNetworkPolicy`（基于 eBPF，支持 L3-L7 规则））
 
 ## kind/kindnet 不生效问题与 Calico 方案
 

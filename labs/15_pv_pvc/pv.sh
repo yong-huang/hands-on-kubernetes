@@ -86,6 +86,8 @@ do_verify() {
 
 # ----------------------------- 3. 回收策略演示 (Retain) -----------------------------
 do_reclaim() {
+    local node
+    node=$(pod_node)                # 先取节点名, 删 Pod 后就查不到了
     step "reclaim" "先删除正在使用 PVC 的 Pod (否则 PVC 因 pvc-protection 卡 Terminating)"
     kubectl delete pod "${POD}" -n "${NAMESPACE}" --ignore-not-found --wait=true
 
@@ -100,8 +102,6 @@ do_reclaim() {
 
     step "reclaim" "手动清理第二步: 进入 kind 节点容器删除宿主数据"
     echo "(kind 节点本身是容器, NODE_DIR 解析在节点容器内部)"
-    local node
-    node=$(pod_node)
     if [[ -n "${node}" ]]; then
         echo "docker exec ${node} rm -rf ${NODE_DIR}"
         docker exec "${node}" rm -rf "${NODE_DIR}" \

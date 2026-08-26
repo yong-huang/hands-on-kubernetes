@@ -24,7 +24,7 @@ ax1.add_patch(mpatches.FancyBboxPatch((0.8, 5.9), 4.4, 2.2,
               boxstyle="round,pad=0.08", fc="#d62728", ec="black"))
 ax1.text(3.0, 7.55, "app 容器 (distroless, 无 shell)", ha="center",
          fontsize=10, color="white", fontweight="bold")
-ax1.text(3.0, 6.55, "PID 1: /broken-binary  <- 启动即崩\nnet + ipc ns 独立; 文件系统只读挂载",
+ax1.text(3.0, 6.55, "PID 1: /broken-binary  <- 启动即崩\nPID ns 本容器独有(net/ipc ns 为 Pod 级共享); 文件系统只读挂载",
          ha="center", va="center", fontsize=8.2, color="white")
 
 ax1.add_patch(mpatches.FancyBboxPatch((0.8, 3.9), 4.4, 1.7,
@@ -44,7 +44,7 @@ ax1.text(7.8, 6.65, "• network ns   同 IP:port\n• IPC ns       同信号量
 ax1.add_patch(mpatches.FancyBboxPatch((6.1, 3.9), 3.4, 1.6,
               boxstyle="round,pad=0.1", fc="#fff", ec="#d62728", ls="--"))
 ax1.text(7.8, 5.05, "临时容器的限制:", ha="center", fontsize=9.5, color="#d62728")
-ax1.text(7.8, 4.35, "• 不能加 ports/probes/env 改动\n• 不能 restart, 死了就死了\n• kubectl exec 不能直接进它",
+ax1.text(7.8, 4.35, "• 不能加 ports/probes/lifecycle/resources\n• env 可以设置\n• 不能 restart; exec 需 -c 指定容器",
          ha="left", va="center", fontsize=8.5)
 
 ax1.annotate("", xy=(3.0, 5.65), xytext=(3.0, 5.85),

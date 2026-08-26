@@ -70,12 +70,30 @@ do_install() {
     fi
 
     step "install" "修补 argocd-redis: 清单里 imagePullPolicy=Always 且镜像在 docker.io"
-    # 实测坑: argocd-redis 用 redis:7.0.15-alpine (docker.io, 节点拉不到),
-    # 且策略为 Always —— 即使 ../../scripts/load_images.sh 预载了节点也不会用本地镜像。
-    # 补丁改成 IfNotPresent 后预载镜像才能生效。
-    kubectl patch deployment argocd-redis -n "${ARGOCD_NS}" --type=strategic \
-        -p '{"spec":{"template":{"spec":{"$setElementOrder/containers":[{"name":"redis"}],"containers":[{"name":"redis","image":"redis:7.0.15-alpine","imagePullPolicy":"IfNotPresent"}]}}}}' \
-        2>/dev/null || echo "[hint] patch 失败(可能已改过), 手动处理见脚本注释"
+    # 实测坑: argocd-redis 的 redis 镜像在 docker.io, 节点常拉不到, 且策略为
+    # Always —— 即使 ../../scripts/load_images.sh 预载了节点也不会用本地镜像。
+    # 补丁只改 imagePullPolicy=IfNotPresent; 镜像 tag 不硬编码,
+    # 优先从缓存的安装清单里解析, 拿不到再读当前 Deployment 的实际值。
+    REDIS_IMAGE=""
+    if [[ -f "${LOCAL_MANIFEST}" ]]; then
+        REDIS_IMAGE="$(grep -m1 -oE 'image: *redis:[0-9][0-9a-zA-Z._-]*' "${LOCAL_MANIFEST}" \
+            | head -1 | sed 's/^image: *//')"
+    fi
+    REDIS_IMAGE="${REDIS_IMAGE:-$(kubectl -n "${ARGOCD_NS}" get deployment argocd-redis \
+        -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null || true)}"
+    if [[ -n "${REDIS_IMAGE}" ]]; then
+        echo "[info] redis 镜像: ${REDIS_IMAGE}"
+        REDIS_PATCH="$(printf \
+            '{"spec":{"template":{"spec":{"$setElementOrder/containers":[{"name":"redis"}],"containers":[{"name":"redis","image":"%s","imagePullPolicy":"IfNotPresent"}]}}}}' \
+            "${REDIS_IMAGE}")"
+        kubectl patch deployment argocd-redis -n "${ARGOCD_NS}" --type=strategic \
+            -p "${REDIS_PATCH}" \
+            2>/dev/null || echo "[hint] patch 失败(可能已改过), 手动处理见脚本注释"
+    else
+        echo "[hint] 未能确定 redis 镜像 tag, 跳过 patch; 可手动执行:"
+        echo "  kubectl -n ${ARGOCD_NS} patch deploy argocd-redis --type=strategic \\"
+        echo "    -p '{\"spec\":{\"template\":{\"spec\":{\"containers\":[{\"name\":\"redis\",\"imagePullPolicy\":\"IfNotPresent\"}]}}}}'"
+    fi
 
     step "install" "等待 ArgoCD 核心组件就绪 (application-controller 为领头组件)"
     kubectl rollout status deployment/argocd-server -n "${ARGOCD_NS}"

@@ -72,8 +72,8 @@ def panel_services(ax):
         # 三个 Pod
         for i, py in enumerate([y + 1.05, y + 0.45, y - 0.15]):
             box(ax, svc_x, py - 0.28, 1.5, 0.56, f'Pod {i + 1}', C_RED, fontsize=7.5)
-            arrow(ax, svc_x - 0.9 if svc_x == 7.2 else svc_x - 0.9,
-                  y + 0.45, svc_x, py, C_GRAY, lw=1.0)
+            # 箭头从 Service 框右边缘 (svc_x) 出发, 指向各 Pod
+            arrow(ax, svc_x, y + 0.45, svc_x, py, C_GRAY, lw=1.0)
 
 
 def panel_internals(ax):

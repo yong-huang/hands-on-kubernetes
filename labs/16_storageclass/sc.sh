@@ -60,12 +60,16 @@ do_deploy() {
 
     step "deploy" "PV 是自动冒出来的 (对比 15: 那是手动写好 PV 再绑定)"
     local pv; pv=$(pv_of_pvc)
-    echo "动态生成的 PV: ${pv}"
-    kubectl get pv "${pv}"
-    echo "(storageClassName = $(kubectl get pv "${pv}" \
-        -o jsonpath='{.spec.storageClassName}'), "
-    echo " reclaimPolicy = $(kubectl get pv "${pv}" \
-        -o jsonpath='{.spec.persistentVolumeReclaimPolicy}'))"
+    if [[ -n "${pv}" ]]; then
+        echo "动态生成的 PV: ${pv}"
+        kubectl get pv "${pv}"
+        echo "(storageClassName = $(kubectl get pv "${pv}" \
+            -o jsonpath='{.spec.storageClassName}'), "
+        echo " reclaimPolicy = $(kubectl get pv "${pv}" \
+            -o jsonpath='{.spec.persistentVolumeReclaimPolicy}'))"
+    else
+        echo "PV 尚未生成 (供给仍在进行), 稍后可用 kubectl get pv 查看"
+    fi
 }
 
 # ----------------------------- 2. 数据持久性验证 -----------------------------

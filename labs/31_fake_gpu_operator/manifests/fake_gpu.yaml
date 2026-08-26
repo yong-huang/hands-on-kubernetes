@@ -20,7 +20,7 @@ kind: ClusterRole
 metadata: {name: fake-gpu-updater}
 rules:
   - apiGroups: [""]
-    resources: [nodes]
+    resources: [nodes, nodes/status]   # patch --subresource=status 需要 nodes/status
     verbs: [get, list, watch, patch]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -62,7 +62,7 @@ spec:
                sleep 15;        # 定时补写, 防止被真实设备状态覆盖
              done"]
 ---
-# 3. 团队命名空间配额: 最多申请 4 张卡 (超出的任务只能 Pending)
+# 3. 团队命名空间配额: 最多申请 4 张卡 (超出配额的 Pod 在 admission 阶段被直接拒绝, 根本不会创建)
 apiVersion: v1
 kind: ResourceQuota
 metadata:

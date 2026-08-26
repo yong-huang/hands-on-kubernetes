@@ -41,7 +41,7 @@ containerd 把每个容器的 stdout/stderr 落成宿主机文件，Fluent Bit �
     Merge_Log On
 ```
 
-原始日志行里只有容器 hash。filter 用 fluent-bit 的 ServiceAccount 反查 API Server，把 namespace/pod/container/label 注进每条记录；`Merge_Log On` 再把 JSON 格式的日志体自动展开成结构化字段。之后 `log.level:ERROR AND kubernetes.namespace_name:"logging-demo"` 这样的检索才成为可能。这也是清单里 RBAC 只授 `pods/namespaces` 只读权限的原因。
+原始日志行里只有容器 hash。filter 用 fluent-bit 的 ServiceAccount 反查 API Server，把 namespace/pod_name/container_name/container_id/docker_id 注进每条记录（label 默认**不会**注入，需显式配置 Labels；本实验未启用）；`Merge_Log On` 再把 JSON 格式的日志体自动展开成结构化字段。之后 `log.level:ERROR AND kubernetes.namespace_name:"logging-demo"` 这样的检索才成为可能。这也是清单里 RBAC 只授 `pods/namespaces` 只读权限的原因。
 
 ### 3. 索引策略：按天切分
 

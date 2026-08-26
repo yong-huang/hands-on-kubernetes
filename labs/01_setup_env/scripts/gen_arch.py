@@ -91,17 +91,19 @@ def main():
          "pull node images, start containers,\nkubeadm init, install CNI,\nset kubectl context (wait 120s)"),
         ("4. verify", "#8172B2",
          "kubectl get nodes -- Ready\nkubectl cluster-info\nkubectl wait --for=condition=Ready"),
-        ("5. deploy test workload", "#C44E52",
+        ("5. preload image (CN mirror)", "#CCB974",
+         "docker pull via mirror registry,\nctr images import into each node\n(bypass registry-1.docker.io timeout)"),
+        ("6. deploy test workload", "#C44E52",
          "kubectl create deployment nginx\nkubectl expose --NodePort\nrollout status -> pods,svc"),
     ]
     for i, (title, color, desc) in enumerate(steps):
-        y = 8.6 - i * 1.95
-        box(ax2, 5, y, 8.8, 1.5, "", color, alpha=0.08)
-        ax2.text(5, y + 0.42, title, ha="center", fontsize=10,
+        y = 8.7 - i * 1.55
+        box(ax2, 5, y, 8.8, 1.35, "", color, alpha=0.08)
+        ax2.text(5, y + 0.38, title, ha="center", fontsize=9.5,
                  fontweight="bold", color=color)
-        ax2.text(5, y - 0.25, desc, ha="center", fontsize=8, color="#444")
+        ax2.text(5, y - 0.22, desc, ha="center", fontsize=7.5, color="#444")
         if i < len(steps) - 1:
-            arrow(ax2, 5, y - 0.8, 5, y - 1.15, color)
+            arrow(ax2, 5, y - 0.72, 5, y - 0.83, color)
 
     fig.tight_layout()
     path = os.path.join(SCRIPT_DIR, '..', 'images', 'setup_arch.png')

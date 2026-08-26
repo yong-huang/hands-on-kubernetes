@@ -14,7 +14,8 @@
 # 镜像预加载 (国内网络):
 #   docker pull docker.io/velero/velero:v1.14.0
 #   docker pull docker.io/velero/velero-plugin-for-aws:v1.10.0
-#   ../../scripts/load_images.sh   # kind load docker-image 进集群
+#   ../../scripts/load_images.sh velero/velero:v1.14.0 \
+#       velero/velero-plugin-for-aws:v1.10.0   # kind load 进集群 (无参调用只载默认清单, 不含 velero)
 # =============================================================================
 set -euo pipefail
 
@@ -73,13 +74,16 @@ do_install() {
         echo "velero CLI 未安装, 打印生产环境完整命令 (教学输出):"
         cat <<'EOF'
 # --- 生产路径: S3/MinIO 对象存储 ---
+# (注释单独成行: 行尾续行符 \ 后面不能再跟注释, 否则复制执行会报错)
+# --use-node-agent                        DaemonSet: 文件系统备份
+# --default-volumes-to-filesystem-backup  所有 PVC 默认走文件级备份
 velero install \
   --provider aws \
   --plugins velero/velero-plugin-for-aws:v1.10.0 \
   --bucket MY_BUCKET --backup-location-config region=us-east-1 \
   --snapshot-location-config region=us-east-1 \
-  --use-node-agent \                        # DaemonSet: 文件系统备份
-  --default-volumes-to-filesystem-backup \  # 所有 PVC 默认走文件级备份
+  --use-node-agent \
+  --default-volumes-to-filesystem-backup \
   --namespace velero
 # MinIO 自建: 上面再加 --backup-location-config s3ForcePathStyle=true,s3Url=http://minio:9000
 # (MinIO 需先建好 bucket, 并用 credentials 文件 --secret-file ./cloud-creds 传 AK/SK)
@@ -172,7 +176,8 @@ do_clean() {
         velero restore delete "restore-${BACKUP}" --confirm 2>/dev/null || true
     else
         echo "(学习模式: 无备份/恢复对象可删; 想卸载 velero 服务端:"
-        echo "  kubectl delete ns ${VELERO_NS} kubectl delete crd -l app.kubernetes.io/name=velero)"
+        echo "  kubectl delete ns ${VELERO_NS}"
+        echo "  kubectl delete crd -l app.kubernetes.io/name=velero)"
     fi
 }
 

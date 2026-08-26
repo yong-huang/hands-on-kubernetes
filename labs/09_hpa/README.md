@@ -13,8 +13,8 @@ HPA（Horizontal Pod Autoscaler）就是把"扩缩容"交给控制器：持续�
 ├── README.md    # 本文档
 ├── hpa.sh         # 全流程演示脚本：metrics-server/压测扩容/观察缩容/清理
 ├── manifests/
-│   └── hpa.yaml       # 多文档清单：CPU 密集型应用 Deployment + HPA (autoscaling/v2)
-└── metrics-server.yaml  # metrics-server 安装清单(HPA 指标来源, 本地缓存)
+│   ├── hpa.yaml       # 多文档清单：CPU 密集型应用 Deployment + HPA (autoscaling/v2)
+│   └── metrics-server.yaml  # metrics-server 安装清单 (HPA 指标来源, 本地缓存)
 ├── scripts/
 │   └── gen_arch.py        # 架构图生成脚本 (python3 scripts/gen_arch.py)
 └── images/

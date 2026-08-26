@@ -68,7 +68,7 @@ def panel_arch(ax):
     draw_box(ax, 1.8, 1.1, 3.4, 0.9, 'PV / PVC data', '/data in pods', face='#d9edf4', edge='#3a7a9a')
 
     # object storage
-    draw_box(ax, 7.6, 4.5, 3.2, 2.6, 'Backup storage', 'S3 / MinIO / OSS\n\nobjects tarball (gz)\nvolume snapshots\n+ metadata JSON',
+    draw_box(ax, 7.6, 4.5, 3.2, 2.6, 'Backup storage', 'S3 / MinIO / OSS\n\nobjects tarball (gz)\nvolume file backups (kopia/restic)\n+ metadata JSON',
              face=C_STORE, edge='#4e3a7a')
 
     # backup arrows

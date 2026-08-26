@@ -23,7 +23,7 @@ spec:
           command: ["sh", "-c",
             "i=0; while true; do i=$((i+1));
              printf '{\"seq\":%d,\"level\":\"%s\",\"msg\":\"hello from pod\",\"ts\":\"%s\"}\n' \
-               $i $([ $((i%%5)) -eq 0 ] && echo ERROR || echo INFO) \"$(date -Iseconds)\";
+               $i $([ $((i%5)) -eq 0 ] && echo ERROR || echo INFO) \"$(date -Iseconds)\";
              sleep 1; done"]
 ---
 apiVersion: v1

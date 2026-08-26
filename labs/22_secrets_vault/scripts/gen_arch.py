@@ -58,7 +58,7 @@ ax2.set_title("动态凭证租约生命周期 (database/creds/*)", fontsize=13)
 timeline = [
     (0.5, 8.6, "Pod 申请挂载", "#aec7e8"),
     (3.2, 8.6, "Vault 创建租约\n生成 user_xxx / pwd_yyy", "#2ca02c"),
-    (6.6, 8.6, "TTL 到期前\nrenew_period 自动续租", "#ff7f0e"),
+    (6.6, 8.6, "TTL 到期后文件保持陈旧值\nPod 重建时重新签发", "#ff7f0e"),
     (8.8, 8.6, "max_ttl 强制过期\n或 Pod 删除 -> revoke", "#d62728"),
 ]
 for cx, cy, txt, c in timeline:

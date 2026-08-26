@@ -49,11 +49,20 @@ do_scale() {
 
 do_failover() {
     step "failover" "模拟 member-ap 失联 -> 60s 后份额迁移"
-    kubectl --context member-ap config unset current-context || true
-    echo "  (实验中可 cordon/停掉 kind 节点模拟; 观察 ResourceBinding 变化)"
+    # 真实模拟: 直接停掉 member-ap 的 kind 控制面容器。
+    # (只改本地 kubeconfig 的 current-context 对 Karmada 控制面毫无影响 ——
+    #  它访问成员集群用的是注册时保存的凭据, 与本机配置无关)
+    AP_NODE="member-ap-control-plane"
+    echo "  停止成员集群节点容器: docker stop ${AP_NODE}"
+    docker stop "$AP_NODE"
+    echo "  member-ap 已失联; tolerationSeconds=60, 观察下面 ResourceBinding 的变化"
+    echo "  (gracefulEvctionTasks 出现 -> ap 的份额被迁往 member-us)"
     kubectl --context karmada-apiserver get resourcebinding \
         -n federation-demo -w &
     W=$!; sleep 90; kill $W 2>/dev/null || true
+    echo "  恢复成员集群: docker start ${AP_NODE}"
+    docker start "$AP_NODE"
+    echo "  member-ap 回来后, 下个调度周期会按 4:2 权重重新平衡副本"
 }
 
 case "${1:-all}" in

@@ -94,7 +94,7 @@ volumes:
 几个易踩的坑：
 
 - PVC 请求量大于所有可用 PV 的 capacity 时会一直 `Pending`（没有 StorageClass 时不会自动扩出 PV）
-- hostPath/local PV 必须配 `nodeAffinity`，否则 Pod 可能调度到没有这块数据的节点，挂载失败
+- `local` 类型 PV 必须配 `nodeAffinity`（K8s 强制），否则连创建都不过；hostPath PV 不强制，但若数据只存在于部分节点，仍应配 `nodeAffinity` 引导 Pod 调度到有数据的节点，避免挂载失败
 - PV 的 capacity 只是声明值，hostPath 并不会真的限额——配额由底层存储实现（如云盘、LVM）
 
 ## 可视化

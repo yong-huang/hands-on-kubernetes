@@ -68,7 +68,9 @@ do_label() {
     kubectl get pods -l "app=${DS_SSD}" -n "${NAMESPACE}" -o wide || true
 
     step "label" "挑选一个 worker 节点打上 disktype=ssd 标签"
-    TARGET_NODE=$(kubectl get nodes -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | head -1)
+    # ssd-cache-agent 没有控制面容忍度, 必须选 worker 节点 (排除 control-plane)
+    TARGET_NODE=$(kubectl get nodes -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' \
+        | grep -v control-plane | head -1)
     kubectl label node "${TARGET_NODE}" disktype=ssd --overwrite
     echo "已标记节点: ${TARGET_NODE}"
 

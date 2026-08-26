@@ -32,9 +32,6 @@ Kubernetes 用三层 ownership（属主关系）管理无状态应用：
 
 ```
 Deployment（应用版本管理：滚动更新、回滚）
-├── README.md    # 本文档
-├── scripts/
-│   └── gen_arch.py        # 架构图生成脚本 (python3 scripts/gen_arch.py)
 ├── ReplicaSet（副本管理：保证 Pod 数量，每个版本一个 RS）
 └── Pod（真正干活的实例）
 ```

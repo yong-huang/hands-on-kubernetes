@@ -55,7 +55,9 @@ spec:
           args:
             - |
               echo "collecting logs on $(hostname) ..."
-              tail -F /var/log/messages /var/logContainers/*/*-json.log 2>/dev/null
+              # containerd (CRI) 的 kubelet 把容器日志写到:
+              #   /var/log/pods/<ns>_<pod>_<uid>/<container>/*.log
+              tail -F /var/log/messages /var/log/pods/*/*/*.log 2>/dev/null
           resources:                # DaemonSet 每个节点都跑, 必须限制资源
             requests:
               cpu: 50m
@@ -67,20 +69,21 @@ spec:
             - name: varlog          # 节点系统日志目录
               mountPath: /var/log
               readOnly: true
-            - name: dockerlog       # 容器运行时日志目录 (kubelet 写入的 *-json.log)
-              mountPath: /var/logContainers
+            - name: podlog          # 容器运行时日志目录 (kubelet 按CRI 布局写入)
+              mountPath: /var/log/pods
               readOnly: true
       volumes:
         - name: varlog
           hostPath:                 # hostPath 把"节点本身"的目录挂进 Pod
             path: /var/log          # Agent 因此能看到同节点所有容器的日志
-        - name: dockerlog
+        - name: podlog
           hostPath:
             # 注意: 容器运行时日志目录因运行时而异!
-            #   Docker 节点:      /var/lib/docker/containers (不存在于 kind 节点)
-            #   containerd 节点:  /var/lib/containerd (kind/kubeadm 默认)
+            #   containerd (CRI): /var/log/pods/<ns>_<pod>_<uid>/<container>/*.log
+            #     (kind/kubeadm 默认运行时, kubelet 统一按此布局写日志)
+            #   老版 Docker 节点: /var/lib/docker/containers/*/*-json.log
             # 用 DirectoryOrCreate: 目录不存在时由 kubelet 创建, 避免挂载失败
-            path: /var/lib/containerd
+            path: /var/log/pods
             type: DirectoryOrCreate
       terminationGracePeriodSeconds: 10
 ---

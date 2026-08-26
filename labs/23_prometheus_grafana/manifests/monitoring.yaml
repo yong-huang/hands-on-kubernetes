@@ -1,7 +1,8 @@
 # =============================================================================
 # Prometheus + Grafana 监控栈 (kube-prometheus-stack 精简自建版)
-# 组成: 1) demo 应用 + PodMonitor 指标采集
-#       2) ServiceMonitor 定义(监控 Nginx/应用)
+# 组成: 1) demo 应用 + ServiceMonitor 指标采集 (Operator 按 ServiceMonitor 选择器抓取;
+#       Pod 模板上的 prometheus.io/scrape 注解仅对 annotation 发现型抓取器有意义,
+#       本栈实际由 ServiceMonitor 驱动, 注解保留仅作两种发现方式对照)
 #       3) 告警规则: 高错误率 / Pod 重启
 #       4) Grafana 数据源自动配置
 # 注: 生产推荐 helm install kube-prometheus-stack 一键装全栈;

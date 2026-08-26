@@ -43,7 +43,7 @@ helm upgrade demo ./manifests/demo-chart \
   --set image.tag=1.25.3 --reuse-values
 ```
 
-优先级从低到高：chart 内置 values.yaml < `-f my-values.yaml` < `--set` 命令行。`--reuse-values` 让 upgrade 复用上次 release 的用户值，否则会静默回退到 chart 默认值——这是生产事故的经典来源。
+优先级从低到高：chart 内置 values.yaml < `-f my-values.yaml` < `--set` 命令行。注意 Helm 3 里 upgrade **默认就复用**上次 release 的用户值（等价于隐式 `--reuse-values`）；`--set` 只覆盖显式给出的键。想回到"纯 chart 默认值 + 本次新值"必须显式传 `--reset-values`——不校验当前生效值直接 upgrade，才是生产事故的经典来源。
 
 ### 3. _helpers.tpl：命名约定决定多租户安全
 

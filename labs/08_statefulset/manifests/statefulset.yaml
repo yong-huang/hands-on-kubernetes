@@ -122,6 +122,10 @@ spec:
   volumeClaimTemplates:
     - metadata:
         name: data                     # 模板名, 会拼进 PVC 名: data-web-<N>
+        labels:
+          app: mysql                   # PVC 继承 VCT 的标签: 有了它
+                                       # `kubectl get/delete pvc -l app=mysql`
+                                       # 才能筛到这些 PVC (清理/排查用)
       spec:
         accessModes: ["ReadWriteOnce"] # RWO: 只能被单节点以读写方式挂载
                                       # (每 Pod 独占一块盘, 天然要求 RWO)

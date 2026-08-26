@@ -14,7 +14,8 @@ do_install() {
     helm upgrade --install prometheus prometheus-community/kube-prometheus-stack \
         -n monitoring --create-namespace \
         --set grafana.adminPassword=admin \
-        --set prometheus.prometheusSpec.serviceMonitorSelectorNilUsesHelmValues=false --wait
+        --set prometheus.prometheusSpec.serviceMonitorSelectorNilUsesHelmValues=false \
+        --set prometheus.prometheusSpec.ruleSelectorNilUsesHelmValues=false --wait
 
     step "install" "部署示例应用 + ServiceMonitor + 告警规则"
     kubectl create ns monitoring-demo --dry-run=client -o yaml | kubectl apply -f -
@@ -28,17 +29,15 @@ do_verify() {
 
 do_query() {
     step "query" "port-forward Prometheus 并查询 demo 指标"
-    kubectl -n monitoring port-forward svc/prometheus-kube-prometheus-prometheus 9090:9090 &
-    PF=$!; sleep 2
     echo "  浏览器打开 http://localhost:9090"
     echo "  查询: demo_requests_total   /   up"
-    kill $PF 2>/dev/null || true
+    echo "  (按 Ctrl-C 结束 port-forward 后继续 Grafana 步骤)"
+    kubectl -n monitoring port-forward svc/prometheus-kube-prometheus-prometheus 9090:9090
 
     step "query" "port-forward Grafana (admin/admin)"
-    kubectl -n monitoring port-forward svc/prometheus-grafana 3000:80 &
-    GP=$!; sleep 2
     echo "  浏览器打开 http://localhost:3000 -> Dashboards 导入 1860 (Node Exporter Full)"
-    kill $GP 2>/dev/null || true
+    echo "  (按 Ctrl-C 结束 port-forward, 脚本退出)"
+    kubectl -n monitoring port-forward svc/prometheus-grafana 3000:80
 }
 
 do_alert() {

@@ -11,7 +11,7 @@
 ```
 17_csi_snapshot/
 ├── README.md    # 本文档
-├── snapshot.sh             # 分步演示: crd | deploy | snapshot | verify | clean
+├── snapshot.sh             # 分步演示: crd | deploy | snapshot | restore | verify | clean
 ├── manifests/
 │   └── csi_snapshot.yaml       # PVC+Pod / VolumeSnapshotClass / VolumeSnapshot / 还原 PVC
 ├── scripts/
@@ -55,7 +55,7 @@ kind 默认 StorageClass `standard` 的 provisioner 是 `rancher.io/local-path`�
 - `status.readyToUse` **永远不会变成 true**（controller 找不到能处理的驱动）
 - 用它做 dataSource 的还原 PVC 会一直 Pending
 
-这不是故障，是能力边界。脚本 `snapshot.sh snapshot` 会轮询 30 秒后如实报告，并解释在 EBS/Longhorn/Ceph 上此时会发生什么；`verify` 会打印还原 manifest 讲解流程，而不是假装成功。想在本地完整跑通，可以在 kind 里装 Longhorn 或用 `cloud-provider` 类方案。
+这不是故障，是能力边界。manifest 按 `tier` 标签分层（`tier=app` / `tier=snapshot` / `tier=restore`，同 lab 12 的套路），脚本各步骤用 `kubectl apply -l tier=...` 分批生效：`deploy` 只装源数据，`snapshot` 只装快照对象，`restore` 才 apply 还原 PVC（并在 kind 上如实展示它一直 Pending）。`snapshot.sh snapshot` 会轮询 30 秒后如实报告，并解释在 EBS/Longhorn/Ceph 上此时会发生什么；想在本地完整跑通，可以在 kind 里装 Longhorn 或用 `cloud-provider` 类方案。
 
 ### dataSource 还原
 

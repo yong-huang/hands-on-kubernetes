@@ -135,15 +135,19 @@ def panel_lifecycle(ax):
     arrow(ax, 2.25, 8.2, 3.35, 8.2, color='#555')
     ax.text(2.8, 8.6, 'PVC binds', fontsize=7, ha='center', color='#555')
     arrow(ax, 4.65, 8.2, 5.85, 8.2, color='#555')
-    ax.text(5.25, 8.6, 'PVC deleted', fontsize=7, ha='center', color='#555')
+    ax.text(5.25, 8.6, 'PVC deleted\n(Retain)', fontsize=7, ha='center', color='#555')
 
-    # Released -> two outcomes
-    draw_box(ax, 8.9, 9.0, 2.0, 0.95, 'Retain', 'manual clean\n& reuse',
+    # outcome boxes
+    draw_box(ax, 8.9, 9.0, 2.0, 0.95, 'Retain', 'Released ->\nmanual clean & reuse',
              face='#e6f2e6', edge='#2e6b3e')
     draw_box(ax, 8.9, 7.4, 2.0, 0.95, 'Delete', 'PV + data\ngone',
              face='#f2dede', edge='#7a2e30')
+    # Retain path: PVC deleted -> Released -> manual reuse
     arrow(ax, 7.15, 8.45, 7.85, 8.9, color='#2e6b3e')
-    arrow(ax, 7.15, 7.95, 7.85, 7.5, color='#7a2e30')
+    # Delete path: PVC deleted while reclaimPolicy=Delete -> PV removed directly from Bound
+    arrow(ax, 4.9, 7.85, 7.85, 7.5, color='#7a2e30', cs='arc3,rad=-0.25')
+    ax.text(5.9, 6.85, 'PVC deleted (Delete): PV deleted directly,\nnever enters Released',
+            fontsize=7, ha='center', color='#7a2e30')
 
     # ---- static vs dynamic provisioning (bottom half) ----
     ax.text(0.4, 6.3, 'Provisioning:', fontsize=9, fontweight='bold',
