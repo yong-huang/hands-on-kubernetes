@@ -63,12 +63,12 @@ spec:
       name: geo-app
   overrideRules:
     - targetCluster:
-        clusterNames: [member-ap]   # 亚太集群用就近镜像源
-      overriders:
+        clusterNames: [member-ap]   # 亚太集群用旧一档版本 (演示按集群差异化的 Tag 覆盖;
+      overriders:                   #  不要 override 成假 registry, 否则 Pod 永远拉不到镜像)
         imageOverrider:
-          - component: Registry
+          - component: Tag
             operator: replace
-            value: registry.ap.example.com
+            value: "1.26"
     - targetCluster:
         clusterNames: [member-us]
       overriders:

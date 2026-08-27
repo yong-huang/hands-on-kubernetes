@@ -132,15 +132,19 @@ data:
         Name                  kubernetes
         Match                 kube.*
         Kube_URL              https://kubernetes.default.svc:443
-        Merge_Log             On           # 解析 JSON 日志体
+        # Merge_Log: 解析 JSON 日志体 (fluent-bit 配置不支持行内注释, 注释须独立成行)
+        Merge_Log             On
         Keep_Log              Off
     [OUTPUT]
         Name   es
         Match  *
         Host   elasticsearch.logging.svc.cluster.local
         Port   9200
-        Index  k8s-logs
-        Logstash_Format On                # 按天分索引 k8s-logs-YYYY.MM.DD
+        # Logstash_Format 按天分索引, 前缀取 Logstash_Prefix (不是 Index)
+        Logstash_Prefix k8s-logs
+        Logstash_Format On
+        # ES 8.x 已移除 _type, 必须抑制否则 _bulk 全部被 400 拒绝
+        Suppress_Type_Name On
         Retry_Limit False
 ---
 # 5. Kibana 可视化检索

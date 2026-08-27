@@ -74,3 +74,12 @@ nicolaka/netshoot 是网络诊断瑞士军刀（tcpdump/dig/mtr/nslookup），bu
 - **eBPF 升级版**: kubectl-trace / inspektor-gadget 在内核态观察，无需目标镜像配合
 - **自动化预案**: 把常见 debug 流程写成脚本/Operator，故障时自动注入采集器再通知人
 - **权限收敛**: ephemeralcontainers subresource 写权限要单独 RBAC 控制，避免人人可往生产 Pod 里塞容器
+
+## 环境预期说明
+
+- kind 默认 CNI(kindnet) **不执行 NetworkPolicy**：本实验给 net-victim 配的 deny-egress
+  策略在本集群不会真正断网（nslookup 仍会成功）。想看到真实拦截需换 Calico 等
+  策略执行型 CNI（见实验 12 的说明与切换方法）。断网抓包姿势(netshoot)本身不受影响。
+- containerd 上对**已退出**的容器使用 `--target` 会 CreateContainerError —— 这是
+  真实世界的坑，脚本姿势 1a 会现场演示；CrashLoop 的正确入口是 logs/describe
+  或姿势 2 的 `--copy-to` 克隆。

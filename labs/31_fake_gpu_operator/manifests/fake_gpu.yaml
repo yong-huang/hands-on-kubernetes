@@ -47,20 +47,38 @@ spec:
       tolerations: [{operator: Exists}]
       containers:
         - name: updater
-          image: bitnami/kubectl:1.29
+          # kubectl 类镜像多无 shell, 改用 python + 直调 K8s API (RBAC 已授予
+          # nodes/status 的 patch), pip 走国内源装 requests, 每 15s 补写一次容量
+          image: python:3.12-slim
           env:
             - name: FAKE_GPUS_PER_NODE
               value: "8"
             - name: NODE_NAME
               valueFrom: {fieldRef: {fieldPath: spec.nodeName}}
-          command: ["sh", "-c",
-            "NODE=${NODE_NAME:-$(hostname)};
-             while true; do
-               kubectl patch node $NODE --subresource=status --type=json \\
-                 -p=\"[{\\\"op\\\":\\\"add\\\",\\\"path\\\":\\\"/status/capacity/nvidia.com~1gpu\\\",\\\"value\\\":\\\"${FAKE_GPUS_PER_NODE}\\\"},\"
-                    \"{\\\"op\\\":\\\"add\\\",\\\"path\\\":\\\"/status/allocatable/nvidia.com~1gpu\\\",\\\"value\\\":\\\"${FAKE_GPUS_PER_NODE}\\\"}]\" >/dev/null;
-               sleep 15;        # 定时补写, 防止被真实设备状态覆盖
-             done"]
+          command: ["sh", "-c"]
+          args:
+            - |
+              pip install -q -i https://pypi.tuna.tsinghua.edu.cn/simple requests \
+                && exec python -c "
+              import os, time, json, urllib.request, ssl
+              node = os.environ['NODE_NAME']
+              n = os.environ['FAKE_GPUS_PER_NODE']
+              ctx = ssl.create_default_context(
+                  cafile='/var/run/secrets/kubernetes.io/serviceaccount/ca.crt')
+              token = open('/var/run/secrets/kubernetes.io/serviceaccount/token').read()
+              payload = json.dumps([{'op': 'add', 'path': '/status/capacity/nvidia.com~1gpu', 'value': n},
+                                    {'op': 'add', 'path': '/status/allocatable/nvidia.com~1gpu', 'value': n}]).encode()
+              url = 'https://kubernetes.default.svc/api/v1/nodes/' + node + '/status'
+              while True:
+                  try:
+                      req = urllib.request.Request(url, data=payload, method='PATCH')
+                      req.add_header('Authorization', 'Bearer ' + token)
+                      req.add_header('Content-Type', 'application/json-patch+json')
+                      urllib.request.urlopen(req, context=ctx)
+                  except Exception as e:
+                      print('patch failed:', e, flush=True)
+                  time.sleep(15)   # 定时补写, 防止被真实设备状态覆盖
+              "
 ---
 # 3. 团队命名空间配额: 最多申请 4 张卡 (超出配额的 Pod 在 admission 阶段被直接拒绝, 根本不会创建)
 apiVersion: v1

@@ -18,11 +18,24 @@ do_install() {
     helm upgrade --install vault hashicorp/vault -n "$NS_VAULT" --create-namespace \
         --set "server.dev.enabled=true" --wait
 
-    helm repo add secrets-store-csi-driver \
-        https://kubernetes-sigs.github.io/secrets-store-csi-driver >/dev/null 2>&1 || true
-    helm upgrade --install csi-secrets-store \
-        secrets-store-csi-driver/secrets-store-csi-driver \
-        -n kube-system --set syncSecret.enabled=true --wait
+    # CSI 驱动: 官方 chart 仓库已迁移(github pages 404, OCI 在 ghcr 上国内不可达),
+    # 改用仓库内的 raw 清单(含 CRD/RBAC/DaemonSet), raw 不通时走 jsdelivr CDN
+    local base_raw="https://raw.githubusercontent.com/kubernetes-sigs/secrets-store-csi-driver/main/deploy"
+    local base_cdn="https://cdn.jsdelivr.net/gh/kubernetes-sigs/secrets-store-csi-driver@main/deploy"
+    for f in secrets-store.csi.x-k8s.io_secretproviderclasses.yaml \
+             secrets-store.csi.x-k8s.io_secretproviderclasspodstatuses.yaml \
+             rbac-secretproviderclass.yaml rbac-secretprovidersyncing.yaml \
+             csidriver.yaml secrets-store-csi-driver.yaml; do
+        kubectl apply -f "${base_raw}/${f}" || kubectl apply -f "${base_cdn}/${f}"
+    done
+    kubectl -n kube-system rollout status ds/csi-secrets-store --timeout=180s
+
+    # CSI 驱动是通用的, Vault 后端由独立的 provider 提供:
+    # 用 hashicorp/vault chart 的 csi 子图表装 provider 本体(server/injector 关掉,
+    # externalVaultAddr 指向上面部署的 Vault)
+    helm upgrade --install vault-csi hashicorp/vault -n "$NS_VAULT" \
+        --set server.enabled=false --set injector.enabled=false --set csi.enabled=true \
+        --set "global.externalVaultAddr=http://vault.${NS_VAULT}.svc:8200" --wait
 
     kubectl create ns "$NS_APP" --dry-run=client -o yaml | kubectl apply -f -
     kubectl -n "$NS_APP" create sa demo-app --dry-run=client -o yaml | kubectl apply -f -
@@ -36,12 +49,12 @@ do_config() {
     export VAULT_TOKEN="root"                       # dev 模式固定 root token
 
     # K8s 认证: 让 Pod 的 SA Token 可换 Vault token
-    # 注意: 本脚本在宿主机运行, 没有 KUBERNETES_SERVICE_* 环境变量,
-    # 从当前 kubeconfig 读取 API Server 地址 (kind 集群即控制面容器暴露的端口)
-    kubernetes_host="$(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}')"
+    # 注意: kubernetes_host 必须是 Vault 服务端(Pod 内)可达的地址。
+    # kubeconfig 里的 127.0.0.1:PORT 是宿主机映射端口, 集群内不通,
+    # 用集群内 Service 地址(Vault Pod 自带访问 API Server 的 SA 与 CA)
     vault auth enable kubernetes 2>/dev/null || true
     vault write auth/kubernetes/config \
-        kubernetes_host="$kubernetes_host"
+        kubernetes_host="https://kubernetes.default.svc:443"
     vault write auth/kubernetes/role/demo-app \
         bound_service_account_names=demo-app \
         bound_service_account_namespaces="$NS_APP" \

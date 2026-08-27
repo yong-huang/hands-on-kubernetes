@@ -26,7 +26,8 @@
 
 ```bash
 helm upgrade --install trivy-operator aqua/trivy-operator \
-  --namespace trivy-system --set trivy.ignoreUnfixed=true
+  --namespace trivy-system --set trivy.ignoreUnfixed=true \
+  --set trivy.dbRegistry=<DB_REGISTRY>   # 见下方"国内网络"说明
 ```
 
 Operator 以 DaemonSet/Deployment 形式常驻，自动发现工作负载镜像并离线比对 CVE 库，产物不是日志而是 **CRD 对象**（VulnerabilityReport）。`ignoreUnfixed=true` 过滤掉没有修复版本的 CVE——报告的价值在于"可行动"，列出永远修不了的洞只会造成告警疲劳。
@@ -90,4 +91,10 @@ exclude:
 - **SBOM 附件**: cosign attest 把 SBOM 签进镜像，审计时可证明"部署的就是扫过的那份"
 - **keyless 签名**: 用 OIDC 短期证书替代长期密钥，避免私钥管理负担
 - **策略即代码**: Kyverno policies 放 Git 仓库走 PR 审批 + ArgoCD 同步，安全策略也 GitOps 化
+**国内网络注意**：trivy 首次扫描需从 `ghcr.io` 下载 ~110MB 漏洞库，若节点直连
+ghcr/mirror.gcr 均超时，scan 步骤会一直"尚无报告"。可用 helm values 换 DB 源
+（`trivy.dbRegistry` / `trivy.dbRepository`，如自建白名单镜像或 `oras` 抽取后
+推私有仓库）；都不具备时，policy/deny 步骤（Kyverno 拦截演示）不依赖漏洞库，
+仍可完整演示。
+
 - **准入前移**: CI 里跑 `trivy image --exit-code 1 --severity CRITICAL`，把拦截提前到推送之前，省去"进了集群再被拒"的返工

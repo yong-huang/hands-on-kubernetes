@@ -21,20 +21,34 @@ do_setup() {
 }
 
 do_container() {
-    step "container" "姿势1: CrashLoopBackOff 且无 shell -> 注入工具容器"
-    kubectl -n "$NS" debug broken-app -it --image=busybox:1.36 \
-        --target=app -- sh -c 'ps aux | head; echo ---; ls /proc/1/root/' || true
-    echo "  ^ --target=app 共享 PID 后, 可看到原进程并读它的根文件系统"
+    step "container" "姿势1a: CrashLoop 容器 + --target -> 真实世界的坑"
+    kubectl -n "$NS" debug broken-app --image=busybox:1.36 \
+        --target=app -- sh -c 'ps aux' 2>&1 | tail -1 || true
+    echo "  ^ containerd 上 --target 要求目标容器处于 Running:"
+    echo "    崩溃容器(Exit 状态)会 CreateContainerError。CrashLoop 的正确诊断"
+    echo "    工具是 kubectl logs / describe, 或用姿势2的 --copy-to 改命令起克隆。"
+
+    step "container" "姿势1b: 对 Running 的容器 --target -> 共享 PID 看进程与文件系统"
+    kubectl -n "$NS" debug net-victim --image=busybox:1.36 \
+        --target=app -- sh -c 'echo "== 看到 target 的进程 =="; ps | head -4;
+                               echo "== 经 /proc/1/root 读 target 根文件系统 ==";
+                               ls /proc/1/root/etc/ | head -3' || true
+    echo "  ^ --target=app 后无需重启 Pod 即可注入工具箱(distroless 也能查)"
 
     step "container" "临时容器记录在 spec.ephemeralContainers"
-    kubectl -n "$NS" get pod broken-app \
+    kubectl -n "$NS" get pod net-victim \
         -o jsonpath='{.spec.ephemeralContainers[*].name}'; echo
 }
 
 do_copy() {
     step "copy" "姿势2: 复制克隆 Pod 调试 (--copy-to, 原 Pod 保持原样)"
-    kubectl -n "$NS" debug broken-app --image=ubuntu:22.04 \
-        --copy-to=broken-app-debug --sleep-forever --command -- bash || true
+    # distroless 无 shell, 克隆时连镜像带命令一起换 (老版 --sleep-forever 已移除):
+    # --container=app 定位原容器, --set-image 换镜像, 位置参数覆盖启动命令
+    kubectl -n "$NS" debug broken-app --copy-to=broken-app-debug \
+        --container=app --set-image=app=ubuntu:22.04 -- sh -c 'sleep infinity' || true
+    kubectl -n "$NS" wait --for=condition=Ready pod/broken-app-debug --timeout=180s || true
+    kubectl -n "$NS" exec broken-app-debug -- sh -c 'echo clone-ok; ls /etc | head -3' || true
+    echo "  ^ 克隆 Pod 已常驻, 可 kubectl exec -it broken-app-debug -- bash 进入排查"
     # 打上 app=net-victim 标签: 让 deny-egress-all NetworkPolicy 也选中这个
     # 调试 Pod, 与原 net-victim 配对演示"断网现场 + 抓包诊断"
     kubectl -n "$NS" run net-victim-dbg --rm -it --restart=Never \

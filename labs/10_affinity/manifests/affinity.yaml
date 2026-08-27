@@ -119,20 +119,17 @@ kind: Deployment
 metadata:
   name: web-spread
 spec:
-  replicas: 4                      # 3 节点放 4 副本: 分布只能是 2/1/1, 不能是 3/1/0
-  selector:
-    matchLabels:
+  replicas: 4                      # 故意不放 control-plane 容忍:
+  selector:                        #   可进入的拓扑域只有 2 个 worker (各 1 个), 第 3 个起
+    matchLabels:                   #   放哪都使 skew=2 -> DoNotSchedule 拒绝 -> Pending
       app: web-spread
   template:
     metadata:
       labels:
         app: web-spread
     spec:
-      # 与 web-antiaffinity-required 同理: 需要全部 3 个节点可调度 (含控制面)
-      tolerations:
-        - key: node-role.kubernetes.io/control-plane
-          operator: Exists
-          effect: NoSchedule
+      # 注意: 不容忍 control-plane 污点。污点让 Pod 进不去该节点,
+      # 但该节点仍被计入拓扑域(算 0 个副本) —— 这正是触发拒绝的关键
       topologySpreadConstraints:
         - maxSkew: 1               # 任意两个拓扑域的副本数差不能超过 1
           topologyKey: kubernetes.io/hostname   # 按节点维度打散

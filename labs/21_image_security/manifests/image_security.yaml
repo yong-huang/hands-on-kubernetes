@@ -94,7 +94,8 @@ spec:
       # 系统命名空间豁免: 系统组件常拉取"未收编"的基础镜像, 不能被误伤
       exclude:
         any:
-          - namespaces: ["kube-system", "kyverno", "trivy-system"]
+          - resources:
+              namespaces: ["kube-system", "kyverno", "trivy-system"]
       validate:
         message: "镜像 nginx:1.14.x 属于已知高危漏洞版本, 禁止部署"
         foreach:
@@ -123,7 +124,8 @@ spec:
           - resources: {kinds: [Pod]}
       exclude:
         any:
-          - namespaces: ["kube-system", "trivy-system", "kyverno"]
+          - resources:
+              namespaces: ["kube-system", "trivy-system", "kyverno"]
       verifyImages:
         - imageReferences: ["registry.example.com/*"]
           attestors:

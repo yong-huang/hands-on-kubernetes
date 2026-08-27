@@ -58,19 +58,21 @@ do_nodeaffinity() {
 
 # ----------------------------- 4. topologySpreadConstraints -----------------------------
 do_spread() {
-    step "spread" "统计 web-spread 副本在节点上的分布 (应为 2/1/1, 不能 3/1/0)"
-    kubectl wait --for=condition=Ready pod -l app=web-spread --timeout=60s
+    step "spread" "观察 web-spread 分布 (4 副本, 只有 2 个能跑)"
+    sleep 10                                   # 等调度器决策并打事件
     kubectl get pods -l app=web-spread -o wide
     echo "--- 每节点副本数统计 ---"
     kubectl get pods -l app=web-spread -o jsonpath=\
-'{range .items[*]}{.spec.nodeName}{"\n"}{end}' | sort | uniq -c
-
-    step "spread" "扩到 7 副本: 3 节点最多放 2/2/2=6 个, 第 7 个违反 maxSkew=1 -> Pending"
-    kubectl scale deployment/web-spread --replicas=7
-    sleep 3
-    kubectl get pods -l app=web-spread -o wide | head -12
+'{range .items[*]}{.spec.nodeName}{"\n"}{end}' | awk 'NF' | sort | uniq -c
+    echo "(Pending 的 Pod 没有 NODE, 所以不出现在统计里)"
 
     step "spread" "describe 查看 FailedScheduling 事件 (违反 maxSkew=1)"
+    echo "原理: web-spread 不容忍 control-plane 污点, Pod 进不去控制面节点,"
+    echo "      但控制面仍被计为 1 个拓扑域(0 副本)。两个 worker 各放 1 个后"
+    echo "      (1/1/0), 第 3 个副本放任何 worker 都会让 skew=2 > maxSkew=1,"
+    echo "      DoNotSchedule 直接拒绝 -> 剩余副本永远 Pending。"
+    echo "对比: 若给全部 3 个节点都加了容忍, 调度器总能均衡放置 (如 4 副本 -> 2/1/1),"
+    echo "      单纯加副本数不会触发拒绝 —— 拒绝只发生在'有域进不去'时。"
     kubectl describe pod -l app=web-spread | grep -A3 -B1 "FailedScheduling" || true
 }
 

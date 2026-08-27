@@ -43,15 +43,16 @@ do_crd() {
             || kubectl apply -f "${BASE_CDN}/client/config/crd/snapshot.storage.k8s.io_${f}.yaml"
     done
 
-    step "crd" "部署 snapshot-controller (kube-snapshot-controller namespace)"
+    step "crd" "部署 snapshot-controller (v8.x 清单固定装在 kube-system)"
     # 若 PullImage 失败: ../../scripts/load_images.sh registry.k8s.io/sig-storage/snapshot-controller:v8.2.0
-    # v8.x 清单拆成 rbac + setup 两个文件 (旧单文件路径已 404), 且不自带 namespace, 先建
-    kubectl create namespace kube-snapshot-controller --dry-run=client -o yaml | kubectl apply -f -
+    # v8.x 清单拆成 rbac + setup 两个文件 (旧单文件路径已 404),
+    # 且 Deployment/RBAC 的 metadata 里写死了 namespace: kube-system
+    CTRL_NS="kube-system"
     for f in rbac-snapshot-controller.yaml setup-snapshot-controller.yaml; do
         kubectl apply -f "${BASE_RAW}/deploy/kubernetes/snapshot-controller/${f}" \
             || kubectl apply -f "${BASE_CDN}/deploy/kubernetes/snapshot-controller/${f}"
     done
-    kubectl -n kube-snapshot-controller rollout status deploy/snapshot-controller --timeout=120s
+    kubectl -n "${CTRL_NS}" rollout status deploy/snapshot-controller --timeout=120s
 
     step "crd" "确认 CRD 就绪"
     kubectl get crd | grep volumesnapshot
@@ -107,7 +108,7 @@ do_snapshot() {
       4. status.readyToUse=true, restoreSize=1Gi
 
     排查命令: kubectl describe volumesnapshot snap-demo   (看 Events)
-              kubectl -n kube-snapshot-controller logs deploy/snapshot-controller
+              kubectl -n kube-system logs deploy/snapshot-controller
 EOF
 }
 

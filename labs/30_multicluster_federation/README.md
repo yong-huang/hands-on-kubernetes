@@ -86,3 +86,31 @@ clusterTolerations:
 - **成本感知调度**: 用 Karmada 的 DynamicScheduler 按 realtime 资源价格/利用率选集群
 - **渐进交付**: ArgoCD (项目 28) 管 GitOps 同步 + Karmada 管跨集群编排的组合是常见生产形态
 - **Fleet 安全**: 每个 member 用独立 SA + 最小 RBAC；host 集群即最高权限资产，重点加固
+
+## 多集群环境搭建（实测记录）
+
+脚本假设 Karmada 控制面与两个成员集群已就绪。以下为一次完整搭建的实测步骤：
+
+```bash
+# 1. 两个成员集群 (kubeconfig 落到独立文件, 供 karmadactl join 使用)
+kind create cluster --name member-us --kubeconfig ~/.kube/kind-config-member-us
+kind create cluster --name member-ap --kubeconfig ~/.kube/kind-config-member-ap
+
+# 2. 在 host 集群(k8s-learn)上安装 Karmada 控制面 (需 karmadactl)
+karmadactl init --kubeconfig ~/.kube/config --context kind-k8s-learn \
+    --karmada-data ~/.karmada-data --karmada-pki ~/.karmada-pki
+#    注意: 默认证书目录 /etc/karmada 需 sudo, 用 --karmada-data/--karmada-pki 指到用户目录;
+#    若中途失败, 必须先 `kubectl delete ns karmada-system` 并清空 PKI 目录后重来,
+#    半途续装会因 etcd 证书不匹配而 CrashLoop
+
+# 3. 注册成员集群
+KUBECONFIG=~/.karmada-data/karmada-apiserver.config \
+  karmadactl join member-us --cluster-kubeconfig ~/.kube/kind-config-member-us --karmada-context karmada-apiserver
+# (member-ap 同理)
+
+# 4. OrbStack 注意: 容器网络宿主机可达性因环境而异
+#    - 成员集群 kubeconfig 里的 127.0.0.1:PORT 端点 host 集群内的控制器够不着,
+#      需把 Cluster 对象与 karmada-cluster/<name> secret 的端点改成控制面容器 IP:6443
+#    - karmada-apiserver 若不可直达, 可 port-forward 后把 kubeconfig 的 server 指到 127.0.0.1
+#    验证: kubectl --context karmada-apiserver get clusters  # READY=True 才算成功
+```

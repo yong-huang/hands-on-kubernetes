@@ -43,6 +43,9 @@ do_install() {
                      echo "        YAML 清单与 README.md 仍可作为学习材料" >&2; return 1; }
         fi
     fi
+    # 实际部署的 Istio 版本由已安装的 istioctl 决定 (镜像 tag 必须与之一致),
+    # 动态探测避免写死的版本与 brew 等渠道安装的 istioctl 不一致
+    ISTIO_VERSION="$(istioctl version --client --short 2>/dev/null || echo "${ISTIO_VERSION}")"
     istioctl version
 
     step "install" "kind 集群镜像预载 (demo profile 只需 2 个核心镜像, 节点无法直连 docker.io)"

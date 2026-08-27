@@ -27,9 +27,23 @@ spec:
     spec:
       containers:
         - name: app
-          image: registry.k8s.io/prometheus-dummy-exporter:v0.1.0
-          args: ["--metric-name=demo_requests_total", "--metric-value=100",
-                 "--port=8080"]
+          # 用 python 标准库 http.server 提供 Prometheus 文本格式指标,
+          # 零外部依赖(镜像稳定可拉, 不依赖小众 exporter 镜像)
+          image: python:3.12-slim
+          command: ["python3", "-c"]
+          args:
+            - |
+              from http.server import BaseHTTPRequestHandler, HTTPServer
+              BODY = (b"# HELP demo_requests_total demo counter\n"
+                      b"# TYPE demo_requests_total counter\n"
+                      b"demo_requests_total 100\n")
+              class H(BaseHTTPRequestHandler):
+                  def do_GET(self):
+                      self.send_response(200)
+                      self.send_header("Content-Type", "text/plain; version=0.0.4")
+                      self.end_headers()
+                      self.wfile.write(BODY)
+              HTTPServer(("", 8080), H).serve_forever()
           ports: [{containerPort: 8080, name: http}]
 ---
 # 2. ServiceMonitor: Prometheus Operator 的抓取规则 CRD

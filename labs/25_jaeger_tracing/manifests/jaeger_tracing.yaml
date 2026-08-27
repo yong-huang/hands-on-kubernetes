@@ -51,7 +51,8 @@ spec:
 # 2. Instrumentation CR: OTel Operator 据此向带注解的 Pod 注入 python agent
 #    (init 容器把 agent 拷到 /otel-auto-instrumentation 并设置 PYTHONPATH,
 #     sitecustomize 随解释器启动自动初始化 TracerProvider + OTLP 导出)
-apiVersion: opentelemetry.io/v1beta1
+# 注意: Instrumentation CRD 在当前 operator 版本仍是 v1alpha1 (v1beta1 只有 Collector)
+apiVersion: opentelemetry.io/v1alpha1
 kind: Instrumentation
 metadata:
   name: demo-instrumentation
@@ -82,10 +83,20 @@ data:
     import urllib.request
     from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-    # opentelemetry 包来自 operator 注入的 PYTHONPATH(/otel-auto-instrumentation),
-    # sitecustomize 已自动初始化 TracerProvider 与 OTLP 导出
+    # OTel SDK 在容器启动时由 pip 安装(见 Deployment 的 command), 不依赖
+    # operator 注入的 agent 镜像(ghcr 国内常不可达); 教学上两条路等价:
+    # 注入 = sitecustomize 自动做下面这几行初始化, 这里改为显式写出
     from opentelemetry import trace
     from opentelemetry.propagate import extract, inject
+    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.sdk.trace.export import BatchSpanProcessor
+    from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+
+    from opentelemetry.sdk.resources import Resource, SERVICE_NAME
+    provider = TracerProvider(resource=Resource.create(
+        {SERVICE_NAME: os.environ.get("SERVICE_NAME", "svc")}))   # Jaeger 里的服务名
+    provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))
+    trace.set_tracer_provider(provider)
 
     PORT = int(os.environ.get("PORT", "8080"))
     DOWNSTREAM = os.environ.get("DOWNSTREAM", "")
@@ -96,18 +107,23 @@ data:
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self):
             # 1) 提取上游 W3C traceparent, 把本服务的 span 挂到同一棵 trace 树上
-            ctx = extract(dict(self.headers))
+            # urllib 会把 header 键首字母大写(Traceparent), OTel 默认大小写敏感,
+            # 统一转小写后再提取, 否则链路在这里断开
+            ctx = extract({k.lower(): v for k, v in self.headers.items()})
             with tracer.start_as_current_span(
                     "GET " + self.path, context=ctx) as span:
                 span.set_attribute("http.method", self.command)
                 span.set_attribute("service.name", NAME)
                 body = "ok"
                 if DOWNSTREAM:
-                    # 2) 出站调用: urllib 自动埋点建 client span 并透传 header,
-                    #    当前 span 是它的 parent —— 链路得以延续
-                    req = urllib.request.Request(DOWNSTREAM)
-                    with urllib.request.urlopen(req, timeout=5) as resp:
-                        body = resp.read().decode()
+                    # 2) 出站调用: 显式把当前上下文写进请求头(W3C traceparent),
+                    #    下游 extract 后 span 就挂到同一棵 trace 树 —— 链路得以延续
+                    headers = {}
+                    inject(headers)
+                    req = urllib.request.Request(DOWNSTREAM, headers=headers)
+                    with tracer.start_as_current_span("GET " + DOWNSTREAM):
+                        with urllib.request.urlopen(req, timeout=5) as resp:
+                            body = resp.read().decode()
                 payload = NAME + " <- " + body
                 data = payload.encode()
                 self.send_response(200)
@@ -150,16 +166,25 @@ spec:
   template:
     metadata:
       labels: {app: svc-front}
-      annotations:
-        instrumentation.opentelemetry.io/inject-python: "demo-instrumentation"
+      # 生产可用注解 instrumentation.opentelemetry.io/inject-python: demo-instrumentation
+      # 走 operator 注入; 本实验 ghcr 镜像不可达, 改为容器内自装 SDK(见 command)
     spec:
       containers:
         - name: app
           image: python:3.12-slim
           workingDir: /app
-          command: ["python", "server.py"]
+          # 启动时装 OTel SDK(走国内 pypi 镜像, 约十几秒), 替代 operator 注入
+          command: ["sh", "-c"]
+          args:
+            - |
+              pip install -q \
+                -i https://pypi.tuna.tsinghua.edu.cn/simple \
+                opentelemetry-sdk opentelemetry-exporter-otlp-proto-grpc \
+              && exec python server.py
           env:
             - {name: SERVICE_NAME, value: "svc-front"}
+            # OTel SDK 读该环境变量决定 span 导出到哪 (Jaeger 的 OTLP gRPC 入口)
+            - {name: OTEL_EXPORTER_OTLP_ENDPOINT, value: "http://jaeger-collector.tracing-demo.svc.cluster.local:4317"}
             - {name: DOWNSTREAM, value: "http://svc-order:80/order"}
             - {name: START_CLIENT, value: "1"}   # 前端自带流量发生器
           ports:
@@ -189,16 +214,23 @@ spec:
   template:
     metadata:
       labels: {app: svc-order}
-      annotations:
-        instrumentation.opentelemetry.io/inject-python: "demo-instrumentation"
     spec:
       containers:
         - name: app
           image: python:3.12-slim
           workingDir: /app
-          command: ["python", "server.py"]
+          # 启动时装 OTel SDK(走国内 pypi 镜像, 约十几秒), 替代 operator 注入
+          command: ["sh", "-c"]
+          args:
+            - |
+              pip install -q \
+                -i https://pypi.tuna.tsinghua.edu.cn/simple \
+                opentelemetry-sdk opentelemetry-exporter-otlp-proto-grpc \
+              && exec python server.py
           env:
             - {name: SERVICE_NAME, value: "svc-order"}
+            # OTel SDK 读该环境变量决定 span 导出到哪 (Jaeger 的 OTLP gRPC 入口)
+            - {name: OTEL_EXPORTER_OTLP_ENDPOINT, value: "http://jaeger-collector.tracing-demo.svc.cluster.local:4317"}
             - {name: DOWNSTREAM, value: "http://svc-payment:80/pay"}
           ports:
             - {containerPort: 8080}
@@ -226,16 +258,23 @@ spec:
   template:
     metadata:
       labels: {app: svc-payment}
-      annotations:
-        instrumentation.opentelemetry.io/inject-python: "demo-instrumentation"
     spec:
       containers:
         - name: app
           image: python:3.12-slim
           workingDir: /app
-          command: ["python", "server.py"]
+          # 启动时装 OTel SDK(走国内 pypi 镜像, 约十几秒), 替代 operator 注入
+          command: ["sh", "-c"]
+          args:
+            - |
+              pip install -q \
+                -i https://pypi.tuna.tsinghua.edu.cn/simple \
+                opentelemetry-sdk opentelemetry-exporter-otlp-proto-grpc \
+              && exec python server.py
           env:
-            - {name: SERVICE_NAME, value: "svc-payment"}   # 链路终点: 不再调用下游
+            - {name: SERVICE_NAME, value: "svc-payment"}
+            # OTel SDK 读该环境变量决定 span 导出到哪 (Jaeger 的 OTLP gRPC 入口)
+            - {name: OTEL_EXPORTER_OTLP_ENDPOINT, value: "http://jaeger-collector.tracing-demo.svc.cluster.local:4317"}   # 链路终点: 不再调用下游
           ports:
             - {containerPort: 8080}
           volumeMounts:

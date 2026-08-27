@@ -11,7 +11,7 @@
 ```
 10_affinity/
 ├── README.md    # 本文档
-├── affinity.sh         # 全流程演示: 打标签 -> 打散验证 -> 扩容观察 Pending -> 清理
+├── affinity.sh         # 全流程演示: 打标签 -> 打散验证 -> 拓扑约束拒绝 -> 清理
 ├── manifests/
 │   └── affinity.yaml       # 四个示例: 硬性/软性 podAntiAffinity、nodeAffinity、topologySpread
 ├── scripts/
@@ -82,7 +82,9 @@ topologySpreadConstraints:
         app: web-spread                 # 只统计本应用自己的 Pod
 ```
 
-3 个节点跑 4 副本时，2/1/1 合法、3/1/0 非法（skew=3）。`whenUnsatisfiable: DoNotSchedule` 是硬性（违反就 Pending），`ScheduleAnyway` 是软性（违反也调度，但打分更低）。
+3 个节点跑 4 副本时，2/1/1 合法、3/1/0 非法（skew=3）。`whenUnsatisfiable: DoNotSchedule` 是硬性（违反就拒绝调度），`ScheduleAnyway` 是软性（违反也调度，但打分更低）。
+
+**一个容易误解的点**：如果所有拓扑域都可进入，调度器总能均衡放置（任意副本数都能保持 skew=1，如 7 副本 -> 3/2/2），单纯加副本**不会**触发 DoNotSchedule 拒绝。拒绝只发生在"某个域进不去"时——本实验故意不容忍 control-plane 污点：控制面节点被计为 0 副本的域但 Pod 无法进入，两个 worker 各放 1 个（1/1/0）后，第 3 个副本放哪都是 skew=2，于是 Pending。
 
 ## 各方式对比
 
