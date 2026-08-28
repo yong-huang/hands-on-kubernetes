@@ -80,3 +80,54 @@ metadata:
 ## 总结
 
 Velero 的本质是把"应用 + 数据"整体搬进对象存储这个中立地带：controller 管 API 对象，node agent 管文件数据，restore 用 namespace mapping 实现跨集群/跨环境迁移。记住三条对比线：文件级（可迁移）vs 块级快照（同集群快）、应用级粒度 vs etcd 全量、备份一致性靠 hooks。配合 `velero.sh` 里"备份 marker.log → 恢复到新 namespace → 文件还在"的闭环，跨集群迁移就不再是个黑盒。
+
+## 真实模式实测记录（本地 S3 兼容对象存储）
+
+学习模式之外，本实验已用本机 S3 兼容模拟器（ObjStor，监听 3020）完整跑通真实模式：
+
+```bash
+# 1. 起对象存储并建 bucket (任何 S3 兼容服务均可: ObjStor/MinIO/LocalStack)
+aws --endpoint-url http://localhost:3020 s3api create-bucket --bucket velero
+
+# 2. 写凭据文件后安装 (kind 节点经 host.docker.internal/宿主机 IP 访问 S3)
+cat > /tmp/velero-creds <<'EOF2'
+[default]
+aws_access_key_id=test-access-key
+aws_secret_access_key=test-secret-key
+EOF2
+velero install --provider aws --plugins velero/velero-plugin-for-aws:v1.14.0 \
+  --bucket velero \
+  --backup-location-config region=us-east-1,s3ForcePathStyle=true,s3Url=http://<宿主机可达地址>:3020 \
+  --secret-file /tmp/velero-creds \
+  --use-node-agent --default-volumes-to-fs-backup -n velero --wait
+
+# 3. 真实模式跑本脚本
+VELERO_S3_BUCKET=velero VELERO_S3_ENDPOINT=http://<宿主机可达地址>:3020 ./velero.sh all
+```
+
+实测结果（2026-08，kind v1.36 + velero 1.18 + ObjStor）：
+
+- backup `Completed`（0 错误）：API 对象 + 备份产物全部落入对象存储
+  （`backups/demo-backup/*.tar.gz`、`velero-backup.json` 等齐套）；
+- restore `Completed`：14 个对象恢复到 `velero-demo-restored`，Pod 重建、
+  PVC 重新绑定，namespace 映射（velero-demo → velero-demo-restored）生效。
+
+**已知环境限制（如实说明）**：kind 默认 StorageClass（local-path）创建的 PV
+底层是 hostPath，**velero 会拒绝对其做文件级备份**（日志：
+"Volume data in pod … is a hostPath volume which is not supported for pod
+volume backup"），因此 PVC 里的业务数据（marker.log）不会随恢复带过去。
+要完整演示卷数据迁移，需要 CSI 类存储驱动（或云盘）；本实验在 kind 上
+验证的是 API 对象迁移 + 对象存储链路。
+
+**踩坑记录（对 S3 兼容实现方也有参考价值）**：
+
+1. S3 端点选宿主机可达地址（`host.docker.internal` 宿主机自身不解析，
+   用局域网 IP；`velero backup logs` 在宿主机读日志也走该端点）；
+2. kopia（node-agent 的备份引擎）用 `STREAMING-AWS4-HMAC-SHA256-PAYLOAD`
+   分块上传——S3 兼容层必须解码 aws-chunked 帧，否则 blob 全部 403；
+3. kopia 靠 `list-objects-v2?prefix=` 枚举索引——prefix 过滤必须实现，
+   否则把格式 blob 当索引解析直接报 "blob id too short"；
+4. `backup.velero.io/backup-volumes` 必须是 **annotation**——写成 label 时
+   velero 静默跳过卷备份（本实验曾踩）；
+5. 备份失败会在 bucket 留下半个 kopia repo，重试前需清 bucket 前缀 +
+   删 `backuprepositories` CR，否则 "found existing data in storage location"。

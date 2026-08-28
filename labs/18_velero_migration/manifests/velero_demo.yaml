@@ -60,8 +60,9 @@ spec:
     metadata:
       labels:
         app: web
-        # 这个注解让 Velero node agent 明确备份该 Pod 的所有 PVC
-        # (install 时若带 --default-volumes-to-filesystem-backup 可省略)
+      annotations:
+        # 注意: 必须是 annotation 而不是 label (写成 label 时 node agent 会静默跳过卷备份)
+        # 让 Velero node agent 备份 data 卷; install 带 --default-volumes-to-fs-backup 时可省略
         backup.velero.io/backup-volumes: "data"
     spec:
       containers:
