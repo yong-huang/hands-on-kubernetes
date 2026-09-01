@@ -1,0 +1,182 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "集群内 DNS 解析：ndots 展开 → CoreDNS 插件链",
+    "locale": "zh-CN",
+    "output": "labs/14_dns_discovery/images/dns_resolution.html",
+    "quality_profile": "showcase"
+  },
+  "lanes": [
+    {
+      "id": "pod",
+      "label": "Pod 内"
+    },
+    {
+      "id": "coredns",
+      "label": "CoreDNS（kube-dns Service · :53）"
+    },
+    {
+      "id": "outside",
+      "label": "集群外部",
+      "variant": "exception"
+    }
+  ],
+  "phases": [
+    {
+      "id": "p1",
+      "label": "展开搜索域",
+      "fromCol": 0,
+      "toCol": 1,
+      "variant": "emphasis"
+    },
+    {
+      "id": "p2",
+      "label": "插件链",
+      "fromCol": 2,
+      "toCol": 3
+    },
+    {
+      "id": "p3",
+      "label": "应答",
+      "fromCol": 4,
+      "toCol": 5,
+      "variant": "dashed"
+    }
+  ],
+  "mainPath": [
+    "resolve",
+    "expand",
+    "coredns",
+    "hit",
+    "answer"
+  ],
+  "nodes": [
+    {
+      "id": "resolve",
+      "lane": "pod",
+      "col": 0,
+      "type": "frontend",
+      "label": "解析短名 web",
+      "sublabel": "getaddrinfo",
+      "width": 120
+    },
+    {
+      "id": "expand",
+      "lane": "pod",
+      "col": 1,
+      "type": "backend",
+      "label": "ndots:5 展开",
+      "sublabel": "先拼搜索域再查绝对名",
+      "tag": "resolv.conf",
+      "width": 140
+    },
+    {
+      "id": "coredns",
+      "lane": "coredns",
+      "col": 2,
+      "type": "security",
+      "label": "CoreDNS",
+      "sublabel": "kubernetes 插件 · cluster.local",
+      "tag": "插件链",
+      "width": 150
+    },
+    {
+      "id": "hit",
+      "lane": "coredns",
+      "col": 3,
+      "type": "backend",
+      "label": "命中集群记录",
+      "sublabel": "Service→VIP · Headless→Pod IP 列表",
+      "width": 160
+    },
+    {
+      "id": "fwd",
+      "lane": "outside",
+      "col": 3,
+      "type": "external",
+      "label": "forward → 8.8.8.8",
+      "sublabel": "cluster.local 查不到才走",
+      "tag": "外部兜底",
+      "width": 150
+    },
+    {
+      "id": "ext",
+      "lane": "outside",
+      "col": 4,
+      "type": "external",
+      "label": "外部 DNS",
+      "sublabel": "返回公网 IP"
+    },
+    {
+      "id": "answer",
+      "lane": "pod",
+      "col": 5,
+      "type": "frontend",
+      "label": "拿到 IP · 建连",
+      "sublabel": "A 记录 · cache 30s",
+      "width": 130
+    }
+  ],
+  "edges": [
+    {
+      "from": "resolve",
+      "to": "expand"
+    },
+    {
+      "from": "expand",
+      "to": "coredns",
+      "route": "drop",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "from": "coredns",
+      "to": "hit"
+    },
+    {
+      "from": "coredns",
+      "to": "fwd",
+      "label": "非 cluster.local",
+      "role": "error"
+    },
+    {
+      "from": "fwd",
+      "to": "ext"
+    },
+    {
+      "from": "hit",
+      "to": "answer",
+      "label": "应答"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "三种记录",
+      "items": [
+        "ClusterIP Service → 单个 VIP",
+        "Headless（clusterIP: None）→ 所有 Ready Pod IP 列表",
+        "Pod 级：hostname + subdomain，或 StatefulSet 自动生成"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "ndots:5 的坑",
+      "items": [
+        "api.github.com 只有 2 个点 < 5 → 先拼 3 个搜索域各查一遍",
+        "全部 NXDOMAIN 后才查绝对域名：1 次变 4 次",
+        "优化：dnsConfig 调低 ndots / 写全 FQDN / 结尾加点"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "策略与注入",
+      "items": [
+        "dnsPolicy: ClusterFirst（默认）→ 指向 CoreDNS",
+        "dnsPolicy: None 必须配 dnsConfig，完全接管解析",
+        "Pod 要自己的记录：hostname + subdomain 缺一不可"
+      ]
+    }
+  ]
+}

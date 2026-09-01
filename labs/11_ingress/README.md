@@ -8,14 +8,15 @@ Service 的 NodePort 模式有三个痛点：端口随机难记、每个服务�
 
 ```
 11_ingress/
-├── README.md    # 本文档
-├── ingress.sh          # controller | apply | test | clean 四步演示
+├── README.md                 # 本文档
+├── ingress.sh                # controller | apply | test | clean 四步演示
+├── ingress-nginx-kind.yaml   # ingress-nginx 控制器清单（kind 定制版，本地缓存）
 ├── manifests/
-│   └── ingress.yaml        # 两个后端 + 域名路由 Ingress + 路径路由 Ingress
-└── ingress-nginx-kind.yaml  # ingress-nginx 控制器清单(kind 定制版, 本地缓存)
-└── ingress_arch.png  # 架构图（gen_arch.py 生成）
-└── scripts/
-       └── gen_arch.py        # 架构图生成脚本 (python3 scripts/gen_arch.py)
+│   └── ingress.yaml          # 两个后端 + 域名路由 Ingress + 路径路由 Ingress
+└── images/
+    ├── ingress_routing.architecture.json  # 图源（Archify Typed JSON IR）
+    ├── ingress_routing.html               # 交互版架构图
+    └── ingress_routing.svg                # 双主题矢量版（本文档 §6 内嵌）
 ```
 
 ## 3. 核心概念
@@ -78,9 +79,11 @@ cd ../../scripts && ./load_images.sh \
 
 ## 6. 可视化
 
-![ingress](images/ingress_arch.png)
+![Ingress 路由](images/ingress_routing.svg)
 
-左图：流量路径——客户端带 Host 头请求 → Ingress Controller（nginx Deployment + Service）→ 按 Ingress 规则转发到后端 Service。右图：域名/路径路由规则一览，以及 ClusterIP / NodePort / LoadBalancer / Ingress 四种暴露方式的对比。
+流量路径：客户端带 Host 头请求 → **ingress-nginx Controller**（唯一入口）→ 按 Ingress 规则转发到 web-a / web-b 的 Service → Pod。虚线是控制面：Controller watch Ingress 资源，把规则翻译成 nginx.conf 并热加载——**资源只是规则，Controller 才是执行者**。
+
+> 🌐 **交互版**：[在线打开（GitHub Pages）](https://yong-huang.github.io/hands-on-kubernetes/labs/11_ingress/images/ingress_routing.html)（或本地打开 [`images/ingress_routing.html`](images/ingress_routing.html)）。
 
 ## 7. 面试要点
 

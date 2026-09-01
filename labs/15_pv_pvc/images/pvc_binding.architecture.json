@@ -1,0 +1,168 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "PV/PVC：供给与需求在绑定条件下对接",
+    "locale": "zh-CN",
+    "output": "labs/15_pv_pvc/images/pvc_binding.html",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    {
+      "id": "ctrl",
+      "type": "cloud",
+      "label": "PV 控制器",
+      "sublabel": "静态匹配：找 compatible 的 PV",
+      "pos": [
+        560,
+        50
+      ],
+      "size": [
+        230,
+        78
+      ],
+      "tag": "控制平面"
+    },
+    {
+      "id": "pod",
+      "type": "backend",
+      "label": "Pod",
+      "sublabel": "volumes：persistentVolumeClaim",
+      "pos": [
+        60,
+        250
+      ],
+      "size": [
+        180,
+        78
+      ]
+    },
+    {
+      "id": "pvc",
+      "type": "database",
+      "label": "PVC · pvc-demo",
+      "sublabel": "申请 1Gi · RWO · sc=manual",
+      "pos": [
+        330,
+        250
+      ],
+      "size": [
+        200,
+        88
+      ],
+      "tag": "namespace 级 · 需求方"
+    },
+    {
+      "id": "pv",
+      "type": "database",
+      "label": "PV · pv-demo",
+      "sublabel": "提供 1Gi · RWO · Retain",
+      "pos": [
+        640,
+        250
+      ],
+      "size": [
+        200,
+        88
+      ],
+      "tag": "集群级 · 供给方"
+    },
+    {
+      "id": "storage",
+      "type": "backend",
+      "label": "hostPath · /data/pv-demo",
+      "sublabel": "kind 节点容器内目录（演示）",
+      "pos": [
+        940,
+        250
+      ],
+      "size": [
+        220,
+        88
+      ],
+      "tag": "实际存储"
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "kind 集群",
+      "wraps": [
+        "ctrl",
+        "pod",
+        "pvc",
+        "pv",
+        "storage"
+      ],
+      "pad": 26
+    }
+  ],
+  "connections": [
+    {
+      "from": "pod",
+      "to": "pvc",
+      "label": "claimName 引用",
+      "variant": "emphasis"
+    },
+    {
+      "from": "pvc",
+      "to": "pv",
+      "label": "Bound · 一对一",
+      "variant": "emphasis"
+    },
+    {
+      "from": "pv",
+      "to": "storage",
+      "label": "挂载到节点"
+    },
+    {
+      "from": "ctrl",
+      "to": "pvc",
+      "label": "watch PVC · 挑选合适 PV",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "from": "ctrl",
+      "to": "pv",
+      "label": "三条件匹配 → 写 claimRef",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        810,
+        186
+      ]
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "绑定三条件",
+      "items": [
+        "① PV capacity ≥ PVC 请求量",
+        "② PV accessModes ⊇ PVC 请求模式",
+        "③ storageClassName 一致（留空走默认 SC → 动态供给）"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "生命周期",
+      "items": [
+        "Available → Bound（claimRef 一对一）→ Released",
+        "Retain：删 PVC 后 Released ≠ Available，数据保留需手动清理",
+        "Delete：PV 连底层存储一起删（动态供给默认）"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "易踩的坑",
+      "items": [
+        "RWO 限节点不限 Pod：同节点多 Pod 可共享一个 RWO 卷",
+        "hostPath/local 数据只在特定节点：配 nodeAffinity 引导调度",
+        "PVC 比 PV 小可绑定但整块独占——生产用动态供给按需建"
+      ]
+    }
+  ]
+}

@@ -10,14 +10,14 @@ Kubernetes 的解法是 **PV/PVC 两层抽象**：管理员用 PersistentVolume 
 
 ```
 15_pv_pvc/
-├── README.md    # 本文档
-├── pv.sh          # 全流程演示脚本: deploy/verify/reclaim/clean
+├── README.md            # 本文档
+├── pv.sh                # 全流程演示脚本: deploy/verify/reclaim/clean
 ├── manifests/
-│   └── pv_pvc.yaml    # PV(hostPath) + PVC + 挂载 Pod + 带节点亲和性的第二个 PV
-├── scripts/
-│   └── gen_arch.py        # 架构图生成脚本 (python3 scripts/gen_arch.py)
+│   └── pv_pvc.yaml      # PV(hostPath) + PVC + 挂载 Pod + 带节点亲和性的第二个 PV
 └── images/
-       └── pv_pvc_arch.png # 绑定链路与生命周期示意图
+    ├── pvc_binding.architecture.json  # 图源（Archify Typed JSON IR）
+    ├── pvc_binding.html               # 交互版架构图
+    └── pvc_binding.svg                # 双主题矢量版（本文档 §可视化 内嵌）
 ```
 
 ## 核心概念
@@ -99,9 +99,11 @@ volumes:
 
 ## 可视化
 
-左图是静态绑定链路：Pod → PVC(1Gi RWO sc=manual) → PV → hostPath，以及三个绑定条件（capacity ≥、accessModes ⊇、storageClassName =）；右图是 PV 生命周期状态机（Available → Bound → Released，Retain 手动复用 vs Delete 直接删除）与静态/动态供给对比：
+![PV/PVC 绑定](images/pvc_binding.svg)
 
-![pv_pvc](images/pv_pvc_arch.png)
+静态绑定链路：Pod 用 `claimName` 引用 PVC → PV 控制器按**三条件**（capacity ≥、accessModes ⊇、storageClassName =）匹配 → 绑定为一对一独占（写 claimRef）→ PV 挂到实际存储（本例 hostPath）。Pod 全程不感知底层是 hostPath、local 盘还是云盘。
+
+> 🌐 **交互版**：[在线打开（GitHub Pages）](https://yong-huang.github.io/hands-on-kubernetes/labs/15_pv_pvc/images/pvc_binding.html)（或本地打开 [`images/pvc_binding.html`](images/pvc_binding.html)）。
 
 ## 面试要点
 

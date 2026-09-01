@@ -15,14 +15,14 @@
 
 ```
 13_service_mesh/
-├── README.md    # 本文档
-├── istio.sh              # 全流程演示脚本：install/deploy/test/clean
+├── README.md               # 本文档
+├── istio.sh                # 全流程演示脚本：install/deploy/test/clean
 ├── manifests/
-│   └── service_mesh.yaml     # 多文档清单：Namespace(注入) + v1/v2 Deployment + Service + DestinationRule + VirtualService
-├── scripts/
-│   └── gen_arch.py        # 架构图生成脚本 (python3 scripts/gen_arch.py)
+│   └── service_mesh.yaml   # Namespace(注入) + v1/v2 Deployment + Service + DestinationRule + VirtualService
 └── images/
-       └── service_mesh_arch.png # Sidecar 模型与金丝雀路由示意图
+    ├── istio_canary.architecture.json  # 图源（Archify Typed JSON IR）
+    ├── istio_canary.html               # 交互版架构图
+    └── istio_canary.svg                # 双主题矢量版（本文档 §可视化 内嵌）
 ```
 
 ## 核心概念
@@ -132,9 +132,11 @@ docker tag  docker.m.daocloud.io/istio/proxyv2:${ISTIO_VERSION} docker.io/istio/
 
 ## 可视化
 
-左图是 Sidecar 模型：Pod 内 app 容器 + envoy sidecar，istiod 通过 xDS 推送配置，进出流量全部被劫持到 envoy；右图是金丝雀路由：VirtualService 按 90/10 权重分流到 v1/v2 subset，以及镜像流量示意和 Ingress（仅边缘 L7）与 Mesh（每一跳）的对比。
+![Istio 金丝雀](images/istio_canary.svg)
 
-![service_mesh](images/service_mesh_arch.png)
+图中一条主线：客户端请求 → Service（只认 app 标签）→ VirtualService 按 **90/10 权重**把流量分到 v1/v2 两个 subset（DestinationRule 按 version 标签划分）；istiod 通过 xDS 把路由配置推送到每个 envoy sidecar。改权重不重启 Pod——这正是灰度"秒级回切"的底气。
+
+> 🌐 **交互版**：[在线打开（GitHub Pages）](https://yong-huang.github.io/hands-on-kubernetes/labs/13_service_mesh/images/istio_canary.html)（或本地打开 [`images/istio_canary.html`](images/istio_canary.html)）。
 
 ## 面试要点
 

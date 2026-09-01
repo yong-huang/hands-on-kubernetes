@@ -12,14 +12,14 @@
 
 ```
 14_dns_discovery/
-├── README.md    # 本文档
-├── dns.sh               # 全流程演示脚本：deploy/test/clean
+├── README.md                # 本文档
+├── dns.sh                   # 全流程演示脚本：deploy/test/clean
 ├── manifests/
-│   └── dns_discovery.yaml   # 多文档 YAML：Headless + StatefulSet + ClusterIP Service + 自定义 DNS Pod
-├── scripts/
-│   └── gen_arch.py        # 架构图生成脚本 (python3 scripts/gen_arch.py)
+│   └── dns_discovery.yaml   # Headless + StatefulSet + ClusterIP Service + 自定义 DNS Pod
 └── images/
-       └── dns_discovery_arch.png # 解析流程与三种记录对比图
+    ├── dns_resolution.workflow.json  # 图源（Archify Typed JSON IR）
+    ├── dns_resolution.html           # 交互版解析流程图
+    └── dns_resolution.svg            # 双主题矢量版（本文档 §可视化 内嵌）
 ```
 
 ## 核心概念
@@ -120,9 +120,11 @@ nslookup kube-dns.kube-system.svc.cluster.local -> 10.96.0.10
 
 ## 可视化
 
-左图是集群内 DNS 解析全流程（应用 → resolv.conf 搜索域展开 → CoreDNS 插件链 → A 记录应答）与 FQDN 逐段解剖；右图对比三种记录的解析结果，并展示短名 `web` 的搜索域展开顺序：
+![DNS 解析流水线](images/dns_resolution.svg)
 
-![dns](images/dns_discovery_arch.png)
+解析一条短名 `web` 的完整路径：应用 getaddrinfo → **ndots:5 先拼搜索域**（`web.default.svc.cluster.local` → …）→ CoreDNS 插件链（`kubernetes` 插件管 cluster.local，命中返回记录）→ 应答建连；`cluster.local` 之外的域名才走 `forward` 插件兜底到外部 DNS——这正是 ndots:5 拖慢外部域名解析的根源。
+
+> 🌐 **交互版**：[在线打开（GitHub Pages）](https://yong-huang.github.io/hands-on-kubernetes/labs/14_dns_discovery/images/dns_resolution.html)（或本地打开 [`images/dns_resolution.html`](images/dns_resolution.html)）。
 
 ## 面试要点
 

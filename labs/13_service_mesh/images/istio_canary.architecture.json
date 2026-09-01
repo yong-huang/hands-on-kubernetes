@@ -1,0 +1,207 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Istio 金丝雀：VirtualService 按 90/10 精确分流",
+    "locale": "zh-CN",
+    "output": "labs/13_service_mesh/images/istio_canary.html",
+    "quality_profile": "showcase",
+    "viewBox": [
+      1150,
+      600
+    ]
+  },
+  "components": [
+    {
+      "id": "istiod",
+      "type": "cloud",
+      "label": "istiod 控制面",
+      "sublabel": "watch API · xDS 推送 envoy 配置",
+      "pos": [
+        60,
+        40
+      ],
+      "size": [
+        210,
+        74
+      ],
+      "tag": "单进程"
+    },
+    {
+      "id": "vs",
+      "type": "backend",
+      "label": "VirtualService",
+      "sublabel": "host: canary-web · 90/10 权重",
+      "pos": [
+        60,
+        140
+      ],
+      "size": [
+        210,
+        84
+      ],
+      "tag": "路由规则"
+    },
+    {
+      "id": "dr",
+      "type": "backend",
+      "label": "DestinationRule",
+      "sublabel": "subset：v1 / v2（按 version 标签）",
+      "pos": [
+        60,
+        250
+      ],
+      "size": [
+        210,
+        84
+      ],
+      "tag": "目的地策略"
+    },
+    {
+      "id": "client",
+      "type": "external",
+      "label": "客户端",
+      "sublabel": "20 次请求统计命中",
+      "pos": [
+        60,
+        370
+      ],
+      "size": [
+        210,
+        64
+      ]
+    },
+    {
+      "id": "svc",
+      "type": "backend",
+      "label": "Service canary-web",
+      "sublabel": "selector 只认 app（不区分版本）",
+      "pos": [
+        430,
+        260
+      ],
+      "size": [
+        200,
+        80
+      ]
+    },
+    {
+      "id": "pod1",
+      "type": "backend",
+      "label": "Pod · v1 稳定版",
+      "sublabel": "app + envoy sidecar · 2/2",
+      "pos": [
+        760,
+        60
+      ],
+      "size": [
+        220,
+        88
+      ],
+      "tag": "subset v1"
+    },
+    {
+      "id": "pod2",
+      "type": "backend",
+      "label": "Pod · v2 金丝雀",
+      "sublabel": "app + envoy sidecar · 2/2",
+      "pos": [
+        760,
+        400
+      ],
+      "size": [
+        220,
+        88
+      ],
+      "tag": "subset v2"
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "istio-injection=enabled 的命名空间",
+      "wraps": [
+        "vs",
+        "dr",
+        "svc",
+        "pod1",
+        "pod2"
+      ],
+      "pad": 26
+    }
+  ],
+  "connections": [
+    {
+      "from": "dr",
+      "to": "vs",
+      "label": "subset 定义",
+      "variant": "dashed",
+      "fromSide": "top",
+      "toSide": "bottom"
+    },
+    {
+      "from": "client",
+      "to": "svc",
+      "label": "发起请求",
+      "fromSide": "right",
+      "toSide": "bottom"
+    },
+    {
+      "from": "vs",
+      "to": "svc",
+      "label": "路由：90% → v1 / 10% → v2",
+      "variant": "emphasis",
+      "fromSide": "right",
+      "toSide": "top"
+    },
+    {
+      "from": "svc",
+      "to": "pod1"
+    },
+    {
+      "from": "svc",
+      "to": "pod2"
+    },
+    {
+      "from": "istiod",
+      "to": "pod1",
+      "label": "xDS 下发每个 sidecar",
+      "variant": "dashed",
+      "fromSide": "right",
+      "toSide": "left",
+      "labelAt": [
+        520,
+        146
+      ]
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Sidecar 注入",
+      "items": [
+        "Namespace 打 istio-injection=enabled 标签",
+        "MutatingWebhook 在 Pod 创建时追加 istio-proxy 容器（2/2）",
+        "存量 Pod 不自动注入，需 rollout restart"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "灰度三策略（风险递减）",
+      "items": [
+        "权重路由：90/10，按比例放真实流量",
+        "header 匹配：x-canary: true 白名单先行",
+        "镜像：流量复制、响应丢弃，零风险验证"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "易踩的坑",
+      "items": [
+        "Service selector 只写 app——分版本交给 VirtualService",
+        "改权重秒级生效：istiod xDS 推送，无需重启 Pod",
+        "istiod 挂了只影响规则更新，已下发配置继续生效"
+      ]
+    }
+  ]
+}

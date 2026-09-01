@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Ingress：一个七层入口，按域名/路径分流",
+    "locale": "zh-CN",
+    "output": "labs/11_ingress/images/ingress_routing.html",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    { "id": "client", "type": "external", "label": "客户端", "sublabel": "curl -H 'Host: a.example.com'", "pos": [60, 120], "size": [170, 70] },
+    { "id": "rules", "type": "backend", "label": "Ingress 资源", "sublabel": "rules：host / path → Service", "pos": [60, 320], "size": [200, 80], "tag": "声明式规则" },
+    { "id": "controller", "type": "backend", "label": "ingress-nginx Controller", "sublabel": "watch 规则 → nginx.conf 热加载", "pos": [390, 200], "size": [210, 88], "tag": "真正接流量" },
+    { "id": "svc-a", "type": "backend", "label": "Service · web-a", "sublabel": "ClusterIP :80", "pos": [770, 80], "size": [180, 70] },
+    { "id": "svc-b", "type": "backend", "label": "Service · web-b", "sublabel": "ClusterIP :80", "pos": [770, 330], "size": [180, 70] },
+    { "id": "pod-a", "type": "backend", "label": "Pod web-a", "sublabel": "nginx :80（首页写 web-a）", "pos": [1040, 80], "size": [180, 70] },
+    { "id": "pod-b", "type": "backend", "label": "Pod web-b", "sublabel": "nginx :80（首页写 web-b）", "pos": [1040, 330], "size": [180, 70] }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "kind 集群", "wraps": ["rules", "controller", "svc-a", "svc-b", "pod-a", "pod-b"], "pad": 26 }
+  ],
+  "connections": [
+    { "from": "client", "to": "controller", "label": "HTTP :80（Host 头路由）", "variant": "emphasis" },
+    { "from": "rules", "to": "controller", "label": "watch · 翻译成 nginx.conf", "variant": "dashed", "fromSide": "right", "toSide": "bottom" },
+    { "from": "controller", "to": "svc-a", "label": "Host: a.example.com" },
+    { "from": "controller", "to": "svc-b", "label": "Host: b.example.com" },
+    { "from": "svc-a", "to": "pod-a", "label": ":80" },
+    { "from": "svc-b", "to": "pod-b", "label": ":80" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "资源 vs Controller", "items": ["Ingress 资源 = etcd 里的路由规则，本身不转发流量", "Controller（ingress-nginx）watch 规则，翻译成 nginx.conf 热加载", "ingressClassName 决定这条规则由哪个 Controller 处理"] },
+    { "dot": "rose", "title": "两种路由", "items": ["域名路由：a/b.example.com → 不同 Service（虚拟主机）", "路径路由：example.com//b 按 Prefix 前缀分流", "rewrite-target 注解：把 /a 重写为 / 再转后端，避免 404"] },
+    { "dot": "emerald", "title": "TLS 与 kind", "items": ["TLS 在 Controller 的 443 终止，到后端走明文 :80", "证书放 tls.secretName，生产用 cert-manager 自动签发", "kind 宿主机直连 80/443，建集群时需配 extraPortMappings"] }
+  ]
+}

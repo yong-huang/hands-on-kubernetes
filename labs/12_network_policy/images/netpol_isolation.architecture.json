@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "NetworkPolicy：默认拒绝 + 白名单放行",
+    "locale": "zh-CN",
+    "output": "labs/12_network_policy/images/netpol_isolation.html",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    { "id": "frontend", "type": "backend", "label": "frontend Pod", "sublabel": "app=frontend · wget backend", "pos": [60, 90], "size": [190, 78] },
+    { "id": "evil", "type": "external", "label": "evil Pod", "sublabel": "任意 Pod · 横向扫描", "pos": [60, 280], "size": [190, 74] },
+    { "id": "backend", "type": "backend", "label": "backend Pod", "sublabel": "app=backend · nginx :80", "pos": [430, 180], "size": [200, 88], "tag": "podSelector 选中" },
+    { "id": "policy", "type": "security", "label": "NetworkPolicy", "sublabel": "default-deny + allow-frontend", "pos": [430, 400], "size": [200, 84], "tag": "tier=policy" },
+    { "id": "cni", "type": "cloud", "label": "CNI 插件（Calico）", "sublabel": "编程 iptables / eBPF", "pos": [760, 400], "size": [210, 84], "tag": "真正执行者" },
+    { "id": "dns", "type": "backend", "label": "kube-dns", "sublabel": "kube-system · :53 UDP/TCP", "pos": [760, 90], "size": [210, 78], "tag": "egress 必须放行" }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "命名空间 demo-netpol（策略只作用于本 ns）", "wraps": ["frontend", "evil", "backend", "policy"], "pad": 26 }
+  ],
+  "connections": [
+    { "from": "frontend", "to": "backend", "label": "✓ 白名单放行 :80", "variant": "emphasis" },
+    { "from": "evil", "to": "backend", "label": "✗ 默认拒绝", "variant": "security" },
+    { "from": "policy", "to": "backend", "label": "选中：入站转白名单", "variant": "dashed", "fromSide": "top", "toSide": "bottom" },
+    { "from": "policy", "to": "cni", "label": "下发规则", "variant": "dashed" },
+    { "from": "cni", "to": "backend", "label": "iptables/eBPF 生效", "variant": "dashed", "fromSide": "top", "toSide": "right" },
+    { "from": "backend", "to": "dns", "label": "DNS 查询放行（egress 例外）", "variant": "dashed", "fromSide": "top", "toSide": "left" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "判定三规则", "items": ["无策略选中 = 该方向全放行", "有策略选中 = 只放行规则匹配的流量，其余全拒绝", "多条策略叠加取并集；K8s 原生没有 deny 规则"] },
+    { "dot": "rose", "title": "from 三种来源", "items": ["podSelector：同命名空间按标签选 Pod", "namespaceSelector（可再 AND podSelector）：跨命名空间", "ipBlock：CIDR 网段，except 排除例外段"] },
+    { "dot": "emerald", "title": "两个必踩的坑", "items": ["Egress 一旦启用先拦 DNS：放行 kube-dns :53 UDP+TCP", "kindnet 不执行策略：对象能建但无隔离，需 Calico/Cilium", "ports.port 是 Pod 端口（targetPort），不是 Service 端口"] }
+  ]
+}

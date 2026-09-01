@@ -10,14 +10,14 @@ Service 提供的是"找到并负载均衡"，但默认情况下 Kubernetes 集�
 
 ```
 12_network_policy/
-├── README.md    # 本文档
-├── network_policy.sh         # 全流程演示: CNI 检查/deploy/test/isolate/verify/clean
+├── README.md                 # 本文档
+├── network_policy.sh         # CNI 检查 / deploy / test / isolate / verify / clean
 ├── manifests/
-│   └── network_policy.yaml       # 多文档 YAML: Namespace + 工作负载 + 网络策略(分组打标签)
-├── scripts/
-│   └── gen_arch.py        # 架构图生成脚本 (python3 scripts/gen_arch.py)
+│   └── network_policy.yaml   # Namespace + 工作负载 + 网络策略（tier 标签分组）
 └── images/
-       └── network_policy_arch.png   # 策略模型 + 隔离前后对比图
+    ├── netpol_isolation.architecture.json  # 图源（Archify Typed JSON IR）
+    ├── netpol_isolation.html               # 交互版架构图
+    └── netpol_isolation.svg                # 双主题矢量版（本文档 §可视化 内嵌）
 ```
 
 YAML 里用 `tier=workload` / `tier=policy` 两组标签把工作负载和策略分开，脚本就能分阶段 apply，演示"隔离前 vs 隔离后"的对比：
@@ -143,9 +143,11 @@ kubectl -n kube-system rollout status ds/calico-node
 
 ## 可视化
 
-左图是策略模型：podSelector 决定"谁被隔离"，ingress 规则（from + ports）决定"谁能进来"，以及"无策略=全放行、有策略无规则=全拒绝"的默认拒绝语义；右图是隔离前后对比：frontend 被白名单放行、evil 被拦截、DNS 必须例外放行，并注明策略由 CNI 插件执行：
+![NetworkPolicy 隔离](images/netpol_isolation.svg)
 
-![network_policy](images/network_policy_arch.png)
+图中一条策略链路：NetworkPolicy（podSelector 选中 backend）→ 下发给 CNI 插件 → 在节点上编程 iptables/eBPF → frontend 的流量被白名单放行（✓）、evil 被默认拒绝（✗）、到 kube-dns 的 DNS 查询作为 egress 例外显式放行。执行者是 CNI 而非 API server——kindnet 下"写了策略≠有隔离"。
+
+> 🌐 **交互版**：[在线打开（GitHub Pages）](https://yong-huang.github.io/hands-on-kubernetes/labs/12_network_policy/images/netpol_isolation.html)（或本地打开 [`images/netpol_isolation.html`](images/netpol_isolation.html)）。
 
 ## 面试要点
 
