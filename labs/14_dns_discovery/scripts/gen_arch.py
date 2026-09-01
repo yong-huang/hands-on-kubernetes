@@ -29,10 +29,12 @@ def box(ax, x, y, w, h, text, color, fontsize=9, text_color='white'):
 
 
 def arrow(ax, x1, y1, x2, y2, color=C_GRAY, label=None, lw=1.8, style='-|>',
-          dy=0.15):
+          dy=0.15, cs=None):
     """画一条带箭头的连线，可带标签"""
-    ax.annotate('', xy=(x2, y2), xytext=(x1, y1),
-                arrowprops=dict(arrowstyle=style, color=color, lw=lw))
+    props = dict(arrowstyle=style, color=color, lw=lw)
+    if cs:
+        props['connectionstyle'] = cs
+    ax.annotate('', xy=(x2, y2), xytext=(x1, y1), arrowprops=props)
     if label:
         ax.text((x1 + x2) / 2, (y1 + y2) / 2 + dy, label,
                 ha='center', va='bottom', fontsize=8, color=color)
@@ -49,12 +51,14 @@ def panel_flow(ax):
     box(ax, 0.3, 7.0, 2.5, 1.0, 'App Pod\ngetent hosts web', C_BLUE, fontsize=8.5)
     # resolv.conf
     box(ax, 0.3, 4.4, 2.5, 1.8,
-        '/etc/resolv.conf\nnameserver 10.96.0.10\nsearch <ns>.svc\n  .svc.cluster.local\noptions ndots:5',
+        '/etc/resolv.conf\nnameserver 10.96.0.10\nsearch <ns>.svc.cluster.local\n  svc.cluster.local cluster.local\noptions ndots:5',
         C_ORANGE, fontsize=6.8)
-    arrow(ax, 1.55, 7.0, 1.55, 6.2, C_GRAY, 'glibc expands\nshort name', dy=0.05)
+    arrow(ax, 1.55, 7.0, 1.55, 6.2, C_GRAY, lw=1.4)
+    ax.text(1.65, 6.6, 'expands short name', ha='left', va='center',
+            fontsize=7.5, color=C_GRAY)
 
     # CoreDNS
-    box(ax, 3.9, 5.0, 2.8, 2.4,
+    box(ax, 3.9, 5.0, 2.8, 1.9,
         'CoreDNS\n(kube-dns Service)\n--- Corefile ---\nkubernetes\nforward . 8.8.8.8\nhosts / cache',
         C_PURPLE, fontsize=8)
     arrow(ax, 2.8, 5.3, 3.9, 5.9, C_GRAY, 'UDP :53 query', dy=0.1)
@@ -66,8 +70,8 @@ def panel_flow(ax):
     # 解析结果
     box(ax, 8.0, 5.4, 2.6, 1.4, 'Answer: A records\nweb -> 10.96.0.35\n(VIP)', C_GREEN, fontsize=8)
     arrow(ax, 6.7, 6.6, 8.0, 6.2, C_GREEN, 'response', dy=0.1)
-    # 回到应用
-    arrow(ax, 8.0, 5.6, 2.8, 7.2, C_GRAY, lw=1.2, dy=0.05)
+    # 回到应用 (弧线从 CoreDNS 上方绕过)
+    arrow(ax, 8.0, 5.6, 2.8, 7.2, C_GRAY, lw=1.2, dy=0.05, cs='arc3,rad=0.4')
 
     # FQDN 解剖图
     ax.text(7.0, 9.5, 'FQDN Anatomy', fontsize=11, fontweight='bold',
@@ -115,10 +119,10 @@ def panel_compare(ax):
     for y, title, cmd, result, color in rows:
         ax.text(0.3, y + 1.05, title, fontsize=10, fontweight='bold', color='#333333')
         box(ax, 0.3, y, 3.0, 0.8, cmd, C_BLUE, fontsize=8)
-        box(ax, 4.0, y, 6.2, 0.8, result, color, fontsize=8)
+        box(ax, 4.0, y, 5.4, 0.8, result, color, fontsize=8)
         arrow(ax, 3.3, y + 0.4, 4.0, y + 0.4, C_GRAY)
 
-    ax.text(10.8, 6.1, 'Headless use cases:\n- StatefulSet peers\n  (MySQL, Cassandra)\n- Client-side LB (gRPC)\n- service mesh sidecars',
+    ax.text(11.5, 6.3, 'Headless use cases:\n- StatefulSet peers\n  (MySQL, Cassandra)\n- Client-side LB (gRPC)\n- service mesh sidecars',
             ha='center', va='center', fontsize=7.8, color='#444444',
             bbox=dict(boxstyle='round,pad=0.4', facecolor='#f5f0f6',
                       edgecolor=C_PURPLE, linewidth=1.2))

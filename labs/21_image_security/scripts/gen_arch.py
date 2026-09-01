@@ -17,29 +17,29 @@ fig.suptitle("镜像安全与漏洞扫描: 供应链流水线 与 准入拦截",
 # ============================ Panel 1: 供应链流水线 ============================
 ax1.set_title("镜像供应链: 构建到运行的安全卡点", fontsize=13)
 stages = [
-    (0.6, "CI 构建", "#aec7e8", ["Dockerfile 多阶段构建", "最小基础镜像 distroless"]),
-    (2.5, "Trivy 扫描", "#ff7f0e", ["CI 内 pre-scan", "阻断 Critical CVE"]),
-    (4.4, "Cosign 签名", "#2ca02c", ["keyless / KMS 密钥", "attest SBOM 附件"]),
-    (6.3, "私有 Registry", "#9467bd", ["不可变 tag", "保留扫描元数据"]),
+    (0.6, "CI 构建", "#aec7e8", ["Dockerfile\n多阶段构建", "最小基础镜像 distroless"], 7.2),
+    (2.75, "Trivy 扫描", "#ff7f0e", ["CI 内 pre-scan", "阻断 Critical CVE"], 7.8),
+    (4.9, "Cosign 签名", "#2ca02c", ["keyless / KMS 密钥", "attest SBOM 附件"], 7.8),
+    (7.05, "私有 Registry", "#9467bd", ["不可变 tag", "保留扫描元数据"], 7.8),
 ]
-for x, name, c, items in stages:
+for x, name, c, items, ifs in stages:
     ax1.add_patch(mpatches.FancyBboxPatch((x - 0.85, 7.3), 1.7, 1.9,
                   boxstyle="round,pad=0.08", fc=c, ec="black", alpha=0.88))
     ax1.text(x, 8.75, name, ha="center", fontsize=11, fontweight="bold", color="white")
-    ax1.text(x, 7.95, "\n".join(items), ha="center", va="center", fontsize=7.8, color="white")
+    ax1.text(x, 7.95, "\n".join(items), ha="center", va="center", fontsize=ifs, color="white")
 for i in range(3):
     x1 = stages[i][0] + 0.9
     ax1.annotate("", xy=(stages[i + 1][0] - 0.9, 8.25), xytext=(x1, 8.25),
                  arrowprops=dict(arrowstyle="-|>", lw=1.6))
 
 # 运行侧: 准入 + 运行时
-ax1.add_patch(mpatches.FancyBboxPatch((0.6 - 0.85, 4.6), 8.05, 1.7,
+ax1.add_patch(mpatches.FancyBboxPatch((1.2, 4.6), 6.4, 1.7,
               boxstyle="round,pad=0.08", fc="#1f77b4", ec="black"))
-ax1.text(4.6, 5.95, "Kubernetes 准入层 (Kyverno)", ha="center",
+ax1.text(4.4, 5.9, "Kubernetes 准入层 (Kyverno)", ha="center",
          fontsize=12, fontweight="bold", color="white")
-ax1.text(4.6, 5.15, "verifyImages: cosign 公钥验签   |   deny-critical: 结合漏洞报告拦截",
-         ha="center", va="center", fontsize=8.5, color="white")
-ax1.annotate("", xy=(4.6, 6.35), xytext=(4.6, 7.25),
+ax1.text(4.4, 5.1, "verifyImages: cosign 公钥验签\ndeny: 按 tag 正则拦截 nginx:1.14.* (生产联动 VulnerabilityReport)",
+         ha="center", va="center", fontsize=8, color="white")
+ax1.annotate("", xy=(4.4, 6.35), xytext=(4.4, 7.25),
              arrowprops=dict(arrowstyle="-|>", lw=1.6))
 ax1.add_patch(mpatches.FancyBboxPatch((2.9, 2.4), 3.4, 1.3,
               boxstyle="round,pad=0.08", fc="#d62728", ec="black", alpha=0.9))
@@ -89,9 +89,12 @@ for cx in (0.85, 2.6, 4.35):
 
 ax2.add_patch(mpatches.FancyBboxPatch((0.5, 0.6), 4.7, 1.5,
               boxstyle="round,pad=0.1", fc="#f5f5f5", ec="#1f77b4", ls="--"))
-ax2.text(2.85, 1.75, "灰度上线建议", ha="center", fontsize=10, fontweight="bold")
-ax2.text(2.85, 1.0, "validationFailureAction:\n  Audit (观察) -> Enforce (强制)\nexclude: kube-system 等系统命名空间",
-         ha="center", va="center", fontsize=8)
+ax2.text(2.85, 1.78, '灰度上线建议 (deny 策略: block-critical-vuln-images)',
+         ha="center", fontsize=9.5, fontweight="bold")
+ax2.text(2.85, 1.0, "deny + regex_match(nginx:1.14.*)\n"
+         "validationFailureAction: Audit -> Enforce\n"
+         "exclude: kube-system / kyverno / trivy-system",
+         ha="center", va="center", fontsize=7.8)
 
 ax2.set_xlim(0, 5.6); ax2.set_ylim(0, 9.6); ax2.axis("off")
 

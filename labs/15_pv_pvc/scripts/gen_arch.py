@@ -82,17 +82,17 @@ def panel_binding(ax):
     arrow(ax, 6.35, 8.4, 7.15, 8.4, color=C_PVC)
 
     # binding conditions box between PVC and PV
-    draw_box(ax, 6.75, 6.35, 6.7, 2.0,
+    draw_box(ax, 6.75, 6.35, 6.7, 1.8,
              'Binding conditions (all must hold)',
              'capacity: PV >= PVC request (1Gi >= 1Gi)\n'
              'accessModes: PV modes superset of PVC (RWO ⊇ RWO)\n'
              'storageClassName: manual == manual',
              face='#e8eef7', edge='#8899bb')
 
-    arrow(ax, 6.35, 7.85, 6.6, 7.4, color='#8899bb', lw=1.2, cs='arc3,rad=0.2')
-    arrow(ax, 7.2, 7.4, 8.3, 7.85, color='#8899bb', lw=1.2, cs='arc3,rad=0.2')
-    ax.text(5.0, 7.3, 'controller binds\n(claimRef)', fontsize=7.5,
-            color='#555', ha='center', style='italic')
+    arrow(ax, 6.35, 7.85, 6.6, 7.3, color='#8899bb', lw=1.2, cs='arc3,rad=0.2')
+    arrow(ax, 7.2, 7.3, 8.3, 7.85, color='#8899bb', lw=1.2, cs='arc3,rad=0.2')
+    ax.text(5.0, 7.6, 'controller binds\n(claimRef)', fontsize=7.5,
+            color='#555', ha='center', va='center', style='italic')
 
     # storage layer
     draw_box(ax, 8.5, 5.2, 2.7, 1.0, 'hostPath', '/data/pv-demo\n(kind node fs)',
@@ -104,7 +104,7 @@ def panel_binding(ax):
              'PV is cluster-scoped (no namespace)',
              'PVC is namespaced; Pod finds PVC\nonly in its own namespace',
              face='#f2f2f2', edge='#999', )
-    arrow(ax, 5.0, 6.35, 3.8, 5.0, color='#bbb', lw=1.0, cs='arc3,rad=-0.25')
+    arrow(ax, 4.2, 5.45, 3.8, 5.0, color='#bbb', lw=1.0, cs='arc3,rad=-0.25')
 
     # data persistence note
     draw_box(ax, 5.0, 1.7, 8.2, 1.5,

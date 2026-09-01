@@ -58,12 +58,12 @@ box(ax1, 0.52, 0.30, 0.45, 0.30, "cluster-scoped 组合", [
     "ClusterRoleBinding + ClusterRole",
     "→ 权限在所有 ns 生效!",
     "适合: 集群管理员 / 监控组件",
-    "⚠️ 慎用, 违反最小权限常见翻车点"], RED, fs=8)
+    "慎用, 违反最小权限常见翻车点"], RED, fs=8)
 arrow(ax1, 0.25, 0.70, 0.25, 0.60, "", GRAY, lw=1.2)
 arrow(ax1, 0.75, 0.70, 0.75, 0.60, "", GRAY, lw=1.2)
 
 box(ax1, 0.03, 0.04, 0.94, 0.20, "default-deny 语义", [
-    "没有匹配 Subject 的 Binding / Binding 的 Role 里没有对应 rule ⇒ 一律 Forbidden",
+    "没有匹配 Subject 的 Binding / Binding 的 Role 里没有对应 rule -> 一律 Forbidden",
     "授权=白名单累加: 多个 Binding 权限取并集, RBAC 只能\"加\"不能\"减\"",
     "roleRef 创建后不可修改; subresource (pods/log) 必须在 resources 里单独授权"], GRAY, fs=8.5)
 

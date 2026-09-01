@@ -18,21 +18,21 @@ fig.suptitle("Helm Chart: 目录结构与模板渲染流水线", fontsize=16, fo
 ax1.set_title("Chart 目录结构 (demo-chart)", fontsize=13)
 tree = [
     ("demo-chart/", 0, True),
-    ("Chart.yaml        # chart 版本 / appVersion", 1, False),
-    ("values.yaml       # 默认值(可被 --set 覆盖)", 1, False),
+    ("Chart.yaml      # chart 版本 / appVersion", 1, False),
+    ("values.yaml     # 默认值(可被 --set 覆盖)", 1, False),
     ("templates/", 1, True),
-    ("deployment.yaml   # {{ .Values.replicaCount }}", 2, False),
-    ("service.yaml      # {{ include helpers }}", 2, False),
-    ("configmap.yaml    # {{ range features }}", 2, False),
-    ("ingress.yaml      # {{ if enabled }} 条件渲染", 2, False),
-    ("_helpers.tpl      # 命名/标签公共定义", 2, False),
-    ("NOTES.txt         # 安装后使用说明", 2, False),
-    ("charts/           # 子 chart 依赖(可选)", 1, False),
+    ("deployment.yaml  # .Values.replicaCount", 2, False),
+    ("service.yaml     # {{ include helpers }}", 2, False),
+    ("configmap.yaml   # {{ range features }}", 2, False),
+    ("ingress.yaml     # {{ if enabled }} 条件渲染", 2, False),
+    ("_helpers.tpl     # 命名/标签公共定义", 2, False),
+    ("NOTES.txt        # 安装后使用说明", 2, False),
+    ("charts/          # 子 chart 依赖(可选)", 1, False),
 ]
 y = 9.0
 for name, depth, is_dir in tree:
     c = "#1f77b4" if is_dir else "#333333"
-    ax1.text(0.4 + depth * 0.55, y, name, fontsize=9.5,
+    ax1.text(0.4 + depth * 0.55, y, name, fontsize=9,
              color=c, fontweight="bold" if is_dir else "normal")
     y -= 0.82
 
@@ -82,11 +82,11 @@ pipe = [
     (8.0, 4.3, "校验后提交\nK8s API", "#d62728"),
 ]
 for cx, cy, txt, c in pipe:
-    ax2.add_patch(mpatches.FancyBboxPatch((cx - 1.35, cy - 0.65), 2.7, 1.3,
+    ax2.add_patch(mpatches.FancyBboxPatch((cx - 1.15, cy - 0.65), 2.3, 1.3,
                   boxstyle="round,pad=0.08", fc=c, ec="black"))
     ax2.text(cx, cy, txt, ha="center", va="center", fontsize=8.8, color="white")
 for i in range(2):
-    x1 = pipe[i][0] + 1.4; x2 = pipe[i + 1][0] - 1.4
+    x1 = pipe[i][0] + 1.2; x2 = pipe[i + 1][0] - 1.2
     ax2.annotate("", xy=(x2, 4.3), xytext=(x1, 4.3),
                  arrowprops=dict(arrowstyle="-|>", lw=1.6))
 

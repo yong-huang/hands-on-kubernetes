@@ -64,8 +64,8 @@ def panel_loop(ax):
     # Developer
     draw_box(ax, 5, 9.0, 3.6, 1.2, 'Developer', 'git commit / git revert',
              face='#e8eef7', edge=C_BLUE)
-    arrow(ax, 5, 8.4, 5, 7.7, color=C_BLUE)
-    label(ax, 5.25, 8.05, 'push', color=C_BLUE, fs=7.5, ha='left')
+    arrow(ax, 3.7, 8.6, 2.35, 7.25, color=C_BLUE)
+    label(ax, 3.0, 8.05, 'push', color=C_BLUE, fs=7.5, ha='right')
 
     # Git repo (desired state)
     draw_box(ax, 1.7, 6.4, 2.9, 1.6, 'Git Repo', 'desired state\n(YAML manifests)',
@@ -96,8 +96,8 @@ def panel_loop(ax):
     arrow(ax, 7.3, 4.2, 8.0, 5.6, color=C_RED, cs='arc3,rad=-0.25')
     label(ax, 8.75, 4.6, 'someone edits\nthe cluster', color=C_RED, fs=7)
 
-    arrow(ax, 5, 4.2, 5, 5.5, color=C_ORANGE, ls='--')
-    label(ax, 5.15, 5.0, 'selfHeal reverts it back to Git', color=C_ORANGE,
+    arrow(ax, 5, 4.2, 5, 5.15, color=C_ORANGE, ls='--')
+    label(ax, 5.2, 4.75, 'selfHeal reverts it back to Git', color=C_ORANGE,
           fs=7.5, ha='left')
 
     # Bottom note
@@ -127,7 +127,7 @@ def panel_pull_push(ax):
         draw_box(ax, 2.5, y, 2.6, 1.05, title, sub, face=face,
                  edge='#2f6b3c' if i == 2 else '#999')
         if i > 0:
-            arrow(ax, 2.5, y + 0.55, 2.5, y + 0.95, color=C_RED)
+            arrow(ax, 2.5, y + 0.95, 2.5, y + 0.55, color=C_RED)
     label(ax, 2.5, 1.6, 'creds leak risk, drift never detected',
           color=C_RED, fs=7.5)
 
@@ -140,7 +140,7 @@ def panel_pull_push(ax):
         face = C_BLUE if i == 0 else (C_ORANGE if i == 1 else C_GREEN)
         draw_box(ax, 7.5, y, 2.6, 1.05, title, sub, face=face, edge='#555')
         if i > 0:
-            arrow(ax, 7.5, y + 0.55, 7.5, y + 0.95, color=C_GREEN)
+            arrow(ax, 7.5, y + 0.95, 7.5, y + 0.55, color=C_GREEN)
     label(ax, 7.5, 1.6, 'no creds outside, selfHeal fixes drift',
           color=C_GREEN, fs=7.5)
 
@@ -167,7 +167,7 @@ def panel_app_of_apps(ax):
                  face='#e8eef7', edge=C_BLUE)
         arrow(ax, 5, 7.7, x, 6.2, color=C_BLUE)
         # each child deploys workloads
-        arrow(ax, x, 5.0, x, 4.2, color=C_GREEN)
+        arrow(ax, x, 5.0, x, 3.62, color=C_GREEN)
         for j, dx in enumerate([-0.55, 0, 0.55]):
             box = FancyBboxPatch((x + dx - 0.24, 3.3 - 0.24), 0.48, 0.48,
                                  boxstyle='round,pad=0.02',

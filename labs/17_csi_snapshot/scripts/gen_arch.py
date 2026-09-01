@@ -39,7 +39,7 @@ ax1.set_xlim(0, 10); ax1.set_ylim(0, 10); ax1.axis("off")
 
 ax1.text(0.1, 9.6, "快照流程", fontsize=10, fontweight="bold", color=C_CSI)
 box(ax1, 0.2, 7.8, 2.0, 1.2, "VolumeSnapshot\n(用户 CR)", C_K8S)
-box(ax1, 3.0, 7.8, 2.4, 1.2, "snapshot-controller\n(转发 gRPC)", C_CTRL)
+box(ax1, 3.0, 7.8, 2.8, 1.2, "snapshot-controller\n(kube-system, 转发 gRPC)", C_CTRL, 8.5)
 box(ax1, 6.2, 7.8, 2.0, 1.2, "CSI 驱动\nCreateSnapshot", C_CSI)
 box(ax1, 8.6, 7.8, 1.2, 1.2, "存储后端\n快照", C_STORE)
 arrow(ax1, 2.2, 8.4, 3.0, 8.4, "watch")
@@ -48,7 +48,8 @@ arrow(ax1, 8.2, 8.4, 8.6, 8.4)
 box(ax1, 0.2, 6.3, 2.0, 0.9, "源 PVC\n(snap-source)", C_K8S)
 arrow(ax1, 1.2, 7.8, 1.2, 7.2, "spec.source\n.pvcName", style="<|-")
 box(ax1, 3.6, 6.3, 3.0, 0.9, "VolumeSnapshotContent\n(集群级, 绑定快照)", C_K8S)
-arrow(ax1, 7.0, 8.0, 6.4, 7.2, "创建并回填", ls="--")
+# VolumeSnapshotContent 由 controller 创建并回填 (从 controller 框出发, 不再穿过 CSI 框)
+arrow(ax1, 4.4, 7.8, 5.2, 7.2, "创建并回填", ls="--")
 ax1.text(5.5, 5.75, "status: readyToUse=true / restoreSize=1Gi", fontsize=7.5,
          ha="center", style="italic", color="#555")
 
@@ -83,7 +84,9 @@ for name, desc, color, y in strategies:
     box(ax2, 0.2, y, 2.4, 1.6, name, color, 9)
     ax2.text(2.8, y + 0.8, desc, fontsize=8, va="center", color="#333")
 
-arrow(ax2, 5.6, 8.6, 5.6, 1.0, "通用性增强 / 速度下降", color="#666")
+arrow(ax2, 5.6, 8.6, 5.6, 1.0, color="#666")
+ax2.text(5.6, 6.4, "通用性增强 / 速度下降", ha="center", fontsize=7.5,
+         color="#666", bbox=dict(fc="white", ec="none", alpha=0.85, pad=1.5))
 ax2.text(5.0, 9.4, "三层并不互斥: 生产常组合使用 (快照保 RPO + Velero 保容灾)",
          fontsize=8.5, ha="center", color="#666", style="italic")
 

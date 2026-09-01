@@ -29,13 +29,15 @@ def box(ax, x, y, w, h, text, color, fontsize=9, text_color='white'):
 
 
 def arrow(ax, x1, y1, x2, y2, color=C_GRAY, label=None, lw=1.8, style='-|>',
-          label_dy=0.25):
+          label_dy=0.25, cs=None, label_fs=8):
     """画一条带箭头的连线，可带标签"""
-    ax.annotate('', xy=(x2, y2), xytext=(x1, y1),
-                arrowprops=dict(arrowstyle=style, color=color, lw=lw))
+    props = dict(arrowstyle=style, color=color, lw=lw)
+    if cs:
+        props['connectionstyle'] = cs
+    ax.annotate('', xy=(x2, y2), xytext=(x1, y1), arrowprops=props)
     if label:
         ax.text((x1 + x2) / 2, (y1 + y2) / 2 + label_dy, label,
-                ha='center', va='bottom', fontsize=8, color=color)
+                ha='center', va='bottom', fontsize=label_fs, color=color)
 
 
 def dashed_rect(ax, x, y, w, h, title):
@@ -63,19 +65,20 @@ def panel_sidecar(ax):
 
     # 业务 Pod：应用容器 + envoy sidecar
     dashed_rect(ax, 3.6, 3.2, 6.6, 4.2, 'Pod (injected: 2/2 containers)')
-    box(ax, 4.1, 3.7, 2.7, 2.4, 'app container\n(canary-web\nbusybox httpd)', C_RED, fontsize=9)
-    box(ax, 7.1, 3.7, 2.7, 2.4, 'envoy sidecar\n(istio-proxy)\nin/out bound\ninterception', C_ORANGE, fontsize=9)
+    box(ax, 4.0, 3.7, 2.4, 2.4, 'app container\n(canary-web\nbusybox httpd)', C_RED, fontsize=9)
+    box(ax, 7.4, 3.7, 2.4, 2.4, 'envoy sidecar\n(istio-proxy)\nin/out bound\ninterception', C_ORANGE, fontsize=9)
 
     # istiod -> sidecar 配置推送（虚线）
     arrow(ax, 6.4, 8.3, 7.9, 6.3, C_PURPLE, 'xDS push', lw=1.5, style='-|>')
     ax.plot([6.4, 7.9], [8.3, 6.3], color=C_PURPLE, lw=1.5, linestyle='--')
 
-    # 客户端 -> envoy -> 上游 Service
+    # 客户端 -> envoy -> 上游 Service (req 弧线从 app 容器上方绕过, 落在 envoy 顶边)
     box(ax, 0.3, 4.4, 2.2, 1.0, 'Client Pod', C_BLUE)
-    arrow(ax, 2.5, 4.9, 7.1, 4.9, C_GRAY, 'req')
+    arrow(ax, 2.5, 4.9, 7.8, 6.1, C_GRAY, lw=1.8, cs='arc3,rad=-0.45')
+    ax.text(3.1, 5.0, 'req', fontsize=8, ha='center', color=C_GRAY)
     # sidecar 与 app 之间的本地回环
-    arrow(ax, 7.1, 5.6, 6.8, 5.6, C_ORANGE, '127.0.0.1', lw=1.4)
-    arrow(ax, 6.8, 4.4, 7.1, 4.4, C_ORANGE, 'resp', lw=1.4)
+    arrow(ax, 7.4, 5.5, 6.4, 5.5, C_ORANGE, 'lo', lw=1.4, label_fs=7)
+    arrow(ax, 6.4, 4.5, 7.4, 4.5, C_ORANGE, 'resp', lw=1.4, label_fs=7)
 
     # envoy -> 上游 Pod 的 envoy（service-to-service）
     dashed_rect(ax, 11.4, 3.5, 2.4, 3.4, 'upstream Pod')
@@ -107,7 +110,9 @@ def panel_canary(ax):
     box(ax, 2.6, 7.6, 2.4, 0.9, 'VirtualService\nhost: canary-web', C_GREEN, fontsize=8)
     # DestinationRule / subset
     box(ax, 2.6, 6.0, 2.4, 1.0, 'DestinationRule\nsubsets: v1, v2', C_PURPLE, fontsize=8)
-    arrow(ax, 3.8, 7.6, 3.8, 7.0, C_GRAY, 'define subsets', lw=1.4, style='<|-|>')
+    arrow(ax, 3.8, 7.6, 3.8, 7.0, C_GRAY, lw=1.4, style='<|-|>')
+    ax.text(3.8, 7.3, 'define subsets', ha='center', va='center', fontsize=7.5,
+            color=C_GRAY, bbox=dict(fc='white', ec='none', pad=1.2), zorder=5)
 
     # v1 (90%) 大盒子
     dashed_rect(ax, 0.6, 2.4, 2.9, 2.6, 'subset v1 (stable)')
@@ -127,7 +132,7 @@ def panel_canary(ax):
     ax.text(3.75, 1.1, 'mirror: route 100% -> v1, copy traffic to v2\n'
                        '(responses from v2 are dropped; zero user risk)',
             ha='center', va='center', fontsize=8.5, color='#2f6b3a')
-    ax.text(3.75, 5.6, 'header match: x-canary=true -> v2 (internal allowlist)',
+    ax.text(3.75, 5.3, 'header match: x-canary=true -> v2',
             ha='center', fontsize=8.5, style='italic', color=C_GRAY)
 
     # ---- 右半：Ingress vs Mesh 对比 ----

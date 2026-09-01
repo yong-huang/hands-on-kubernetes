@@ -50,12 +50,12 @@ placement:
 
 ```yaml
 imageOverrider:
-  - component: Registry      # 亚太替换镜像源
+  - component: Tag      # 亚太把镜像 Tag 覆成旧一档版本
     operator: replace
-    value: registry.ap.example.com
+    value: "1.26"       # 必须是真实存在的 tag, 别 override 成假 registry
 ```
 
-地域间的现实差异（镜像仓库、副本数、资源规格、时区配置）全部收敛进 OverridePolicy。应用模板保持单一事实源，差异以补丁形式声明——这正是多环境配置管理在多集群维度的延伸。
+地域间的现实差异（镜像 Tag、副本数、资源规格、时区配置）全部收敛进 OverridePolicy。应用模板保持单一事实源，差异以补丁形式声明——这正是多环境配置管理在多集群维度的延伸。
 
 ### 4. 故障转移：容忍度驱动迁移
 

@@ -75,13 +75,13 @@ def panel_arch(ax):
     arrow(ax, 3.3, 6.1, 6.0, 5.4, color=C_BACKUP, lw=2.0)
     ax.text(4.3, 6.15, 'backup: objects', fontsize=7.5, color='#967c1e', ha='center')
     arrow(ax, 3.55, 3.2, 6.0, 3.9, color=C_BACKUP, lw=2.0)
-    ax.text(4.3, 3.0, 'backup: volume files', fontsize=7.5, color='#967c1e', ha='center')
+    ax.text(4.6, 2.95, 'backup: volume files', fontsize=7.5, color='#967c1e', ha='center')
 
-    # restore arrow
-    arrow(ax, 6.6, 6.6, 2.6, 8.0, color=C_RESTORE, lw=2.0, cs='arc3,rad=-0.25')
-    arrow(ax, 6.6, 5.2, 3.0, 2.6, color=C_RESTORE, lw=2.0, cs='arc3,rad=0.2')
-    ax.text(5.4, 7.6, 'restore: recreate\nobjects (new ns)', fontsize=7.5,
-            color=C_RESTORE, ha='center')
+    # restore arrows (both anchored at the Backup storage box left edge)
+    arrow(ax, 6.0, 5.7, 2.6, 8.0, color=C_RESTORE, lw=2.0, cs='arc3,rad=-0.25')
+    arrow(ax, 6.0, 3.8, 3.0, 2.6, color=C_RESTORE, lw=2.0, cs='arc3,rad=0.2')
+    ax.text(6.4, 7.15, 'restore: recreate\nobjects (new ns)', fontsize=7.5,
+            color=C_RESTORE, ha='left')
     ax.text(5.6, 1.75, 'restore: write files\nback into new PVCs', fontsize=7.5,
             color=C_RESTORE, ha='center')
 

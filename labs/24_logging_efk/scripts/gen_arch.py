@@ -63,10 +63,13 @@ ax2.add_patch(mpatches.FancyBboxPatch((0.7, 4.6), 3.9, 1.15,
               boxstyle="round,pad=0.06", fc="#8c564b", ec="black"))
 ax2.text(2.65, 5.18, "/var/log/containers/*.log\n(符号链接 -> containerd 日志目录)",
          ha="center", va="center", fontsize=8.5, color="white")
-ax2.add_patch(mpatches.FancyBboxPatch((1.0, 3.65), 3.3, 0.85,
+ax2.add_patch(mpatches.FancyBboxPatch((1.0, 3.5), 3.3, 0.85,
               boxstyle="round,pad=0.06", fc="#ff7f0e", ec="black"))
-ax2.text(2.65, 4.07, "fluent-bit Pod (DaemonSet)", ha="center",
+ax2.text(2.65, 3.92, "fluent-bit Pod (DaemonSet)", ha="center",
          va="center", fontsize=9, color="white")
+# tail 关系: 日志文件 -> fluent-bit (节点内)
+ax2.annotate("", xy=(2.65, 4.38), xytext=(2.65, 4.55),
+             arrowprops=dict(arrowstyle="-|>", lw=1.3, color="#333"))
 
 ax2.add_patch(mpatches.FancyBboxPatch((5.6, 3.4), 4.1, 5.6,
               boxstyle="round,pad=0.12", fc="#fdf3f3", ec="#d62728"))
@@ -86,7 +89,7 @@ ax2.text(7.65, 4.15, "• 应用只需写 stdout, 不感知采集器\n"
                      "• 与 CRI 无关, 通吃 docker/containerd",
          ha="center", va="center", fontsize=8)
 
-ax2.annotate("", xy=(5.55, 4.1), xytext=(4.35, 4.07),
+ax2.annotate("", xy=(5.85, 7.2), xytext=(4.35, 4.35),
              arrowprops=dict(arrowstyle="-|>", lw=2, color="#333"))
 ax2.text(4.95, 2.6, "RBAC: fluent-bit SA 只需 get/list/watch pods+namespaces\n(k8s filter 反查元数据用)",
          ha="center", fontsize=8.5, color="#555")

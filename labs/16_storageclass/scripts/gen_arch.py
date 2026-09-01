@@ -115,7 +115,7 @@ def panel_mode(ax):
                  fontsize=11, fontweight='bold')
 
     # ---- Immediate ----
-    draw_box(ax, 2.7, 8.1, 4.9, 2.1,
+    draw_box(ax, 2.6, 8.1, 4.7, 2.1,
              'Immediate',
              'PVC created -> volume provisioned at once\n'
              'pod may be scheduled to another zone ->\n'
@@ -123,7 +123,7 @@ def panel_mode(ax):
              face='#d9edf4', edge=C_STATIC)
 
     # ---- WaitForFirstConsumer ----
-    draw_box(ax, 7.6, 8.1, 4.9, 2.1,
+    draw_box(ax, 7.5, 8.1, 4.7, 2.1,
              'WaitForFirstConsumer (recommended)',
              'PVC stays Pending until first pod is scheduled\n'
              'scheduler picks node -> zone; volume created there\n'
@@ -145,17 +145,17 @@ def panel_mode(ax):
 
     # ---- cloud CSI examples table ----
     rows = [
-        ('provisioner (CSI driver)', 'typical parameters', 'topology'),
+        ('provisioner / driver', 'typical parameters', 'topology'),
         ('ebs.csi.aws.com', 'type: gp3, iops, fsType: ext4', 'AWS availability zone'),
         ('pd.csi.storage.gke.io', 'type: pd-balanced / pd-ssd', 'GCP zone'),
         ('disk.csi.azure.com', 'skuName: Premium_LRS', 'Azure zone'),
         ('rancher.io/local-path (kind)', '(none; node local dir)', 'specific node'),
     ]
-    y = 3.4
+    y = 3.7
     for i, (c1, c2, c3) in enumerate(rows):
         face = '#e8eef7' if i == 0 else 'white'
         weight = 'bold' if i == 0 else 'normal'
-        row_h = 0.62
+        row_h = 0.58
         for x, w, text in ((2.4, 3.6, c1), (5.6, 3.4, c2), (8.3, 3.0, c3)):
             box = FancyBboxPatch((x - w / 2, y - row_h / 2), w, row_h,
                                  boxstyle='round,pad=0.01',
@@ -164,11 +164,14 @@ def panel_mode(ax):
             ax.add_patch(box)
             ax.text(x, y, text, ha='center', va='center', fontsize=7.2,
                     fontweight=weight, color=C_TEXT, zorder=4)
-        y -= row_h + 0.08
+        y -= row_h + 0.07
 
-    draw_box(ax, 5.0, 0.7, 9.2, 0.9,
+    ax.text(5.0, 0.62, '(rancher local-path: external provisioner, not a CSI driver)',
+            ha='center', fontsize=6.8, style='italic', color='#555')
+
+    draw_box(ax, 5.0, 0.25, 9.2, 0.5,
              'default StorageClass: annotation storageclass.kubernetes.io/is-default-class=true',
-             '', face='#fdf3d7', edge='#c9a227', title_size=7.8)
+             '', face='#fdf3d7', edge='#c9a227', title_size=7.5)
 
 
 def main():

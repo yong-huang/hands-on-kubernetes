@@ -21,18 +21,18 @@ ax1.add_patch(mpatches.FancyBboxPatch((0.4, 5.6), 9.2, 3.6,
 ax1.text(5.0, 8.85, "Karmada 控制面 (host 集群)", ha="center",
          fontsize=11, fontweight="bold", color="#1f77b4")
 comps = [
-    (1.9, "karmada-apiserver\n统一入口(兼容原生API)", "#aec7e8"),
-    (4.3, "karmada-controller\n创建 ResourceBinding", "#2ca02c"),
-    (6.7, "karmada-scheduler\n选集群/拆副本", "#ff7f0e"),
+    (1.75, "karmada-apiserver\n统一入口(兼容原生API)", "#aec7e8"),
+    (4.0, "karmada-controller\n创建 ResourceBinding", "#2ca02c"),
+    (6.3, "karmada-scheduler\n选集群/拆副本", "#ff7f0e"),
     (8.6, "execution-controller\n下发到成员集群", "#9467bd"),
 ]
 for cx, txt, c in comps:
-    ax1.add_patch(mpatches.FancyBboxPatch((cx - 0.95, 6.6), 1.9, 1.7,
+    ax1.add_patch(mpatches.FancyBboxPatch((cx - 0.9, 6.6), 1.8, 1.7,
                   boxstyle="round,pad=0.07", fc=c, ec="black"))
     ax1.text(cx, 7.45, txt, ha="center", va="center", fontsize=7.8,
              color="white")
 for i in range(3):
-    x1 = comps[i][0] + 0.98; x2 = comps[i + 1][0] - 0.98
+    x1 = comps[i][0] + 0.92; x2 = comps[i + 1][0] - 0.92
     ax1.annotate("", xy=(x2, 7.45), xytext=(x1, 7.45),
                  arrowprops=dict(arrowstyle="-|>", lw=1.5))
 
@@ -41,12 +41,12 @@ ax1.add_patch(mpatches.FancyBboxPatch((0.6, 4.35), 3.2, 0.9,
               boxstyle="round,pad=0.07", fc="#444444"))
 ax1.text(2.2, 4.8, "用户只提交: Deployment\n+ PropagationPolicy",
          ha="center", va="center", fontsize=8.8, color="white")
-ax1.annotate("", xy=(1.9, 5.55), xytext=(2.2, 5.3),
+ax1.annotate("", xy=(1.78, 6.55), xytext=(2.2, 5.3),
              arrowprops=dict(arrowstyle="-|>", lw=1.5))
 
 # 成员集群
 members = [(2.2, 2.6, "member-us", "#d62728", "replicas=4\nnginx:1.27"),
-           (7.8, 2.6, "member-ap", "#e377c2", "replicas=2\n镜像源替换为\nregistry.ap...")]
+           (7.8, 2.6, "member-ap", "#e377c2", "replicas=2\nnginx:1.26\n(Tag 覆盖, 旧一档版本)")]
 for cx, cy, name, c, detail in members:
     ax1.add_patch(mpatches.FancyBboxPatch((cx - 1.6, cy - 0.95), 3.2, 1.9,
                   boxstyle="round,pad=0.1", fc="white", ec=c, lw=2))
@@ -111,10 +111,10 @@ ax2.annotate("", xy=(2.6, 3.3), xytext=(5.0, 2.6),
 
 ax2.add_patch(mpatches.FancyBboxPatch((0.6, 0.45), 9.0, 1.05,
               boxstyle="round,pad=0.08", fc="#fff8e1", ec="#f5a623"))
-ax2.text(5.1, 0.97, "策略对象分工:", ha="left", fontsize=9, fontweight="bold")
-ax2.text(5.1, 0.68, "PropagationPolicy 决定'去哪/几份' | OverridePolicy 决定'差异长什么样'\n"
+ax2.text(0.85, 1.08, "策略对象分工:", ha="left", fontsize=9, fontweight="bold")
+ax2.text(0.85, 0.9, "PropagationPolicy 决定'去哪/几份' | OverridePolicy 决定'差异长什么样'\n"
                     "ResourceBinding 记录调度结果 | clusterTolerations 触发故障转移",
-         ha="left", fontsize=8)
+         ha="left", va="top", fontsize=8)
 
 ax2.set_xlim(0, 10); ax2.set_ylim(0.2, 9.1); ax2.axis("off")
 

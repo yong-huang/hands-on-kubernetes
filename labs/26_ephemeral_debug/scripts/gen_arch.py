@@ -27,27 +27,27 @@ ax1.text(3.0, 7.55, "app 容器 (distroless, 无 shell)", ha="center",
 ax1.text(3.0, 6.55, "PID 1: /broken-binary  <- 启动即崩\nPID ns 本容器独有(net/ipc ns 为 Pod 级共享); 文件系统只读挂载",
          ha="center", va="center", fontsize=8.2, color="white")
 
-ax1.add_patch(mpatches.FancyBboxPatch((0.8, 3.9), 4.4, 1.7,
+ax1.add_patch(mpatches.FancyBboxPatch((0.8, 3.7), 4.4, 1.7,
               boxstyle="round,pad=0.08", fc="#2ca02c", ec="black"))
-ax1.text(3.0, 5.15, "debugger 容器 (busybox) [临时容器]", ha="center",
+ax1.text(3.0, 4.95, "debugger 容器 (busybox) [临时容器]", ha="center",
          fontsize=9.5, color="white", fontweight="bold")
-ax1.text(3.0, 4.45, "kubectl debug --target=app\n加入同一 PID ns -> ps 看到 PID 1,\n/proc/1/root 读到对方文件系统",
+ax1.text(3.0, 4.25, "kubectl debug --target=app\n加入同一 PID ns -> ps 看到 PID 1,\n/proc/1/root 读到对方文件系统",
          ha="center", va="center", fontsize=8.2, color="white")
 
 # 同一 net ns 说明
 ax1.add_patch(mpatches.FancyBboxPatch((6.1, 5.9), 3.4, 2.2,
               boxstyle="round,pad=0.1", fc="#fff", ec="#1f77b4", ls="--"))
 ax1.text(7.8, 7.55, "天然共享 (Pod 内所有容器):", ha="center", fontsize=9.5)
-ax1.text(7.8, 6.65, "• network ns   同 IP:port\n• IPC ns       同信号量\n• UTS ns       同 hostname",
+ax1.text(6.35, 6.65, "• network ns   同 IP:port\n• IPC ns       同信号量\n• UTS ns       同 hostname",
          ha="left", va="center", fontsize=9)
 
 ax1.add_patch(mpatches.FancyBboxPatch((6.1, 3.9), 3.4, 1.6,
               boxstyle="round,pad=0.1", fc="#fff", ec="#d62728", ls="--"))
 ax1.text(7.8, 5.05, "临时容器的限制:", ha="center", fontsize=9.5, color="#d62728")
-ax1.text(7.8, 4.35, "• 不能加 ports/probes/lifecycle/resources\n• env 可以设置\n• 不能 restart; exec 需 -c 指定容器",
+ax1.text(6.35, 4.35, "• 禁止 ports/probes/lifecycle/resources\n• env 可以设置\n• 不能 restart; exec 需 -c 指定容器",
          ha="left", va="center", fontsize=8.5)
 
-ax1.annotate("", xy=(3.0, 5.65), xytext=(3.0, 5.85),
+ax1.annotate("", xy=(3.0, 5.6), xytext=(3.0, 5.95),
              arrowprops=dict(arrowstyle="<|-|>", lw=1.8, color="#333"))
 ax1.text(3.0, 3.15, "价值: 不改镜像、不动原容器, 就能诊断 '黑盒' 故障",
          ha="center", fontsize=10, color="#2ca02c", fontweight="bold")
@@ -88,7 +88,7 @@ for i, (img, desc) in enumerate(tools):
     ax2.text(6.85, y - 0.42, desc, fontsize=8, color="#666")
 ax2.text(8.15, 4.0, "注意: 别把调试镜像\n留在生产 Pod spec 里", fontsize=8.5,
          color="#d62728", ha="center")
-ax2.set_xlim(0, 10); ax2.set_ylim(3.4, 9.4); ax2.axis("off")
+ax2.set_xlim(-0.35, 10); ax2.set_ylim(3.4, 9.4); ax2.axis("off")
 
 plt.tight_layout(rect=[0, 0, 1, 0.94])
 plt.savefig('images/ephemeral_debug_arch.png', dpi=150, bbox_inches="tight")

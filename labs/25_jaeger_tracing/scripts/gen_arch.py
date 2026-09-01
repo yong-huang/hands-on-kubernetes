@@ -21,21 +21,19 @@ spans = [
     ("svc-order  POST /order", 12, 150, 1, "#2ca02c"),
     ("auth-check", 14, 18, 2, "#8c564b"),
     ("svc-payment  /pay", 60, 95, 2, "#ff7f0e"),
-    ("db INSERT", 100, 40, 3, "#9467bd"),
     ("emit event", 145, 6, 3, "#7f7f7f"),
+    ("db INSERT", 100, 40, 3, "#9467bd"),
 ]
-for name, start, dur, depth, c in spans:
-    y = len(spans) - 1 - spans.index((name, start, dur, depth, c))
+row_of = {i: len(spans) - 1 - i for i in range(len(spans))}
+for i, (name, start, dur, depth, c) in enumerate(spans):
+    y = row_of[i]
     ax1.barh(y, dur, left=start, height=0.62, color=c, alpha=0.88, ec="black")
     ax1.text(start + dur + 3, y, f"{dur}ms", va="center", fontsize=9)
     ax1.text(1, y, "  " * depth + name, va="center", ha="left", fontsize=9.5)
-for i in range(len(spans) - 1):
-    pass
-# parent-child 连线
-links = [(5, 4), (4, 2), (4, 3), (3, 1)]
+# parent-child 连线: 每个子 span 的 start-x 处向父 span 引出竖直虚线
+links = [(0, 1), (1, 2), (1, 3), (3, 4), (3, 5)]
 for pa, ch in links:
-    ya = len(spans) - 1 - pa; yc = len(spans) - 1 - ch
-    x_end = spans[pa][1] + spans[pa][2]
+    ya = row_of[pa]; yc = row_of[ch]
     ax1.plot([spans[ch][1], spans[ch][1]], [ya - 0.31, yc + 0.31],
              color="#555", lw=1, ls=":")
 ax1.set_xlabel("时间 (ms)")
@@ -49,7 +47,7 @@ ax1.set_xlim(0, 260); ax1.set_ylim(-1.4, len(spans))
 ax2.set_title("Jaeger 链路数据流: W3C traceparent 头透传是关键", fontsize=13)
 boxes = [
     (1.7, 8.4, "client (front 内置流量线程)\n发起请求生成 trace-id", "#aec7e8"),
-    (5.0, 8.4, "svc-front\nOTel agent 建 span", "#1f77b4"),
+    (5.0, 8.4, "svc-front\n自装 OTel SDK 建 span", "#1f77b4"),
     (8.3, 8.4, "svc-order -> svc-payment\n逐跳透传 header 建 span", "#2ca02c"),
     (8.3, 5.2, "OTLP gRPC :4317\n批量异步上报", "#ff7f0e"),
     (5.0, 5.2, "Jaeger Collector\n校验/入库", "#d62728"),
@@ -78,10 +76,12 @@ ax2.text(5.0, 6.85, "HTTP header:\n00-<trace-id>-<span-id>-01",
 ax2.annotate("", xy=(6.85, 7.9), xytext=(5.6, 7.35),
              arrowprops=dict(arrowstyle="-|>", lw=1.2, ls="--"))
 
-ax2.add_patch(mpatches.FancyBboxPatch((4.0, 0.4), 5.6, 1.3,
+ax2.add_patch(mpatches.FancyBboxPatch((3.6, 0.35), 6.4, 1.45,
               boxstyle="round,pad=0.08", fc="#f5f5f5", ec="#999"))
-ax2.text(6.8, 1.05, "自动埋点: OTel Operator 注入 python agent (init 容器), 注解\ninstrumentation.opentelemetry.io/inject-python; 本实验全量采样, 生产常用 1~10%",
-         ha="center", va="center", fontsize=8.8)
+ax2.text(6.8, 1.05, "埋点: 容器内 pip 安装 OTel SDK (本实验, 与 Operator 注入等价)\n"
+                    "生产路径: 注解 instrumentation.opentelemetry.io/inject-python\n"
+                    "采样: 本实验全量; 生产常用 1~10%",
+         ha="center", va="center", fontsize=8.2)
 
 ax2.set_xlim(-0.2, 10); ax2.set_ylim(0.2, 9.4); ax2.axis("off")
 

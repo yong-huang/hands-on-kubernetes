@@ -23,7 +23,7 @@ ax1.add_patch(mpatches.FancyBboxPatch((0.4, 6.6), 4.0, 2.4,
 ax1.text(2.4, 8.65, "真实 GPU 链路", ha="center", fontsize=10.5,
          fontweight="bold", color="#76b7b2")
 real_steps = [
-    (7.55, "NVIDIA Driver + nvidia-container-toolkit"),
+    (7.55, "NVIDIA Driver / container-toolkit"),
     (6.85, "gpu-operator DaemonSet 跑 device plugin"),
     (6.15, "plugin 经 gRPC socket 向 kubelet 上报设备"),
 ]
@@ -36,8 +36,8 @@ ax1.text(7.55, 8.65, "Fake 模拟链路 (本项目)", ha="center", fontsize=10.5
          fontweight="bold", color="#ff7f0e")
 fake_steps = [
     "无驱动无卡; DaemonSet 每 15s 补写",
-    "kubectl patch node --subresource=status",
-    "直接改 capacity/allocatable 的 gpu 字段",
+    "python updater 直调 API (RBAC 最小化)",
+    "patch nodes/status 改 capacity/allocatable",
 ]
 for i, txt in enumerate(fake_steps):
     ax1.text(5.75, 7.55 - i * 0.7, "• " + txt, fontsize=8.3)
@@ -51,7 +51,7 @@ ax1.text(5.0, 4.75, "allocatable:\n  nvidia.com/gpu: 8",
          ha="center", va="center", fontsize=9, family="monospace",
          color="#cfe8ff")
 for x in (2.4, 7.55):
-    ax1.annotate("", xy=(x if x < 5 else 5.6, 5.1), xytext=(x, 6.55),
+    ax1.annotate("", xy=(2.95 if x < 5 else 7.05, 5.1), xytext=(x, 6.55),
                  arrowprops=dict(arrowstyle="-|>", lw=1.6))
 
 # 底部: 调度器视角
@@ -89,8 +89,9 @@ for y in (5.55, 3.45):
     ax2.annotate("", xy=(2.6, y - 0.75), xytext=(2.6, y),
                  arrowprops=dict(arrowstyle="-|>", lw=1.4, ls="--",
                                  color="#555"))
-ax2.text(1.05, 5.0, "train-big 在第1关即被拒\n(admission 拒绝, Pod 不创建),\n后面关卡只有 train-small 走",
-         ha="left", va="center", fontsize=7.8, color="#d62728")
+ax2.text(1.05, 5.35, "train-big 在第1关即被拒 (admission)\n后面关卡只有 train-small 走",
+         ha="left", va="center", fontsize=7.8, color="#d62728", zorder=5,
+         bbox=dict(boxstyle="round,pad=0.18", fc="white", ec="none", alpha=0.92))
 
 outcomes = [
     (6.9, 7.3, "train-small (1卡)", "#2ca02c",

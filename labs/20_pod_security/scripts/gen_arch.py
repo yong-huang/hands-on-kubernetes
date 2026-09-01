@@ -41,7 +41,7 @@ for i, (name, width, color, tag, items) in enumerate(levels):
     if i < 2:
         ax1.annotate("", xy=(cx, cy - h / 2 - 0.65), xytext=(cx, cy - h / 2 - 0.05),
                      arrowprops=dict(arrowstyle="-|>", color="gray", lw=1.5))
-ax1.text(5.0, y0 - 2 * 3.2 - 1.6, "包含关系: restricted 的要求 ⊇ baseline 的要求 ⊇ 无",
+ax1.text(5.0, y0 - 2 * 3.2 - 1.6, "包含关系: restricted 要求多于 baseline 多于无 (逐级加严)",
          ha="center", fontsize=9, color="gray")
 ax1.set_xlim(0, 10); ax1.set_ylim(-1.2, 10.5); ax1.axis("off")
 
@@ -62,15 +62,15 @@ for cx, cy, txt, c in boxes:
 ax2.annotate("", xy=(2.5, 7.5), xytext=(2.5, 8.0), arrowprops=dict(arrowstyle="-|>", lw=1.5))
 
 # 标签解剖
-ax2.add_patch(mpatches.FancyBboxPatch((0.25, 4.9), 4.5, 1.5,
+ax2.add_patch(mpatches.FancyBboxPatch((0.25, 4.9), 4.5, 1.2,
               boxstyle="round,pad=0.1", fc="#f5f5f5", ec="#1f77b4", ls="--"))
-ax2.text(2.5, 6.1, "标签解剖", ha="center", fontsize=10, fontweight="bold")
+ax2.text(2.5, 5.88, "标签解剖", ha="center", fontsize=10, fontweight="bold")
 ax2.text(2.5, 5.35,
          "pod-security.kubernetes.io/enforce: restricted\n"
          "pod-security.kubernetes.io/enforce-version: v1.36\n"
          "mode ∈ {enforce, audit, warn}  version 可固定",
-         ha="center", va="center", fontsize=8.5, family="monospace")
-ax2.annotate("", xy=(2.5, 6.5), xytext=(2.5, 6.3),
+         ha="center", va="center", fontsize=8.5)
+ax2.annotate("", xy=(2.5, 6.38), xytext=(2.5, 6.12),
              arrowprops=dict(arrowstyle="-|>", lw=1.2, color="#1f77b4"))
 
 # 三种模式分支
@@ -88,9 +88,10 @@ for cx, cy, head, c, body in modes:
 for xy in [(0.95, 3.85), (2.5, 3.85), (4.05, 3.85)]:
     ax2.annotate("", xy=xy, xytext=(2.5, 4.85),
                  arrowprops=dict(arrowstyle="-|>", lw=1.2, color="#1f77b4"))
-ax2.annotate("", xy=(2.5, 1.95), xytext=(2.5, 4.85),
+# 合规: 绕过三个违规框, 沿右侧边缘向下折返进入 "合规" 框
+ax2.annotate("", xy=(3.22, 1.4), xytext=(4.85, 6.4),
              arrowprops=dict(arrowstyle="-|>", lw=1.2, color="#2ca02c",
-                             connectionstyle="arc3,rad=-0.35"))
+                             connectionstyle="angle,angleA=-90,angleB=180"))
 
 ax2.text(2.5, 0.4, "灰度路径: warn (观察影响面) -> audit (留痕) -> enforce (强制)",
          ha="center", fontsize=9, color="gray", style="italic")

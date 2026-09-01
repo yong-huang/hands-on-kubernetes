@@ -78,6 +78,8 @@ def main():
     arrow(ax2, 5, 8.8, 6.8, 8.1, C1)
     arrow(ax2, 5, 4.9, 3.2, 6.1, C1, rad=-0.2)
     arrow(ax2, 5, 4.9, 6.8, 6.1, C1, rad=0.2)
+    ax2.text(5, 4.55, "path-based Ingress rules", ha="center", fontsize=8,
+             style="italic", color="#666")
 
     # exposure comparison
     rows = [

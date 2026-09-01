@@ -86,15 +86,16 @@ def panel_model(ax):
     # Source pods (right): filtered by "from"
     draw_box(ax, 6.4, 3.0, 2.0, 1.1, 'app=frontend', 'allowed in',
              face='white', edge=C_ALLOW)
-    draw_box(ax, 8.9, 3.0, 2.0, 1.1, 'other pods', 'NOT allowed',
+    draw_box(ax, 8.9, 2.05, 2.0, 1.0, 'other pods', 'NOT allowed',
              face='#f7e6e6', edge=C_DENY)
     arrow(ax, 4.6, 3.9, 6.4, 3.1, color=C_ALLOW)
-    arrow(ax, 4.6, 3.9, 8.9, 3.1, color=C_DENY, style='-|>')
+    # deny arrow bows UNDER the app=frontend box down to 'other pods'
+    arrow(ax, 4.4, 3.25, 8.3, 2.3, color=C_DENY, style='-|>', cs='arc3,rad=0.4')
     arrow(ax, 7.4, 3.0, 7.6, 5.7, color=C_ALLOW, cs='arc3,rad=-0.25')
-    draw_x(ax, 8.9, 4.4)
+    draw_x(ax, 8.9, 3.2)
 
     # Default-deny concept box
-    draw_box(ax, 5, 1.0, 8.6, 1.4,
+    draw_box(ax, 5, 0.75, 8.6, 1.3,
              'Default-deny pattern: podSelector:{} + policyTypes:[Ingress] + no rules',
              'no policy = allow all  |  a policy of that type with no matching rule = deny all',
              face='#fdf3d7', edge='#c9a227', fs=8.5)
@@ -130,8 +131,8 @@ def panel_isolation(ax):
     ax.plot([5, 5], [1.4, 9.3], color='#bbb', lw=1, linestyle='--', zorder=1)
 
     # Right half: AFTER
-    ax.text(7.5, 6.9, 'AFTER: default-deny + allow-frontend',
-            fontsize=9.5, fontweight='bold', ha='center', color=C_POLICY)
+    ax.text(8.1, 9.5, 'AFTER: default-deny + allow-frontend',
+            fontsize=8.5, fontweight='bold', ha='center', color=C_POLICY)
     draw_box(ax, 6.4, 5.4, 2.2, 1.0, 'frontend', 'allowed (rule match)',
              face='white', edge=C_ALLOW)
     draw_box(ax, 8.7, 5.4, 2.2, 1.0, 'evil pod', 'blocked (no match)',
