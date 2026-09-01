@@ -18,7 +18,7 @@
 
 ## 3. 调度器视角：先过滤，再打分
 
-![调度器决策流水线](images/scheduler_pipeline.png)
+![调度器决策流水线](images/scheduler_pipeline.svg)
 
 所有调度约束都汇入同一条流水线：**硬性约束（required / DoNotSchedule / 不容忍的污点）在过滤阶段执行，不满足直接淘汰**；候选为空时 Pod 进入 Pending（`FailedScheduling` 事件），绝不降标。**软性偏好（preferred weight / ScheduleAnyway）在打分阶段执行**，只影响候选之间的排名，违反也照样调度。
 
@@ -79,7 +79,7 @@ topologySpreadConstraints:
 
 ## 5. 本实验招牌演示：maxSkew 为什么会拒绝
 
-![maxSkew 打散](images/maxskew_spread.png)
+![maxSkew 打散](images/maxskew_spread.svg)
 
 `web-spread`（replicas=4）**故意不容忍 control-plane 污点**：控制面节点被计为 0 副本的域，但 Pod 进不去。两个 worker 各放 1 个（1/1/0）之后，**第 3 个副本放哪个 worker 都是 2/1/0，skew=2 > maxSkew=1**，被 `DoNotSchedule` 拒绝 → 剩余 2 个副本永远 Pending。
 
@@ -160,13 +160,13 @@ nodeAffinity:
 └── images/
     ├── scheduler_pipeline.workflow.json   # 图源（Archify Typed JSON IR）
     ├── scheduler_pipeline.html            # 交互版：调度决策流水线
-    ├── scheduler_pipeline.png             # 静态版（本文档 §3）
+    ├── scheduler_pipeline.svg             # 双主题矢量版（本文档 §3 内嵌，跟随系统深浅色）
     ├── maxskew_spread.architecture.json   # 图源（Archify Typed JSON IR）
     ├── maxskew_spread.html                # 交互版：maxSkew 打散
-    └── maxskew_spread.png                 # 静态版（本文档 §5）
+    └── maxskew_spread.svg                 # 双主题矢量版（本文档 §5 内嵌，跟随系统深浅色）
 ```
 
-> 两类产物同源：`*.workflow.json` / `*.architecture.json` 是图源（Archify Typed JSON IR，`node bin/archify.mjs deliver <type> <json> <html>` 可复现），`.html` 是交付的交互成品，`.png` 是本文档内嵌的 2x 静态截图。
+> 三类产物同源：`*.workflow.json` / `*.architecture.json` 是图源（Archify Typed JSON IR，`node bin/archify.mjs deliver <type> <json> <html>` 可复现），`.html` 是交付的交互成品，`.svg` 是从交互版 Export 菜单导出的双主题矢量图（跟随系统深浅色，任意缩放不糊）。
 
 ## 8. 面试要点
 

@@ -18,7 +18,7 @@
 
 ## 3. 控制环：指标从哪来，指令到哪去
 
-![HPA 控制环](images/hpa_control_loop.png)
+![HPA 控制环](images/hpa_control_loop.svg)
 
 > 🌐 **交互版**：[在线打开（GitHub Pages）](https://yong-huang.github.io/hands-on-kubernetes/labs/09_hpa/images/hpa_control_loop.html)（未开启 Pages 时可克隆仓库后本地打开 [`images/hpa_control_loop.html`](images/hpa_control_loop.html)）——支持缩放、节点聚焦、连线路径追踪、深浅主题切换。
 
@@ -96,10 +96,10 @@ spec:
 └── images/
     ├── hpa_control_loop.architecture.json  # 图源（Archify Typed JSON IR）
     ├── hpa_control_loop.html               # 交互版架构图（浏览器打开，可缩放/聚焦/追踪连线）
-    └── hpa_control_loop.png                # 静态版（本文档 §3 内嵌）
+    └── hpa_control_loop.svg                # 双主题矢量版（本文档 §3 内嵌，跟随系统深浅色）
 ```
 
-> 两类产物同源：`hpa_control_loop.architecture.json` 是图源（Archify Typed JSON IR，`node bin/archify.mjs deliver architecture <json> <html>` 可复现），`.html` 是交付的交互成品，`.png` 是本文档内嵌的 2x 静态截图。
+> 三类产物同源：`hpa_control_loop.architecture.json` 是图源（Archify Typed JSON IR，`node bin/archify.mjs deliver architecture <json> <html>` 可复现），`.html` 是交付的交互成品，`.svg` 是从交互版 Export 菜单导出的双主题矢量图（跟随系统深浅色，任意缩放不糊）。
 
 ## 7. 面试要点
 
