@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="820" height="560" viewBox="0 0 820 560" font-family="-apple-system,'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#57606a"/>
+    </marker>
+  </defs>
+
+  <rect width="820" height="560" fill="#ffffff"/>
+  <text x="40" y="42" font-size="21" font-weight="700" fill="#1f2328">日志采集流水线：hostPath 触达节点本身</text>
+
+  <!-- node boundary -->
+  <rect x="40" y="96" width="740" height="330" rx="14" fill="#f6f8fa" stroke="#d0d7de" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text x="60" y="120" font-size="11.5" font-weight="600" fill="#57606a">节点（node）</text>
+
+  <!-- app pods -->
+  <text x="70" y="146" font-size="9.5" fill="#57606a">业务 Pod（stdout / stderr）</text>
+  <g font-size="10" fill="#1f2328" text-anchor="middle">
+    <rect x="70" y="152" width="140" height="34" rx="6" fill="#eff5ff" stroke="#a5c2ff"/>
+    <text x="140" y="173">app Pod A</text>
+    <rect x="224" y="152" width="140" height="34" rx="6" fill="#eff5ff" stroke="#a5c2ff"/>
+    <text x="294" y="173">app Pod B</text>
+  </g>
+  <path d="M 195 186 L 195 206" fill="none" stroke="#57606a" stroke-width="1.3" marker-end="url(#arrow)"/>
+  <path d="M 294 186 L 294 206" fill="none" stroke="#57606a" stroke-width="1.3" marker-end="url(#arrow)"/>
+
+  <!-- kubelet -->
+  <rect x="70" y="210" width="294" height="30" rx="6" fill="#ffffff" stroke="#8b949e" stroke-width="1.2"/>
+  <text x="217" y="229" font-size="9.5" fill="#1f2328" text-anchor="middle">kubelet 按 CRI 布局把日志写成文件</text>
+
+  <path d="M 150 240 L 150 260" fill="none" stroke="#57606a" stroke-width="1.3" marker-end="url(#arrow)"/>
+  <path d="M 284 240 L 284 340" fill="none" stroke="#57606a" stroke-width="1.3" marker-end="url(#arrow)"/>
+
+  <!-- log dirs -->
+  <rect x="70" y="264" width="320" height="62" rx="8" fill="#ffffff" stroke="#d4a72c" stroke-width="1.3"/>
+  <text x="86" y="286" font-size="10.5" font-weight="700" fill="#7d4e00">/var/log/pods/</text>
+  <text x="86" y="306" font-size="9" fill="#57606a">&lt;ns&gt;_&lt;pod&gt;_&lt;uid&gt;/&lt;container&gt;/*.log</text>
+
+  <rect x="70" y="344" width="320" height="62" rx="8" fill="#ffffff" stroke="#d4a72c" stroke-width="1.3"/>
+  <text x="86" y="366" font-size="10.5" font-weight="700" fill="#7d4e00">/var/log/</text>
+  <text x="86" y="386" font-size="9" fill="#57606a">节点系统日志（messages 等）</text>
+
+  <!-- agent pod -->
+  <rect x="470" y="230" width="250" height="160" rx="10" fill="#f0fff4" stroke="#1a7f37" stroke-width="1.6"/>
+  <text x="486" y="254" font-size="12" font-weight="700" fill="#1a7f37">DaemonSet Agent Pod</text>
+  <text x="486" y="276" font-size="9.5" fill="#57606a">每个节点一个（演示用 busybox tail）</text>
+  <rect x="486" y="290" width="218" height="40" rx="6" fill="#ffffff" stroke="#8fd6a4"/>
+  <text x="496" y="306" font-size="9" fill="#1f2328">tail -F /var/log/messages</text>
+  <text x="496" y="322" font-size="9" fill="#1f2328">tail -F /var/log/pods/*/*/*.log</text>
+  <text x="486" y="352" font-size="8.5" fill="#57606a">两份 hostPath 卷 · readOnly: true</text>
+  <text x="486" y="370" font-size="8.5" fill="#57606a">Agent 因此能看到本节点所有容器日志</text>
+
+  <path d="M 390 295 L 466 295" fill="none" stroke="#d4a72c" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="428" y="285" font-size="8.5" fill="#7d4e00" text-anchor="middle" stroke="#f6f8fa" stroke-width="3" paint-order="stroke">hostPath 挂载</text>
+  <path d="M 390 375 C 430 375, 430 340, 466 336" fill="none" stroke="#d4a72c" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="428" y="372" font-size="8.5" fill="#7d4e00" text-anchor="middle" stroke="#f6f8fa" stroke-width="3" paint-order="stroke">hostPath 挂载</text>
+
+  <!-- output -->
+  <path d="M 595 390 L 595 442" fill="none" stroke="#2da44e" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <rect x="470" y="446" width="250" height="34" rx="8" fill="#ffffff" stroke="#2da44e" stroke-width="1.3"/>
+  <text x="595" y="467" font-size="9.5" fill="#1a7f37" text-anchor="middle">输出：转发 ES / Loki（演示为 stdout）</text>
+
+  <!-- notes -->
+  <rect x="40" y="452" width="400" height="86" rx="8" fill="#ffffff" stroke="#d0d7de"/>
+  <text x="56" y="476" font-size="10" fill="#1f2328">‣ hostPath 是"逃生舱"卷：只有节点级 Agent 该用</text>
+  <text x="56" y="496" font-size="10" fill="#1f2328">‣ 普通业务 Pod 用 hostPath 既不安全也不可移植</text>
+  <text x="56" y="516" font-size="10" fill="#57606a">‣ 老版 Docker 节点日志在 /var/lib/docker/containers/*/*.log</text>
+</svg>

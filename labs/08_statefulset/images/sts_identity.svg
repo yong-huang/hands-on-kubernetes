@@ -1,0 +1,92 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="840" height="620" viewBox="0 0 840 620" font-family="-apple-system,'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#57606a"/>
+    </marker>
+    <marker id="arrowBlue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#326ce5"/>
+    </marker>
+  </defs>
+
+  <rect width="840" height="620" fill="#ffffff"/>
+  <text x="40" y="42" font-size="21" font-weight="700" fill="#1f2328">StatefulSet：序号即身份（左）vs Deployment（右）</text>
+
+  <!-- ==================== left: StatefulSet ==================== -->
+  <rect x="60" y="100" width="360" height="56" rx="10" fill="#eff5ff" stroke="#326ce5" stroke-width="1.6"/>
+  <text x="76" y="123" font-size="12" font-weight="700" fill="#326ce5">Headless Service · mysql-h</text>
+  <text x="76" y="143" font-size="9.5" fill="#57606a">clusterIP: None —— 不分配 VIP，按名寻址</text>
+
+  <!-- web-0 -->
+  <g>
+    <rect x="60" y="186" width="220" height="64" rx="8" fill="#ffffff" stroke="#326ce5" stroke-width="1.6"/>
+    <text x="74" y="210" font-size="12" font-weight="700" fill="#1f2328">web-0（主库）</text>
+    <text x="74" y="230" font-size="8.5" fill="#57606a">名字固定 · 重建不变</text>
+    <rect x="310" y="192" width="110" height="48" rx="6" fill="#fff8e6" stroke="#d4a72c" stroke-width="1.3"/>
+    <text x="365" y="212" font-size="9.5" font-weight="600" fill="#7d4e00" text-anchor="middle">data-web-0</text>
+    <text x="365" y="228" font-size="8" fill="#7d4e00" text-anchor="middle">1Gi · RWO 专属</text>
+    <path d="M 280 218 L 306 218" fill="none" stroke="#d4a72c" stroke-width="1.4" marker-end="url(#arrow)"/>
+    <text x="60" y="266" font-size="8.5" fill="#8b949e">web-0.mysql-h.default.svc.cluster.local</text>
+  </g>
+  <path d="M 160 156 L 160 182" fill="none" stroke="#326ce5" stroke-width="1.4" marker-end="url(#arrowBlue)"/>
+
+  <!-- web-1 -->
+  <g>
+    <rect x="60" y="296" width="220" height="64" rx="8" fill="#ffffff" stroke="#326ce5" stroke-width="1.6"/>
+    <text x="74" y="320" font-size="12" font-weight="700" fill="#1f2328">web-1（从库）</text>
+    <text x="74" y="340" font-size="8.5" fill="#57606a">initContainer 从 web-0 克隆</text>
+    <rect x="310" y="302" width="110" height="48" rx="6" fill="#fff8e6" stroke="#d4a72c" stroke-width="1.3"/>
+    <text x="365" y="322" font-size="9.5" font-weight="600" fill="#7d4e00" text-anchor="middle">data-web-1</text>
+    <text x="365" y="338" font-size="8" fill="#7d4e00" text-anchor="middle">1Gi · RWO 专属</text>
+    <path d="M 280 328 L 306 328" fill="none" stroke="#d4a72c" stroke-width="1.4" marker-end="url(#arrow)"/>
+    <text x="60" y="376" font-size="8.5" fill="#8b949e">web-1.mysql-h.default.svc.cluster.local</text>
+  </g>
+  <path d="M 100 250 C 90 272, 105 278, 118 292" fill="none" stroke="#326ce5" stroke-width="1.2" marker-end="url(#arrowBlue)"/>
+  <text x="60" y="279" font-size="8" fill="#326ce5">从库连主库靠域名</text>
+
+  <!-- web-2 -->
+  <g>
+    <rect x="60" y="406" width="220" height="64" rx="8" fill="#ffffff" stroke="#326ce5" stroke-width="1.6"/>
+    <text x="74" y="430" font-size="12" font-weight="700" fill="#1f2328">web-2（从库）</text>
+    <text x="74" y="450" font-size="8.5" fill="#57606a">initContainer 从 web-1 克隆</text>
+    <rect x="310" y="412" width="110" height="48" rx="6" fill="#fff8e6" stroke="#d4a72c" stroke-width="1.3"/>
+    <text x="365" y="432" font-size="9.5" font-weight="600" fill="#7d4e00" text-anchor="middle">data-web-2</text>
+    <text x="365" y="448" font-size="8" fill="#7d4e00" text-anchor="middle">1Gi · RWO 专属</text>
+    <path d="M 280 438 L 306 438" fill="none" stroke="#d4a72c" stroke-width="1.4" marker-end="url(#arrow)"/>
+    <text x="60" y="486" font-size="8.5" fill="#8b949e">web-2.mysql-h.default.svc.cluster.local</text>
+  </g>
+  <path d="M 100 360 C 90 382, 105 388, 118 402" fill="none" stroke="#326ce5" stroke-width="1.2" marker-end="url(#arrowBlue)"/>
+
+  <!-- ==================== right: Deployment contrast ==================== -->
+  <rect x="470" y="100" width="330" height="370" rx="12" fill="#f6f8fa" stroke="#8b949e" stroke-width="1.4" stroke-dasharray="6 4"/>
+  <text x="486" y="124" font-size="12.5" font-weight="700" fill="#57606a">Deployment（对照）</text>
+
+  <rect x="486" y="140" width="298" height="50" rx="8" fill="#ffffff" stroke="#8b949e" stroke-width="1.3"/>
+  <text x="500" y="161" font-size="10.5" font-weight="600" fill="#1f2328">Service（VIP）</text>
+  <text x="500" y="179" font-size="8.5" fill="#57606a">请求随机转发，无法指定连哪个实例</text>
+
+  <g font-size="9.5" fill="#57606a" text-anchor="middle">
+    <rect x="486" y="206" width="140" height="30" rx="6" fill="#ffffff" stroke="#8b949e" stroke-dasharray="4 3"/>
+    <text x="556" y="225">web-7d9f6b-x2k9p</text>
+    <rect x="644" y="206" width="140" height="30" rx="6" fill="#ffffff" stroke="#8b949e" stroke-dasharray="4 3"/>
+    <text x="714" y="225">web-7d9f6b-k3tzq</text>
+  </g>
+  <path d="M 556 190 L 556 202" fill="none" stroke="#8b949e" stroke-width="1.2" marker-end="url(#arrow)"/>
+  <path d="M 714 190 L 714 202" fill="none" stroke="#8b949e" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+  <g font-size="9.5">
+    <rect x="486" y="256" width="298" height="30" rx="6" fill="#fff1f0" stroke="#e2a0a6"/>
+    <text x="500" y="275" fill="#a40e26">✗ Pod 名随机，重建即换 → 身份丢失</text>
+    <rect x="486" y="294" width="298" height="30" rx="6" fill="#fff1f0" stroke="#e2a0a6"/>
+    <text x="500" y="313" fill="#a40e26">✗ 没有独立的 Pod DNS，只能 VIP 随机转发</text>
+    <rect x="486" y="332" width="298" height="30" rx="6" fill="#fff1f0" stroke="#e2a0a6"/>
+    <text x="500" y="351" fill="#a40e26">✗ 副本可互换：无主从、无序创建删除</text>
+    <rect x="486" y="370" width="298" height="30" rx="6" fill="#fff1f0" stroke="#e2a0a6"/>
+    <text x="500" y="389" fill="#a40e26">✗ template 只能引用同一个 PVC → 共享踩数据</text>
+  </g>
+  <text x="486" y="436" font-size="9.5" fill="#57606a">无状态服务正需要这种"可互换"；有状态应用恰恰受不了。</text>
+
+  <!-- bottom notes -->
+  <rect x="40" y="520" width="760" height="76" rx="8" fill="#ffffff" stroke="#d0d7de"/>
+  <text x="56" y="546" font-size="10.5" fill="#1f2328">‣ Pod 删除重建：名字还是 web-1，并重新绑定同一个 data-web-1 —— IP 可能变，身份与数据不变</text>
+  <text x="56" y="568" font-size="10.5" fill="#1f2328">‣ 缩容 / 甚至删除整个 StatefulSet 都不会删 PVC，必须手工 kubectl delete pvc —— 宁可麻烦也不丢数据</text>
+</svg>

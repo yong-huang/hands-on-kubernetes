@@ -1,0 +1,169 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "调度器如何执行约束：先过滤，再打分",
+    "locale": "zh-CN",
+    "output": "labs/10_affinity/images/scheduler_pipeline.html",
+    "quality_profile": "showcase"
+  },
+  "lanes": [
+    {
+      "id": "main",
+      "label": "调度决策流水线"
+    },
+    {
+      "id": "exception",
+      "label": "调度失败",
+      "variant": "exception"
+    }
+  ],
+  "phases": [
+    {
+      "id": "hard_phase",
+      "label": "硬性：过滤（必须满足）",
+      "fromCol": 1,
+      "toCol": 2,
+      "variant": "emphasis"
+    },
+    {
+      "id": "soft_phase",
+      "label": "软性：打分（尽力而为）",
+      "fromCol": 3,
+      "toCol": 4,
+      "variant": "dashed"
+    }
+  ],
+  "mainPath": [
+    "submit",
+    "hard_filter",
+    "candidates",
+    "soft_score",
+    "best",
+    "bind"
+  ],
+  "nodes": [
+    {
+      "id": "submit",
+      "lane": "main",
+      "col": 0,
+      "type": "frontend",
+      "label": "kubectl apply",
+      "sublabel": "affinity · spread",
+      "width": 128
+    },
+    {
+      "id": "hard_filter",
+      "lane": "main",
+      "col": 1,
+      "type": "security",
+      "label": "硬性约束过滤",
+      "sublabel": "required · DoNotSchedule · 污点",
+      "tag": "过滤器",
+      "width": 148
+    },
+    {
+      "id": "candidates",
+      "lane": "main",
+      "col": 2,
+      "type": "backend",
+      "label": "候选节点集合",
+      "sublabel": "通过全部硬性条件",
+      "width": 132
+    },
+    {
+      "id": "pending",
+      "lane": "exception",
+      "col": 2,
+      "type": "security",
+      "label": "Pending",
+      "sublabel": "FailedScheduling",
+      "tag": "绝不降标"
+    },
+    {
+      "id": "soft_score",
+      "lane": "main",
+      "col": 3,
+      "type": "backend",
+      "label": "软性偏好打分",
+      "sublabel": "preferred · ScheduleAnyway",
+      "tag": "权重 1-100",
+      "width": 148
+    },
+    {
+      "id": "best",
+      "lane": "main",
+      "col": 4,
+      "type": "backend",
+      "label": "最高分节点",
+      "sublabel": "软约束只影响排名"
+    },
+    {
+      "id": "bind",
+      "lane": "main",
+      "col": 5,
+      "type": "frontend",
+      "label": "绑定并运行",
+      "sublabel": "IgnoredDuringExecution",
+      "tag": "之后不驱逐"
+    }
+  ],
+  "edges": [
+    {
+      "from": "submit",
+      "to": "hard_filter"
+    },
+    {
+      "from": "hard_filter",
+      "to": "candidates"
+    },
+    {
+      "from": "candidates",
+      "to": "soft_score"
+    },
+    {
+      "from": "soft_score",
+      "to": "best"
+    },
+    {
+      "from": "best",
+      "to": "bind"
+    },
+    {
+      "from": "candidates",
+      "to": "pending",
+      "label": "候选为空",
+      "variant": "security",
+      "role": "error"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "三条工具轴",
+      "items": [
+        "选节点：nodeSelector ⊂ nodeAffinity（In / NotIn / Gt / Lt）",
+        "选邻居：podAffinity 亲近，podAntiAffinity 打散",
+        "管均匀：topologySpreadConstraints 只看各域数量差"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "硬与软的分界",
+      "items": [
+        "required / DoNotSchedule：不满足 → 一直 Pending",
+        "preferred / ScheduleAnyway：违反也调度，仅得分低",
+        "拒绝只发生在候选为空时 —— 可用性优先于运行率"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "IgnoredDuringExecution",
+      "items": [
+        "亲和性只在调度那一刻生效",
+        "运行后节点标签变化不会驱逐已运行的 Pod",
+        "与污点 NoExecute（会驱逐）语义不同"
+      ]
+    }
+  ]
+}

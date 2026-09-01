@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "maxSkew 打散：1/1/0 之后，副本 3 放哪都是 skew=2",
+    "locale": "zh-CN",
+    "output": "labs/10_affinity/images/maxskew_spread.html",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    { "id": "deploy", "type": "backend", "label": "web-spread Deployment", "sublabel": "replicas: 4 · maxSkew: 1", "pos": [70, 80], "size": [200, 74], "tag": "DoNotSchedule" },
+    { "id": "sched", "type": "backend", "label": "调度器", "sublabel": "评估 topologySpread", "pos": [95, 212], "size": [150, 66], "tag": "控制平面" },
+    { "id": "cp", "type": "security", "label": "node: control-plane", "sublabel": "污点不容忍 · Pod 进不去", "pos": [500, 80], "size": [220, 80], "tag": "域计数 0" },
+    { "id": "w1", "type": "backend", "label": "node: worker-1", "sublabel": "副本 1 已落位", "pos": [500, 205], "size": [220, 80], "tag": "域计数 1" },
+    { "id": "w2", "type": "backend", "label": "node: worker-2", "sublabel": "副本 2 已落位", "pos": [500, 330], "size": [220, 80], "tag": "域计数 1" },
+    { "id": "pending", "type": "external", "label": "副本 3 & 4", "sublabel": "Pending · FailedScheduling", "pos": [820, 400], "size": [220, 80], "tag": "skew=2 被拒" }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "kind 集群 k8s-learn · topologyKey: kubernetes.io/hostname", "wraps": ["deploy", "sched", "cp", "w1", "w2", "pending"], "pad": 26 }
+  ],
+  "connections": [
+    { "from": "deploy", "to": "sched", "label": "提交 4 副本", "fromSide": "bottom", "toSide": "top", "labelAt": [139, 166] },
+    { "from": "sched", "to": "cp", "variant": "dashed" },
+    { "from": "sched", "to": "w1" },
+    { "from": "sched", "to": "w2" },
+    { "from": "sched", "to": "pending", "label": "任一落点都是 skew=2 → 拒绝", "variant": "emphasis", "fromSide": "bottom", "toSide": "left", "labelAt": [240, 424] }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "maxSkew 语义", "items": ["任意两域计数差 ≤ 1：1/1/0 合法，2/1/0 违规", "域计数包含进不去的 control-plane（算 0）", "whenUnsatisfiable: ScheduleAnyway 则是软性"] },
+    { "dot": "rose", "title": "常见误解", "items": ["所有域都可进入时总能均衡（7 副本 → 3/2/2），加副本不触发拒绝", "拒绝只发生在\"某域计 0 且进不去\"时", "解法：加节点 / 降副本 / 改软性约束"] },
+    { "dot": "emerald", "title": "工具分工", "items": ["podAntiAffinity：每域最多 1 个，副本 > 域数即无解", "topologySpread：均匀且允许多个（5 副本进 3 节点 = 2/2/1）", "IgnoredDuringExecution：运行后拓扑变化不驱逐"] }
+  ]
+}

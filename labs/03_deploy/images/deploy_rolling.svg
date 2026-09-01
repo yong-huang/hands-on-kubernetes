@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="580" height="620" viewBox="0 0 580 620" font-family="-apple-system,'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif">
+<defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#57606a"/>
+    </marker>
+    <marker id="arrowBlue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#326ce5"/>
+    </marker>
+    <marker id="arrowGreen" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#2da44e"/>
+    </marker>
+  </defs>
+<rect width="580" height="620" fill="#ffffff"/>
+<text x="40" y="42" font-size="21" font-weight="700" fill="#1f2328">滚动更新时间线（maxSurge=1 / maxUnavailable=0）</text>
+<g transform="translate(-630,0)">
+<!-- ==================== 右侧：滚动更新时间线 ==================== -->
+
+  <!-- t0 -->
+  <text x="738" y="132" font-size="10" font-weight="700" fill="#1f2328" text-anchor="end">t0 · 稳态</text>
+  <rect x="750" y="112" width="54" height="30" rx="6" fill="#eff5ff" stroke="#326ce5" stroke-width="1.4"/>
+  <text x="777" y="131" font-size="10" font-weight="700" fill="#326ce5" text-anchor="middle">v1</text>
+  <rect x="812" y="112" width="54" height="30" rx="6" fill="#eff5ff" stroke="#326ce5" stroke-width="1.4"/>
+  <text x="839" y="131" font-size="10" font-weight="700" fill="#326ce5" text-anchor="middle">v1</text>
+  <rect x="874" y="112" width="54" height="30" rx="6" fill="#eff5ff" stroke="#326ce5" stroke-width="1.4"/>
+  <text x="901" y="131" font-size="10" font-weight="700" fill="#326ce5" text-anchor="middle">v1</text>
+  <text x="1008" y="124" font-size="9" fill="#57606a">稳态：3 个旧版本 Pod</text>
+  <text x="1008" y="138" font-size="9" fill="#57606a">（RS-旧 desired=3）</text>
+
+  <!-- t1 -->
+  <text x="738" y="197" font-size="10" font-weight="700" fill="#1f2328" text-anchor="end">t1</text>
+  <rect x="750" y="177" width="54" height="30" rx="6" fill="#f0fff4" stroke="#2da44e" stroke-width="1.4"/>
+  <text x="777" y="196" font-size="10" font-weight="700" fill="#1a7f37" text-anchor="middle">v2</text>
+  <rect x="812" y="177" width="54" height="30" rx="6" fill="#eff5ff" stroke="#326ce5" stroke-width="1.4"/>
+  <text x="839" y="196" font-size="10" font-weight="700" fill="#326ce5" text-anchor="middle">v1</text>
+  <rect x="874" y="177" width="54" height="30" rx="6" fill="#eff5ff" stroke="#326ce5" stroke-width="1.4"/>
+  <text x="901" y="196" font-size="10" font-weight="700" fill="#326ce5" text-anchor="middle">v1</text>
+  <rect x="936" y="177" width="54" height="30" rx="6" fill="#eff5ff" stroke="#326ce5" stroke-width="1.4"/>
+  <text x="963" y="196" font-size="10" font-weight="700" fill="#326ce5" text-anchor="middle">v1</text>
+  <text x="1008" y="189" font-size="9" fill="#57606a">maxSurge=1：先建 1 个新 Pod</text>
+  <text x="1008" y="203" font-size="9" fill="#57606a">（总数 4，容量不降）</text>
+
+  <!-- t2 -->
+  <text x="738" y="262" font-size="10" font-weight="700" fill="#1f2328" text-anchor="end">t2</text>
+  <rect x="750" y="242" width="54" height="30" rx="6" fill="#f0fff4" stroke="#2da44e" stroke-width="1.4"/>
+  <text x="777" y="261" font-size="10" font-weight="700" fill="#1a7f37" text-anchor="middle">v2</text>
+  <rect x="812" y="242" width="54" height="30" rx="6" fill="#eff5ff" stroke="#326ce5" stroke-width="1.4"/>
+  <text x="839" y="261" font-size="10" font-weight="700" fill="#326ce5" text-anchor="middle">v1</text>
+  <rect x="874" y="242" width="54" height="30" rx="6" fill="#eff5ff" stroke="#326ce5" stroke-width="1.4"/>
+  <text x="901" y="261" font-size="10" font-weight="700" fill="#326ce5" text-anchor="middle">v1</text>
+  <text x="1008" y="254" font-size="9" fill="#57606a">新 Pod Ready（readiness 把关）</text>
+  <text x="1008" y="268" font-size="9" fill="#57606a">→ 杀 1 个旧 Pod（总数 3）</text>
+
+  <!-- t3 -->
+  <text x="738" y="327" font-size="10" font-weight="700" fill="#1f2328" text-anchor="end">t3</text>
+  <rect x="750" y="307" width="54" height="30" rx="6" fill="#f0fff4" stroke="#2da44e" stroke-width="1.4"/>
+  <text x="777" y="326" font-size="10" font-weight="700" fill="#1a7f37" text-anchor="middle">v2</text>
+  <rect x="812" y="307" width="54" height="30" rx="6" fill="#f0fff4" stroke="#2da44e" stroke-width="1.4"/>
+  <text x="839" y="326" font-size="10" font-weight="700" fill="#1a7f37" text-anchor="middle">v2</text>
+  <rect x="874" y="307" width="54" height="30" rx="6" fill="#eff5ff" stroke="#326ce5" stroke-width="1.4"/>
+  <text x="901" y="326" font-size="10" font-weight="700" fill="#326ce5" text-anchor="middle">v1</text>
+  <rect x="936" y="307" width="54" height="30" rx="6" fill="#eff5ff" stroke="#326ce5" stroke-width="1.4"/>
+  <text x="963" y="326" font-size="10" font-weight="700" fill="#326ce5" text-anchor="middle">v1</text>
+  <text x="1008" y="319" font-size="9" fill="#57606a">再 surge 1 个新 Pod（总数 4）</text>
+  <text x="1008" y="333" font-size="9" fill="#57606a">…… 如此循环</text>
+
+  <!-- t4 -->
+  <text x="738" y="392" font-size="10" font-weight="700" fill="#1f2328" text-anchor="end">t4 · 完成</text>
+  <rect x="750" y="372" width="54" height="30" rx="6" fill="#f0fff4" stroke="#2da44e" stroke-width="1.4"/>
+  <text x="777" y="391" font-size="10" font-weight="700" fill="#1a7f37" text-anchor="middle">v2</text>
+  <rect x="812" y="372" width="54" height="30" rx="6" fill="#f0fff4" stroke="#2da44e" stroke-width="1.4"/>
+  <text x="839" y="391" font-size="10" font-weight="700" fill="#1a7f37" text-anchor="middle">v2</text>
+  <rect x="874" y="372" width="54" height="30" rx="6" fill="#f0fff4" stroke="#2da44e" stroke-width="1.4"/>
+  <text x="901" y="391" font-size="10" font-weight="700" fill="#1a7f37" text-anchor="middle">v2</text>
+  <text x="1008" y="384" font-size="9" fill="#57606a">完成：新 RS desired=3</text>
+  <text x="1008" y="398" font-size="9" fill="#57606a">旧 RS desired=0（保留回滚）</text>
+
+  <!-- right note box -->
+  <rect x="680" y="470" width="480" height="85" rx="8" fill="#ffffff" stroke="#d0d7de"/>
+  <text x="696" y="492" font-size="10.5" fill="#1f2328">‣ maxSurge ↑ 更新快但多占资源；maxUnavailable ↑ 快但容量下降</text>
+  <text x="696" y="511" font-size="10.5" fill="#1f2328">‣ undo = 把旧 RS 的 template 拷回 Deployment，再正向滚一次</text>
+  <text x="696" y="530" font-size="10.5" fill="#1f2328">‣ Recreate 策略：先杀全部旧 Pod 再建新 —— 有中断窗口</text>
+
+  <!-- bottom caption -->
+  <text x="60" y="672" font-size="10.5" fill="#57606a">Deployment = ReplicaSet + 版本管理：声明 replicas 与 template，控制循环把实际状态持续收敛到期望状态；</text>
+  <text x="60" y="691" font-size="10.5" fill="#57606a">出问题 rollout undo 一键回滚 —— 声明式 API + 控制循环的典型范式。</text>
+</g>
+<text x="40" y="592" font-size="10.5" fill="#57606a">任意时刻 Pod 总数 ∈ [replicas − maxUnavailable, replicas + maxSurge]；surge 先扩、Ready 再缩，容量不降。</text>
+</svg>

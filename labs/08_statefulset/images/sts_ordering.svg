@@ -1,0 +1,102 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="820" height="600" viewBox="0 0 820 600" font-family="-apple-system,'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#57606a"/>
+    </marker>
+    <marker id="arrowBlue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#326ce5"/>
+    </marker>
+    <marker id="arrowRed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#cf222e"/>
+    </marker>
+  </defs>
+
+  <rect width="820" height="600" fill="#ffffff"/>
+  <text x="40" y="42" font-size="21" font-weight="700" fill="#1f2328">OrderedReady：正序建、逆序删、更新从最大序号开始</text>
+
+  <!-- section A: create -->
+  <text x="40" y="86" font-size="11.5" font-weight="700" fill="#326ce5">① 创建 / 扩容：0 → 1 → 2（前一个 Ready 才建下一个）</text>
+  <g font-size="9.5">
+    <rect x="40" y="98" width="220" height="104" rx="10" fill="#eff5ff" stroke="#326ce5" stroke-width="1.5"/>
+    <text x="56" y="120" font-size="11" font-weight="700" fill="#1f2328">t1 · web-0</text>
+    <text x="56" y="142" fill="#57606a">init：主库，跳过克隆</text>
+    <text x="56" y="162" fill="#57606a">MySQL 启动 → readiness 通过</text>
+    <text x="56" y="186" font-weight="700" fill="#1a7f37">Ready ✓</text>
+
+    <rect x="300" y="98" width="220" height="104" rx="10" fill="#eff5ff" stroke="#326ce5" stroke-width="1.5"/>
+    <text x="316" y="120" font-size="11" font-weight="700" fill="#1f2328">t2 · web-1</text>
+    <text x="316" y="142" fill="#57606a">init：从 web-0 克隆数据</text>
+    <text x="316" y="162" fill="#57606a">（主库此时已在运行）</text>
+    <text x="316" y="186" font-weight="700" fill="#1a7f37">Ready ✓</text>
+
+    <rect x="560" y="98" width="220" height="104" rx="10" fill="#eff5ff" stroke="#326ce5" stroke-width="1.5"/>
+    <text x="576" y="120" font-size="11" font-weight="700" fill="#1f2328">t3 · web-2</text>
+    <text x="576" y="142" fill="#57606a">init：从 web-1 克隆数据</text>
+    <text x="576" y="162" fill="#57606a">链式就位，集群可用</text>
+    <text x="576" y="186" font-weight="700" fill="#1a7f37">Ready ✓</text>
+  </g>
+  <path d="M 260 150 L 296 150" fill="none" stroke="#326ce5" stroke-width="1.5" marker-end="url(#arrowBlue)"/>
+  <text x="278" y="140" font-size="8.5" fill="#326ce5" text-anchor="middle" stroke="#ffffff" stroke-width="3" paint-order="stroke">Ready 后</text>
+  <path d="M 520 150 L 556 150" fill="none" stroke="#326ce5" stroke-width="1.5" marker-end="url(#arrowBlue)"/>
+  <text x="538" y="140" font-size="8.5" fill="#326ce5" text-anchor="middle" stroke="#ffffff" stroke-width="3" paint-order="stroke">Ready 后</text>
+  <text x="40" y="226" font-size="9.5" fill="#57606a">initContainer 天然串行（成功一个才跑下一个）× OrderedReady = 链式依赖；Parallel 策略可并行建删（更新仍逆序）</text>
+
+  <line x1="40" y1="248" x2="780" y2="248" stroke="#d0d7de" stroke-width="1"/>
+
+  <!-- section B: delete -->
+  <text x="40" y="280" font-size="11.5" font-weight="700" fill="#cf222e">② 缩容 / 删除：2 → 1 → 0（先删从库，最后删主库）</text>
+  <g font-size="10" text-anchor="middle">
+    <rect x="40" y="294" width="110" height="40" rx="8" fill="#f0fff4" stroke="#2da44e" stroke-width="1.4"/>
+    <text x="95" y="318" fill="#1a7f37">web-0 ✓</text>
+    <rect x="170" y="294" width="110" height="40" rx="8" fill="#fff8e6" stroke="#d4a72c" stroke-width="1.3"/>
+    <text x="225" y="318" fill="#7d4e00">web-1 已删</text>
+    <rect x="300" y="294" width="110" height="40" rx="8" fill="#fff8e6" stroke="#d4a72c" stroke-width="1.3"/>
+    <text x="355" y="318" fill="#7d4e00">web-2 已删</text>
+  </g>
+  <circle cx="398" cy="296" r="9" fill="#cf222e"/>
+  <text x="398" y="300" font-size="9" font-weight="700" fill="#ffffff" text-anchor="middle">1</text>
+  <circle cx="268" cy="296" r="9" fill="#cf222e"/>
+  <text x="268" y="300" font-size="9" font-weight="700" fill="#ffffff" text-anchor="middle">2</text>
+  <circle cx="138" cy="296" r="9" fill="#cf222e"/>
+  <text x="138" y="300" font-size="9" font-weight="700" fill="#ffffff" text-anchor="middle">3</text>
+
+  <g font-size="9">
+    <rect x="170" y="344" width="110" height="26" rx="5" fill="#ffffff" stroke="#d4a72c" stroke-dasharray="4 3"/>
+    <text x="225" y="361" fill="#7d4e00" text-anchor="middle">data-web-1 保留</text>
+    <rect x="300" y="344" width="110" height="26" rx="5" fill="#ffffff" stroke="#d4a72c" stroke-dasharray="4 3"/>
+    <text x="355" y="361" fill="#7d4e00" text-anchor="middle">data-web-2 保留</text>
+  </g>
+
+  <rect x="470" y="290" width="310" height="84" rx="8" fill="#ffffff" stroke="#d0d7de"/>
+  <text x="486" y="312" font-size="10" fill="#1f2328">‣ 主从语义：永远先动从库，后动主库</text>
+  <text x="486" y="334" font-size="10" fill="#1f2328">‣ 删掉的 Pod，PVC 留着</text>
+  <text x="486" y="356" font-size="10" fill="#1f2328">‣ 再扩容回来：新 web-2 复用旧数据</text>
+
+  <line x1="40" y1="396" x2="780" y2="396" stroke="#d0d7de" stroke-width="1"/>
+
+  <!-- section C: rolling update -->
+  <text x="40" y="428" font-size="11.5" font-weight="700" fill="#1a7f37">③ 滚动更新：从最大序号开始（与 Deployment 相反）</text>
+  <g font-size="10" text-anchor="middle">
+    <rect x="40" y="442" width="130" height="40" rx="8" fill="#f0fff4" stroke="#2da44e" stroke-width="1.5"/>
+    <text x="105" y="466" fill="#1a7f37">web-2 · v2 ✓</text>
+    <rect x="190" y="442" width="130" height="40" rx="8" fill="#eff5ff" stroke="#326ce5" stroke-width="1.3"/>
+    <text x="255" y="466" fill="#1f2328">web-1 · v1 → v2</text>
+    <rect x="340" y="442" width="130" height="40" rx="8" fill="#eff5ff" stroke="#326ce5" stroke-width="1.3"/>
+    <text x="405" y="466" fill="#1f2328">web-0 · v1 → v2</text>
+  </g>
+  <circle cx="158" cy="444" r="9" fill="#1a7f37"/>
+  <text x="158" y="448" font-size="9" font-weight="700" fill="#ffffff" text-anchor="middle">1</text>
+  <circle cx="308" cy="444" r="9" fill="#1a7f37"/>
+  <text x="308" y="448" font-size="9" font-weight="700" fill="#ffffff" text-anchor="middle">2</text>
+  <circle cx="458" cy="444" r="9" fill="#1a7f37"/>
+  <text x="458" y="448" font-size="9" font-weight="700" fill="#ffffff" text-anchor="middle">3</text>
+  <text x="40" y="502" font-size="9.5" fill="#57606a">先动最大序号：主库（web-0）永远最后被更新，减少主从切换</text>
+
+  <rect x="520" y="436" width="260" height="108" rx="8" fill="#f6f8fa" stroke="#8b949e" stroke-width="1.3"/>
+  <text x="536" y="460" font-size="10.5" font-weight="700" fill="#1f2328">partition 金丝雀发布</text>
+  <text x="536" y="482" font-size="9.5" fill="#57606a">partition=2 → 只更新序号 ≥ 2（即 web-2）</text>
+  <text x="536" y="500" font-size="9.5" fill="#57606a">验证 OK → 降为 0，全量发布</text>
+  <text x="536" y="522" font-size="9" fill="#8b949e">对比 Deployment 的 maxSurge：粒度粗但身份可控</text>
+
+  <text x="40" y="576" font-size="10.5" fill="#1f2328">‣ delete / scale 也遵守同一套序号规则 —— "谁先谁后"是 StatefulSet 与 Deployment 最直观的行为差异</text>
+</svg>

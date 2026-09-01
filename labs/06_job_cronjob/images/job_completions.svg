@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="620" viewBox="0 0 800 620" font-family="-apple-system,'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#57606a"/>
+    </marker>
+    <marker id="arrowGreen" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#2da44e"/>
+    </marker>
+  </defs>
+
+  <rect width="800" height="620" fill="#ffffff"/>
+  <text x="40" y="42" font-size="21" font-weight="700" fill="#1f2328">Job：以退出码论成败的批处理控制器</text>
+
+  <!-- spec box -->
+  <rect x="40" y="96" width="330" height="98" rx="10" fill="#eff5ff" stroke="#326ce5" stroke-width="1.6"/>
+  <text x="56" y="120" font-size="12.5" font-weight="700" fill="#326ce5">Job · work-queue</text>
+  <text x="56" y="142" font-size="9.5" fill="#1f2328">completions: 6 —— 共要成功 6 个</text>
+  <text x="56" y="160" font-size="9.5" fill="#1f2328">parallelism: 2 —— 每批最多 2 个并行</text>
+  <text x="56" y="178" font-size="9.5" fill="#1f2328">backoffLimit: 6 —— 累计失败重试上限</text>
+
+  <!-- semantics box -->
+  <rect x="410" y="96" width="350" height="98" rx="10" fill="#ffffff" stroke="#57606a" stroke-width="1.4"/>
+  <text x="426" y="120" font-size="12.5" font-weight="700" fill="#1f2328">成败判定</text>
+  <text x="426" y="142" font-size="9.5" fill="#1a7f37">exit 0 → Pod Succeeded，计入 completions</text>
+  <text x="426" y="160" font-size="9.5" fill="#cf222e">exit ≠ 0 → 失败，触发重试</text>
+  <text x="426" y="178" font-size="9.5" fill="#57606a">Deployment 恰相反：退出即崩溃，会被重启</text>
+
+  <!-- timeline -->
+  <text x="40" y="240" font-size="11.5" font-weight="700" fill="#1f2328">执行时间线：6 个任务 × 每批 2 个 = 约 3 批</text>
+  <text x="760" y="240" font-size="9.5" fill="#57606a" text-anchor="end">parallelism=2</text>
+
+  <g font-size="10" fill="#1f2328" text-anchor="middle">
+    <rect x="40" y="252" width="66" height="34" rx="6" fill="#f6f8fa" stroke="#8b949e"/>
+    <text x="73" y="273">第 1 批</text>
+    <rect x="130" y="252" width="180" height="34" rx="6" fill="#eff5ff" stroke="#a5c2ff"/>
+    <text x="220" y="273">worker · item 1</text>
+    <rect x="322" y="252" width="180" height="34" rx="6" fill="#eff5ff" stroke="#a5c2ff"/>
+    <text x="412" y="273">worker · item 2</text>
+  </g>
+  <path d="M 512 269 L 596 269" fill="none" stroke="#2da44e" stroke-width="1.4" marker-end="url(#arrowGreen)"/>
+  <text x="660" y="273" font-size="10.5" font-weight="700" fill="#1a7f37" text-anchor="middle">2 / 6 ✓</text>
+
+  <g font-size="10" fill="#1f2328" text-anchor="middle">
+    <rect x="40" y="300" width="66" height="34" rx="6" fill="#f6f8fa" stroke="#8b949e"/>
+    <text x="73" y="321">第 2 批</text>
+    <rect x="130" y="300" width="180" height="34" rx="6" fill="#eff5ff" stroke="#a5c2ff"/>
+    <text x="220" y="321">worker · item 3</text>
+    <rect x="322" y="300" width="180" height="34" rx="6" fill="#eff5ff" stroke="#a5c2ff"/>
+    <text x="412" y="321">worker · item 4</text>
+  </g>
+  <path d="M 512 317 L 596 317" fill="none" stroke="#2da44e" stroke-width="1.4" marker-end="url(#arrowGreen)"/>
+  <text x="660" y="321" font-size="10.5" font-weight="700" fill="#1a7f37" text-anchor="middle">4 / 6 ✓</text>
+
+  <g font-size="10" fill="#1f2328" text-anchor="middle">
+    <rect x="40" y="348" width="66" height="34" rx="6" fill="#f6f8fa" stroke="#8b949e"/>
+    <text x="73" y="369">第 3 批</text>
+    <rect x="130" y="348" width="180" height="34" rx="6" fill="#eff5ff" stroke="#a5c2ff"/>
+    <text x="220" y="369">worker · item 5</text>
+    <rect x="322" y="348" width="180" height="34" rx="6" fill="#eff5ff" stroke="#a5c2ff"/>
+    <text x="412" y="369">worker · item 6</text>
+  </g>
+  <path d="M 512 365 L 596 365" fill="none" stroke="#2da44e" stroke-width="1.4" marker-end="url(#arrowGreen)"/>
+  <text x="660" y="369" font-size="10.5" font-weight="700" fill="#1a7f37" text-anchor="middle">6 / 6 ✓ 完成</text>
+
+  <!-- failure handling -->
+  <text x="40" y="430" font-size="11.5" font-weight="700" fill="#1f2328">失败怎么办：restartPolicy 决定重试方式</text>
+
+  <rect x="40" y="444" width="360" height="110" rx="10" fill="#fff8e6" stroke="#d4a72c" stroke-width="1.4"/>
+  <text x="56" y="468" font-size="11.5" font-weight="700" fill="#7d4e00">restartPolicy: Never</text>
+  <text x="56" y="490" font-size="9.5" fill="#1f2328">容器失败 → 整个 Pod 标记 Failed（现场保留）</text>
+  <text x="56" y="508" font-size="9.5" fill="#1f2328">→ Job 新建一个 Pod 来重试</text>
+  <text x="56" y="526" font-size="9" fill="#7d4e00">适合：要保留失败现场 / 任务不可原地重跑</text>
+
+  <rect x="440" y="444" width="320" height="110" rx="10" fill="#f0fff4" stroke="#2da44e" stroke-width="1.4"/>
+  <text x="456" y="468" font-size="11.5" font-weight="700" fill="#1a7f37">restartPolicy: OnFailure</text>
+  <text x="456" y="490" font-size="9.5" fill="#1f2328">容器失败 → 在原 Pod 内重启容器</text>
+  <text x="456" y="508" font-size="9.5" fill="#1f2328">RESTARTS +1，不产生新的 Failed Pod</text>
+  <text x="456" y="526" font-size="9" fill="#1a7f37">适合：任务幂等、重跑无害（省资源）</text>
+
+  <text x="40" y="592" font-size="10.5" fill="#1f2328">‣ 重试按指数退避：10s → 20s → 40s…　‣ activeDeadlineSeconds：整体死线，优先于 backoffLimit</text>
+</svg>

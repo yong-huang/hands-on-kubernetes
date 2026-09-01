@@ -1,82 +1,62 @@
-# Kubernetes HPA 详解：自动扩缩容的原理与实战
+# 09 · HPA：自动扩缩容的原理与实战
 
-## 引言
+> 线上流量从来不是恒定的。HPA 把"扩缩容"交给控制器：持续观测 Pod 的 CPU/内存指标，与目标值比对后自动增减副本，让"实际利用率"向"目标利用率"持续收敛——声明式目标值 + 控制循环在伸缩场景的又一次应用。
 
-线上流量从来不是恒定的：白天高峰、深夜低谷、大促秒杀、突发热点。如果按峰值流量静态配置副本数，低谷时资源白白浪费（成本翻倍）；按均值配置，峰值一来就过载、超时、雪崩。手动 `kubectl scale` 又有三个问题：**人反应慢**（发现过载到敲完命令可能已过几分钟）、**无法 7x24 值守**（凌晨的流量毛刺没人管）、**不知道扩到几个合适**（拍脑袋定数字）。
+## 1. 为什么手动 scale 不行
 
-HPA（Horizontal Pod Autoscaler）就是把"扩缩容"交给控制器：持续观测 Pod 的 CPU/内存等指标，与目标值比对后自动增减副本数，让"实际利用率"向"目标利用率"持续收敛。配合 `behavior` 稳定窗口，还能抑制来回抖动（flapping）。
+按峰值配置副本数，低谷时资源白费；按均值配置，峰值一来就过载。手动 `kubectl scale` 有三个问题：**人反应慢**（发现过载到敲完命令已过几分钟）、**无法 7x24 值守**（凌晨的流量毛刺没人管）、**不知道扩到几个**（拍脑袋定数字）。
 
-## 文件结构
+## 2. 快速开始
 
-```
-09_hpa/
-├── README.md    # 本文档
-├── hpa.sh         # 全流程演示脚本：metrics-server/压测扩容/观察缩容/清理
-├── manifests/
-│   ├── hpa.yaml       # 多文档清单：CPU 密集型应用 Deployment + HPA (autoscaling/v2)
-│   └── metrics-server.yaml  # metrics-server 安装清单 (HPA 指标来源, 本地缓存)
-├── scripts/
-│   └── gen_arch.py        # 架构图生成脚本 (python3 scripts/gen_arch.py)
-└── images/
-       └── hpa_arch.png   # 控制环 + 扩缩容时间线示意图
+```bash
+./hpa.sh install   # 安装 metrics-server（HPA 指标来源，多数集群默认没有）
+./hpa.sh apply     # 部署 CPU 密集型应用 + HPA（autoscaling/v2，目标 CPU 50%）
+./hpa.sh load      # 制造 CPU 负载，观察 TARGETS 冲高、副本 1→N
+./hpa.sh watch     # 撤掉负载，观察 5 分钟稳定窗口后的慢缩容
+./hpa.sh clean
 ```
 
-## 核心概念
+## 3. 控制环：指标从哪来，指令到哪去
 
-### HPA 扩缩容算法
+![HPA 控制环](images/hpa_control_loop.png)
 
-HPA 控制器默认每 15 秒 reconcile 一次，核心公式：
+> 🌐 **交互版**：[在线打开（GitHub Pages）](https://yong-huang.github.io/hands-on-kubernetes/labs/09_hpa/images/hpa_control_loop.html)（未开启 Pages 时可克隆仓库后本地打开 [`images/hpa_control_loop.html`](images/hpa_control_loop.html)）——支持缩放、节点聚焦、连线路径追踪、深浅主题切换。
 
-```
-desiredReplicas = ceil( currentReplicas × (currentMetricValue / desiredMetricValue) )
-```
+上图是一条闭环：**压测负载 → Pods 用量升高 → kubelet (cAdvisor) 采集 → metrics-server 聚合为 Metrics API → HPA 控制器按公式算出期望副本 → 改 Deployment 的 `scale.replicas` → 增删 Pod → 新用量再反馈回指标层**。
 
-例如目标 CPU 利用率 50%，当前 2 个副本平均利用率 90%：
+HPA 每 15 秒 reconcile 一次，核心公式：
 
 ```
-desired = ceil(2 × 90 / 50) = ceil(3.6) = 4   →  扩到 4 个副本
+desiredReplicas = ceil( currentReplicas × currentMetricValue / desiredMetricValue )
 ```
 
-要点：
+例：目标 CPU 利用率 50%，当前 2 副本平均利用率 90% → `ceil(2 × 90 / 50) = 4`，扩到 4 个。要点：
 
 - **利用率是所有就绪 Pod 的平均值**，不是单 Pod 最大值
-- 多条 metrics（CPU、内存、自定义）时，各自算出一个 desired，**取最大值**（保守策略，宁可多扩）
-- 扩容有 `tolerance`（默认 10%）：计算结果在 ±10% 以内不动，防止指标微小波动引起抖动
-- 缩容时分子用的是"缩容后还剩多少 Pod"重新校验，保证缩完不会立刻又超载
+- 多条 metrics（CPU、内存、自定义）各自算一个 desired，**取最大值**（宁多扩）
+- 扩容有 `tolerance`（默认 ±10%）：结果在带内不动，防指标微抖引起 flapping
+- 缩容时分子按"缩完还剩几个 Pod"重新校验，保证缩完不立刻超载
 
-### metrics-server 与资源指标
+### 指标链路与前置条件
 
-HPA 不会自己去 kubelet 抓数，指标链路是：
+`Resource` 类型的 CPU/内存指标由 **metrics-server** 提供（大多数集群默认不装，装完 `kubectl top` 才能用）；业务指标（QPS、队列长度）需要 **Prometheus Adapter** 或 KEDA 注册为 `custom.metrics.k8s.io`。
 
-```
-kubelet (cAdvisor)  →  metrics-server (聚合为 Metrics API)  →  HPA controller 读取
-```
+**必须设置 `resources.requests`**：CPU 利用率 = 实际用量 / `requests.cpu`——requests 是百分比计算的分母。没有它，TARGETS 列一直显示 `<unknown>`，HPA 永远不会动作。
 
-`Resource` 类型的 CPU/内存指标由 **metrics-server** 提供（大多数集群默认不装），装完 `kubectl top pods/nodes` 才能用。若要用 QPS、队列长度等业务指标，需要 **Prometheus Adapter** 或 KEDA 把自定义指标注册成 `custom.metrics.k8s.io`。
+## 4. behavior：为什么扩容快、缩容慢
 
-### 为什么必须设置 resources.requests
+`autoscaling/v2` 的 `behavior` 字段：
 
-CPU 利用率的定义是 `实际用量 / resources.requests.cpu`——**requests 是百分比计算的分母**。没有 requests：
-
-- HPA 无法计算 Utilization 类目标，TARGETS 列一直显示 `<unknown>`，永远不触发扩缩
-- 调度器也无法把这个 Pod 安排到合适的节点
-
-所以 `hpa.yaml` 里显式写了 `requests.cpu: 100m`：利用率 50% 意味着实际用量 50m，公式才有意义。
-
-### behavior 稳定窗口（v2 新增）
-
-`autoscaling/v2` 的 `behavior` 字段解决两类问题：
-
-| 配置 | 默认行为 | 本例设置 | 目的 |
-|------|----------|----------|------|
+| 配置 | 默认 | 本例 | 目的 |
+|------|------|------|------|
 | scaleUp.stabilizationWindowSeconds | 0s | 0s | 扩容要快，立即执行 |
-| scaleUp.policies | 15s 内 +100% 或 +4 Pod | 同左 | 限制单次扩容幅度，防止指标异常炸到 maxReplicas |
+| scaleUp.policies | 15s 内 +100% 或 +4 Pod | 同左 | 限制单次幅度，防止指标异常炸到 maxReplicas |
 | scaleDown.stabilizationWindowSeconds | 300s | 300s | **缩容前需连续 5 分钟低负载** |
 | scaleDown.policies | 15s 内 -25% 或 -1 Pod | 同左 | 缩容步子要小 |
 
-缩容慢是刻意设计：刚缩掉的 Pod 就没了，流量回升时重新调度、拉镜像、预热要几十秒；而"多留几个 Pod 几分钟"的成本很低。这就是经典的**扩容快、缩容慢**的折中。
+缩容慢是刻意设计：刚缩掉的 Pod 说没就没，流量回升时重新调度、拉镜像、预热要几十秒；而"多留几个 Pod 几分钟"成本很低。这就是经典的**扩容快、缩容慢**的非对称折中。
 
-## YAML 关键字段
+## 5. YAML 关键字段
 
 ```yaml
 spec:
@@ -84,7 +64,7 @@ spec:
     kind: Deployment
     name: cpu-stress-app
   minReplicas: 1                # 副本下限
-  maxReplicas: 10               # 副本上限（硬顶，防止指标异常导致失控扩容）
+  maxReplicas: 10               # 硬顶，防止指标异常导致失控扩容
   metrics:
     - type: Resource            # Pod 资源指标（metrics-server 提供）
       resource:
@@ -97,26 +77,37 @@ spec:
       stabilizationWindowSeconds: 300   # 缩容稳定窗口 5 分钟
 ```
 
-几个易踩的坑：
+易踩的坑：
 
 - Pod 未设 `resources.requests` → TARGETS 显示 `<unknown>`，HPA 不工作
 - kind/minikube 里 metrics-server 需加 `--kubelet-insecure-tls`（kubelet 证书无 CA 签名）
-- 同时配置 CPU 和内存指标时，**内存通常设高些（如 60%）**：内存不像 CPU 那样随请求结束回落，易误触发
+- 同时配 CPU 和内存指标时，**内存目标设高些（如 60%）**：内存不随请求结束回落，易误触发
 - 手动 `kubectl scale` 会被 HPA 在下个周期覆盖（HPA 才是期望副本数的属主）
 
-## 可视化
+## 6. 文件结构
 
-左图是 HPA 控制环：kubelet cAdvisor → metrics-server → HPA 控制器按公式算出期望副本数 → 改 Deployment 的 replicas → 增删 Pod → 新 Pod 的用量又反馈回指标层，闭环收敛。右图是一次完整负载周期：负载来了 CPU 冲高、副本数快速翻倍把利用率压回 50% 附近；负载撤掉后 CPU 归零，但副本数先保持 5 分钟（稳定窗口），再按 -25%/15s 的节奏慢慢缩回：
+```
+09_hpa/
+├── README.md                          # 本文档
+├── hpa.sh                             # install / apply / load / watch / clean
+├── manifests/
+│   ├── hpa.yaml                       # Deployment + HPA（autoscaling/v2）
+│   └── metrics-server.yaml            # metrics-server 安装清单（本地缓存）
+└── images/
+    ├── hpa_control_loop.architecture.json  # 图源（Archify Typed JSON IR）
+    ├── hpa_control_loop.html               # 交互版架构图（浏览器打开，可缩放/聚焦/追踪连线）
+    └── hpa_control_loop.png                # 静态版（本文档 §3 内嵌）
+```
 
-![hpa](images/hpa_arch.png)
+> 两类产物同源：`hpa_control_loop.architecture.json` 是图源（Archify Typed JSON IR，`node bin/archify.mjs deliver architecture <json> <html>` 可复现），`.html` 是交付的交互成品，`.png` 是本文档内嵌的 2x 静态截图。
 
-## 面试要点
+## 7. 面试要点
 
-1. **HPA 扩容算法怎么算**：`desired = ceil(currentReplicas × currentValue / targetValue)`，利用率按就绪 Pod 平均、以 requests 为分母；多指标取各算出的最大 desired；±10% tolerance 内不动作；默认 15 秒一个控制周期。
-2. **为什么缩容慢**：缩容有默认 300 秒稳定窗口 + 步长限制（-25%/15s）。原因是缩容错误代价高——流量回升时重新拉起 Pod 需要调度、拉镜像、预热（分钟级），而多留几个 Pod 的成本很低；扩容错误只是暂时多占资源，所以扩快缩慢是非对称设计。
-3. **HPA 与 VPA / Cluster Autoscaler 的区别**：三者正交互补。HPA 调**副本数**（水平伸缩）；VPA 调**单个 Pod 的 requests/limits**（垂直伸缩，重启 Pod 生效，与 HPA 同用会冲突，除非用 In-Place 或按模式的 Autopilot）；Cluster Autoscaler 调**节点数**（节点资源不足/过剩时增删 Node）。常见组合：HPA + Cluster Autoscaler（Pod 水平扩 → 节点不够 → 加节点）。
-4. **自定义指标怎么做**：`Resource` 只有 CPU/内存。业务指标（QPS、队列长度）用 **Prometheus Adapter** 把 Prometheus 查询注册为 `custom.metrics.k8s.io`（Pods 类型，按 Pod 平均）或 `external.metrics.k8s.io`（External 类型）；HPA metrics 里 `type: Pods/Object/External` 引用。更上层的 KEDA 可以直接以任意 Prometheus 查询/Lag 为信号源驱动扩缩。
+1. **扩容算法**：`desired = ceil(currentReplicas × currentValue / targetValue)`；利用率按就绪 Pod 平均、以 requests 为分母；多指标取最大 desired；±10% tolerance 内不动作；默认 15s 一个控制周期。
+2. **为什么缩容慢**：300s 稳定窗口 + -25%/15s 步长限制。缩容错误代价高——流量回升要重新调度、拉镜像、预热（分钟级）；扩容错误只是暂时多占资源，所以非对称设计是刻意的。
+3. **HPA / VPA / Cluster Autoscaler**：三者正交。HPA 调副本数（水平）；VPA 调单 Pod 的 requests/limits（垂直，重启生效，与 HPA 同用会冲突）；Cluster Autoscaler 调节点数。常见组合：HPA + Cluster Autoscaler。
+4. **自定义指标**：Resource 只有 CPU/内存。业务指标用 Prometheus Adapter 把查询注册为 `custom.metrics.k8s.io`（Pods 类型按 Pod 平均）或 `external.metrics.k8s.io`；KEDA 可以直接以任意 Prometheus 查询/Lag 为信号源驱动扩缩。
 
-## 总结
+## 8. 总结
 
-HPA = 指标 + 公式 + 控制环。记住一条主线：**metrics-server 供数 → 控制器按 `ceil(当前副本 × 当前利用率/目标利用率)` 算期望副本 → 改 Deployment 的 replicas**。两个必踩点：Pod 不设 requests 则百分比无意义；`behavior` 的稳定窗口解释了"为什么缩容那么慢"。配合 `hpa.sh` 里压测扩容、撤压测观察缩容的完整演示，能直观看到"声明式目标值 + 控制循环收敛"在自动伸缩上的又一次应用。
+HPA = 指标 + 公式 + 控制环。主线：**metrics-server 供数 → 控制器按 `ceil(当前副本 × 当前利用率/目标利用率)` 算期望副本 → 改 Deployment 的 replicas**。两个必踩点：Pod 不设 requests 则百分比无意义；`behavior` 的稳定窗口解释了"为什么缩容那么慢"。配合 `hpa.sh` 压测扩容、撤压观察缩容的完整演示，直观看到控制循环收敛的全过程。

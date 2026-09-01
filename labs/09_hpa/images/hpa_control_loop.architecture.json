@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "HPA 控制环：指标 → 公式 → 自动扩缩容",
+    "locale": "zh-CN",
+    "output": "labs/09_hpa/images/hpa_control_loop.html",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    { "id": "hpa", "type": "backend", "label": "HPA 控制器", "sublabel": "autoscaling/v2 · 15s 控制周期", "pos": [70, 260], "size": [180, 70], "tag": "控制平面" },
+    { "id": "deployment", "type": "backend", "label": "Deployment", "sublabel": "cpu-stress-app · replicas: N", "pos": [350, 110], "size": [180, 70] },
+    { "id": "pods", "type": "backend", "label": "cpu-stress Pods", "sublabel": "requests.cpu: 100m", "pos": [640, 110], "size": [180, 70], "tag": "工作负载" },
+    { "id": "load", "type": "external", "label": "压测负载", "sublabel": "busybox · yes > /dev/null", "pos": [900, 110], "size": [160, 66] },
+    { "id": "kubelet", "type": "backend", "label": "kubelet · cAdvisor", "sublabel": "采集容器实际用量", "pos": [640, 430], "size": [180, 70], "tag": "每个节点" },
+    { "id": "metrics", "type": "backend", "label": "metrics-server", "sublabel": "聚合为 Metrics API", "pos": [350, 430], "size": [180, 70], "tag": "kube-system" }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "Kubernetes 集群 · kind (k8s-learn)", "wraps": ["hpa", "deployment", "pods", "kubelet", "metrics"], "pad": 26 }
+  ],
+  "connections": [
+    { "from": "load", "to": "pods", "label": "制造 CPU 负载" },
+    { "from": "pods", "to": "kubelet", "label": "实际用量", "variant": "dashed", "labelDy": 24 },
+    { "from": "kubelet", "to": "metrics", "label": "采集 · 聚合" },
+    { "from": "metrics", "to": "hpa", "label": "Metrics API 供数" },
+    { "from": "hpa", "to": "deployment", "label": "scale：改 replicas", "variant": "emphasis" },
+    { "from": "deployment", "to": "pods", "label": "增删副本", "variant": "emphasis" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "扩缩容公式", "items": ["desired = ceil(当前副本 × 当前利用率 ÷ 目标利用率)", "利用率 = 就绪 Pod 平均用量 ÷ resources.requests", "多指标各算一个 desired 取最大；±10% tolerance 内不动"] },
+    { "dot": "rose", "title": "扩快缩慢（behavior）", "items": ["scaleUp：立即执行，15s 内最多 +100% 或 +4 个 Pod", "scaleDown：先稳定 300s，再按 -25% / 15s 小步缩", "缩容错误代价高（重新调度+拉镜像），多留几分钟很便宜"] },
+    { "dot": "emerald", "title": "前置条件与坑", "items": ["Pod 必须设 resources.requests，否则 TARGETS 一直 unknown", "metrics-server 默认不装；kind 里需 --kubelet-insecure-tls", "手动 kubectl scale 会被 HPA 在下个周期覆盖"] }
+  ]
+}

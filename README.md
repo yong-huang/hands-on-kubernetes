@@ -2,6 +2,8 @@
 
 Kubernetes 动手学习系列：通过 **31 个可真实跑通的小项目**，从环境搭建一路学到多集群与 Operator 开发。每个实验都自带原理讲解（README）、K8s 清单（manifests/）、一键演示脚本（scripts/）和架构图（images/）。
 
+> 🖼️ **交互式架构图**：部分实验配有可交互 HTML 图（缩放 / 节点聚焦 / 连线追踪 / 深浅主题），由 [Archify](https://github.com/tt-a1i/archify) 生成并通过 showcase 级校验。仓库开启 GitHub Pages 后可[在线查看](https://yong-huang.github.io/hands-on-kubernetes/)；克隆到本地后直接用浏览器打开对应实验的 `images/*.html` 也可以。
+
 ## 环境要求
 
 - Docker（kind 以容器模拟节点；未装 kind/kubectl 先跑 [labs/00_setup_kind](labs/00_setup_kind/README.md)）

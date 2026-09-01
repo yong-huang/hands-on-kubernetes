@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="820" height="560" viewBox="0 0 820 560" font-family="-apple-system,'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#57606a"/>
+    </marker>
+  </defs>
+
+  <rect width="820" height="560" fill="#ffffff"/>
+  <text x="40" y="42" font-size="21" font-weight="700" fill="#1f2328">Service 如何找到 Pod：selector → Endpoints → kube-proxy</text>
+
+  <!-- row 1 -->
+  <rect x="40" y="100" width="180" height="104" rx="10" fill="#eff5ff" stroke="#326ce5" stroke-width="1.6"/>
+  <text x="56" y="124" font-size="12.5" font-weight="700" fill="#326ce5">Service</text>
+  <text x="56" y="146" font-size="10" fill="#1f2328">nginx-clusterip</text>
+  <text x="56" y="165" font-size="9.5" fill="#57606a">VIP: 10.96.0.10:80</text>
+  <text x="56" y="184" font-size="9.5" fill="#57606a">selector: app=nginx</text>
+
+  <line x1="220" y1="152" x2="256" y2="152" stroke="#57606a" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <rect x="260" y="100" width="190" height="104" rx="10" fill="#ffffff" stroke="#57606a" stroke-width="1.4"/>
+  <text x="276" y="124" font-size="11.5" font-weight="700" fill="#1f2328">Endpoints Controller</text>
+  <text x="276" y="146" font-size="9.5" fill="#57606a">（控制面组件）</text>
+  <text x="276" y="165" font-size="9.5" fill="#57606a">持续 watch Pod，只收 Ready</text>
+  <text x="276" y="184" font-size="9.5" fill="#57606a">写入同名 Endpoints 对象</text>
+
+  <line x1="450" y1="152" x2="486" y2="152" stroke="#57606a" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <rect x="490" y="100" width="290" height="146" rx="10" fill="#ffffff" stroke="#57606a" stroke-width="1.4"/>
+  <text x="504" y="122" font-size="11.5" font-weight="700" fill="#1f2328">Endpoints · nginx-clusterip</text>
+  <g font-size="9.5">
+    <rect x="502" y="132" width="266" height="22" rx="5" fill="#f0fff4" stroke="#8fd6a4"/>
+    <text x="512" y="147" fill="#1a7f37">✓ 10.244.1.5:80　Ready</text>
+    <rect x="502" y="158" width="266" height="22" rx="5" fill="#f0fff4" stroke="#8fd6a4"/>
+    <text x="512" y="173" fill="#1a7f37">✓ 10.244.2.7:80　Ready</text>
+    <rect x="502" y="184" width="266" height="22" rx="5" fill="#f0fff4" stroke="#8fd6a4"/>
+    <text x="512" y="199" fill="#1a7f37">✓ 10.244.3.2:80　Ready</text>
+    <rect x="502" y="212" width="266" height="22" rx="5" fill="#fff8e6" stroke="#d4a72c"/>
+    <text x="512" y="227" fill="#7d4e00">✗ 10.244.1.9:80　NotReady —— 被排除</text>
+  </g>
+
+  <!-- swoop connector row1 -> row2 -->
+  <path d="M 635 246 C 635 285, 320 262, 178 298" fill="none" stroke="#8b949e" stroke-width="1.3" stroke-dasharray="4 3" marker-end="url(#arrow)"/>
+
+  <!-- row 2 -->
+  <rect x="40" y="300" width="260" height="110" rx="10" fill="#f0fff4" stroke="#1a7f37" stroke-width="1.6"/>
+  <text x="56" y="324" font-size="11.5" font-weight="700" fill="#1a7f37">kube-proxy（每个节点都有）</text>
+  <text x="56" y="346" font-size="9.5" fill="#57606a">watch Service + Endpoints</text>
+  <text x="56" y="364" font-size="9.5" fill="#57606a">把最新后端同步成本地转发规则</text>
+  <text x="56" y="382" font-size="9.5" fill="#57606a">iptables（默认）或 ipvs</text>
+
+  <line x1="300" y1="355" x2="336" y2="355" stroke="#57606a" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <rect x="340" y="300" width="260" height="50" rx="8" fill="#eff5ff" stroke="#326ce5" stroke-width="1.3"/>
+  <text x="354" y="321" font-size="10.5" font-weight="600" fill="#1f2328">iptables：DNAT 规则 · 线性匹配</text>
+  <text x="354" y="339" font-size="9" fill="#57606a">规则数千条时更新与匹配都变慢</text>
+
+  <rect x="340" y="360" width="260" height="50" rx="8" fill="#f0fff4" stroke="#2da44e" stroke-width="1.3"/>
+  <text x="354" y="381" font-size="10.5" font-weight="600" fill="#1f2328">ipvs：内核哈希表 O(1)</text>
+  <text x="354" y="399" font-size="9" fill="#57606a">支持多种负载均衡算法 · 大规模首选</text>
+
+  <line x1="600" y1="355" x2="636" y2="355" stroke="#57606a" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <g font-size="9.5" fill="#1f2328">
+    <rect x="640" y="300" width="150" height="30" rx="6" fill="#f6f8fa" stroke="#d0d7de"/>
+    <text x="715" y="319" text-anchor="middle">Pod 10.244.1.5</text>
+    <rect x="640" y="340" width="150" height="30" rx="6" fill="#f6f8fa" stroke="#d0d7de"/>
+    <text x="715" y="359" text-anchor="middle">Pod 10.244.2.7</text>
+    <rect x="640" y="380" width="150" height="30" rx="6" fill="#f6f8fa" stroke="#d0d7de"/>
+    <text x="715" y="399" text-anchor="middle">Pod 10.244.3.2</text>
+  </g>
+
+  <!-- bottom notes -->
+  <rect x="40" y="452" width="740" height="86" rx="8" fill="#ffffff" stroke="#d0d7de"/>
+  <text x="56" y="476" font-size="10.5" fill="#1f2328">‣ ClusterIP ping 不通、curl 通：VIP 只做 TCP/UDP 的 DNAT，不响应 ICMP</text>
+  <text x="56" y="498" font-size="10.5" fill="#1f2328">‣ 排查 Service 不通第一站：kubectl get endpoints —— 为空 = selector 不匹配或没有 Ready 的 Pod</text>
+  <text x="56" y="520" font-size="10.5" fill="#1f2328">‣ VIP 上没有任何进程监听：包在节点上被规则直接改写目的 IP</text>
+</svg>

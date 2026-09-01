@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="560" height="620" viewBox="0 0 560 620" font-family="-apple-system,'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif">
+<defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#57606a"/>
+    </marker>
+    <marker id="arrowBlue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#326ce5"/>
+    </marker>
+    <marker id="arrowGreen" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#2da44e"/>
+    </marker>
+    <marker id="arrowRed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#cf222e"/>
+    </marker>
+  </defs>
+<rect width="560" height="620" fill="#ffffff"/>
+<text x="40" y="42" font-size="21" font-weight="700" fill="#1f2328">Pod 生命周期与三类探针（kubelet 视角）</text>
+<g transform="translate(-640,0)">
+<!-- ==================== 右侧：生命周期与探针 ==================== -->
+
+  <!-- states -->
+  <rect x="700" y="110" width="180" height="40" rx="8" fill="#f6f8fa" stroke="#57606a" stroke-width="1.3"/>
+  <text x="790" y="128" font-size="11.5" font-weight="700" fill="#1f2328" text-anchor="middle">Pending</text>
+  <text x="790" y="143" font-size="8.5" fill="#57606a" text-anchor="middle">已提交 · 等调度器选节点</text>
+
+  <path d="M 790 150 L 790 183" fill="none" stroke="#57606a" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="798" y="170" font-size="9" fill="#57606a">调度成功</text>
+
+  <rect x="700" y="187" width="180" height="40" rx="8" fill="#f6f8fa" stroke="#57606a" stroke-width="1.3"/>
+  <text x="790" y="205" font-size="11.5" font-weight="700" fill="#1f2328" text-anchor="middle">ContainerCreating</text>
+  <text x="790" y="220" font-size="8.5" fill="#57606a" text-anchor="middle">拉镜像 · 建容器 · 接网络</text>
+
+  <path d="M 790 227 L 790 258" fill="none" stroke="#57606a" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="798" y="247" font-size="9" fill="#57606a">容器就绪</text>
+
+  <rect x="700" y="262" width="180" height="40" rx="8" fill="#f0fff4" stroke="#2da44e" stroke-width="1.8"/>
+  <text x="790" y="280" font-size="11.5" font-weight="700" fill="#1a7f37" text-anchor="middle">Running</text>
+  <text x="790" y="295" font-size="8.5" fill="#57606a" text-anchor="middle">kubelet 持续执行探针</text>
+
+  <!-- crash loop -->
+  <path d="M 748 302 C 748 350, 748 358, 748 393" fill="none" stroke="#cf222e" stroke-width="1.4" marker-end="url(#arrowRed)"/>
+  <text x="738" y="352" font-size="9" fill="#cf222e" text-anchor="end">进程崩溃</text>
+  <path d="M 832 393 C 832 350, 832 342, 832 303" fill="none" stroke="#8b949e" stroke-width="1.4" stroke-dasharray="4 3" marker-end="url(#arrow)"/>
+  <text x="842" y="352" font-size="9" fill="#57606a">退避后重启</text>
+
+  <rect x="695" y="397" width="190" height="48" rx="8" fill="#fff1f0" stroke="#cf222e" stroke-width="1.4"/>
+  <text x="790" y="417" font-size="11" font-weight="700" fill="#cf222e" text-anchor="middle">CrashLoopBackOff</text>
+  <text x="790" y="434" font-size="8.5" fill="#a40e26" text-anchor="middle">退避重启 10s→20s→40s…封顶 5min</text>
+
+  <!-- probe chips -->
+  <rect x="920" y="150" width="240" height="64" rx="8" fill="#eff5ff" stroke="#326ce5" stroke-width="1.4"/>
+  <text x="932" y="172" font-size="11" font-weight="700" fill="#1f2328">startupProbe（治"慢热"）</text>
+  <text x="932" y="190" font-size="9.5" fill="#57606a">成功前屏蔽下面两个探针；</text>
+  <text x="932" y="203" font-size="9.5" fill="#57606a">30 次 × 2s = 容忍 60s 启动</text>
+
+  <rect x="920" y="228" width="240" height="64" rx="8" fill="#fff1f0" stroke="#cf222e" stroke-width="1.4"/>
+  <text x="932" y="250" font-size="11" font-weight="700" fill="#1f2328">livenessProbe（治"卡死"）</text>
+  <text x="932" y="268" font-size="9.5" fill="#57606a">失败 → kubelet 重启容器，</text>
+  <text x="932" y="281" font-size="9.5" fill="#57606a">RESTARTS +1（进程活着但不工作）</text>
+
+  <rect x="920" y="306" width="240" height="64" rx="8" fill="#fff8e6" stroke="#d4a72c" stroke-width="1.4"/>
+  <text x="932" y="328" font-size="11" font-weight="700" fill="#1f2328">readinessProbe（治"没准备好"）</text>
+  <text x="932" y="346" font-size="9.5" fill="#57606a">失败 → Service 摘除流量，</text>
+  <text x="932" y="359" font-size="9.5" fill="#57606a">容器不重启（预热/发布摘流）</text>
+
+  <!-- arrows running -> probes -->
+  <path d="M 880 275 C 905 268, 900 195, 918 182" fill="none" stroke="#8b949e" stroke-width="1.2" marker-end="url(#arrow)"/>
+  <path d="M 880 280 C 900 278, 905 262, 918 259" fill="none" stroke="#8b949e" stroke-width="1.2" marker-end="url(#arrow)"/>
+  <path d="M 880 290 C 900 298, 898 330, 918 336" fill="none" stroke="#8b949e" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+  <!-- right note box -->
+  <rect x="680" y="470" width="480" height="85" rx="8" fill="#ffffff" stroke="#d0d7de"/>
+  <text x="696" y="492" font-size="10.5" fill="#1f2328">‣ 探针类型：httpGet / tcpSocket / exec，由 kubelet 周期执行</text>
+  <text x="696" y="511" font-size="10.5" fill="#1f2328">‣ CrashLoopBackOff 排查：logs --previous → describe 看 Last State</text>
+  <text x="696" y="530" font-size="10.5" fill="#1f2328">‣ 记忆：liveness 治卡死 · readiness 治没长大 · startup 治慢热</text>
+
+  <!-- bottom caption -->
+  <text x="60" y="672" font-size="10.5" fill="#57606a">Pod = 一组共享网络命名空间与存储卷的容器：pause 提供共享底座，sidecar / initContainer 扩展能力，</text>
+  <text x="60" y="691" font-size="10.5" fill="#57606a">探针赋予自愈与流量治理 —— K8s 调度的原子单位永远是 Pod，不是容器。</text>
+</g>
+<text x="40" y="592" font-size="10.5" fill="#57606a">探针失败 → 重启（liveness）或摘流（readiness）；崩溃重启按指数退避 —— 这就是 Pod 的自愈。</text>
+</svg>

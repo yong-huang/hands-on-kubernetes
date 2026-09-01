@@ -1,55 +1,41 @@
-# Kubernetes DaemonSet 详解：每个节点一个 Pod 的守护进程
+# 07 · DaemonSet：每个节点一个的守护进程
 
-## 引言
+> 有一类负载不在意"总数"，而在意"覆盖面"——集群里每个节点都必须恰好跑一个。DaemonSet 的副本数不写死，**由节点数决定**。
 
-Deployment 解决的是"无状态服务跑几个副本"的问题，但有一类负载的需求完全不同：**它们不在意总数，而在意覆盖面——集群里每个节点都必须恰好跑一个**。
+## 1. 为什么副本数该由节点数决定
 
-典型场景：
+典型场景：日志采集（Fluent Bit / Filebeat 每节点一个 Agent）、节点监控（Node Exporter）、网络插件（CNI、kube-proxy 本质上也是每节点一份）。这类"节点级守护进程"用 Deployment 管理会出乱子：节点扩容后新节点没有 Agent，调度器还可能把两个 Agent 堆到同一个节点上。
 
-- **日志采集**：Fluent Bit / Filebeat 每个节点一个 Agent，通过 hostPath 读取本节点 `/var/log` 和 `/var/lib/docker/containers` 下的容器日志
-- **监控**：Node Exporter / cAdvisor 每个节点一个，采集本节点 CPU、内存、磁盘指标
-- **网络插件**：CNI（Calico、Cilium）、kube-proxy 本质上也是每节点一份的守护进程，Pod 网络才能通
+## 2. 总览：调度模型
 
-这类"节点级守护进程"如果用 Deployment 管理，副本数和节点数会对不上：节点扩容后新节点没有 Agent、调度器还可能把两个 Agent 堆到同一个节点上。DaemonSet 就是为此设计的工作负载——**副本数不写死，由节点数决定**。
+![daemonset scheduling](images/daemonset_scheduling.svg)
 
-## 文件结构
+DaemonSet 控制器（kube-controller-manager 内的 daemon pod controller）的逻辑：
 
+1. 监听集群所有节点和 DaemonSet 的变化；
+2. 对每个 DaemonSet，计算"应该有 Pod 的节点集合"——所有**匹配 selector/affinity、且可调度**的节点；
+3. 节点上有 Pod 则保持，没有则创建；有两个则删多余的；
+4. 节点被删除或 Pod 被驱逐时，在其他匹配节点上自动补齐。
+
+所以 `kubectl get daemonset` 的 `DESIRED` 不是你声明的数字，而是**当前合格节点数**。集群从 3 节点扩到 5 节点，DESIRED 自动变 5，无需任何操作——这是与 Deployment 最本质的区别。
+
+一句话主线：**desired 由节点数决定，覆盖面由 tolerations / nodeAffinity 决定，数据面靠 hostPath 触达节点本身。**
+
+## 3. 快速开始
+
+```bash
+./daemonset.sh apply     # 部署两个 DaemonSet：日志采集（全节点）+ ssd-cache-agent（nodeAffinity）
+./daemonset.sh dist      # -o wide 对比：节点数 vs Pod 数，每个节点名只出现一次
+./daemonset.sh label     # 给节点打/摘 disktype=ssd 标签，看 Pod 即时增删
+./daemonset.sh update    # 改镜像触发滚动更新（逐节点替换）
+./daemonset.sh clean
 ```
-07_daemonset/
-├── README.md    # 本文档
-├── daemonset.sh        # 全流程演示脚本：apply/验证每节点一个/分布/rollout/标签调度/清理
-├── manifests/
-│   └── daemonset.yaml      # 两个 DaemonSet 示例：日志采集(全节点) + nodeAffinity(仅 SSD 节点)
-├── scripts/
-│   └── gen_arch.py        # 架构图生成脚本 (python3 scripts/gen_arch.py)
-└── images/
-       └── daemonset_arch.png  # 调度模型对比 + 日志采集流水线示意图
-```
 
-## 核心概念
-
-### DaemonSet 的调度机制：每节点一个
-
-DaemonSet 控制器（kube-controller-manager 内的 daemon pod controller）的行为逻辑：
-
-1. 监听集群所有节点和 DaemonSet 的变化
-2. 对每个 DaemonSet，计算"应该有 Pod 的节点集合"——所有**匹配 selector/affinity、且可调度**的节点
-3. 节点上有 Pod 则保持，没有则创建；节点上有两个（比如手工建的）则删除多余的
-4. 节点被删除或 Pod 被驱逐时，在其他匹配节点上自动补齐
-
-所以 `kubectl get daemonset` 看到的 `DESIRED` 不是你声明的数字，而是**当前匹配的节点数**。集群从 3 节点扩到 5 节点，DaemonSet 的 desired 自动变 5，无需任何操作——这是和 Deployment 最本质的区别。
+## 4. tolerations / nodeAffinity：覆盖面的两道开关
 
 ### tolerations：为什么需要容忍度才能上控制面节点
 
-生产集群的控制面节点默认打有污点（taint）：
-
-```
-node-role.kubernetes.io/control-plane:NoSchedule
-```
-
-含义是"不许新 Pod 调度到我这"。这是为了保护 etcd / API server 等关键组件不被普通业务挤占资源。
-
-但日志采集、监控这类 Agent 需要**全覆盖**，包括控制面节点（控制面的日志同样要采集）。办法是给 Pod 模板加 tolerations：
+控制面节点默认打有污点 `node-role.kubernetes.io/control-plane:NoSchedule`（"不许新 Pod 调度到我这"），以保护 etcd / API server 不被业务挤占。但日志、监控 Agent 需要**全覆盖**——控制面的日志同样要采集——所以要显式容忍：
 
 ```yaml
 tolerations:
@@ -59,14 +45,11 @@ tolerations:
     effect: NoExecute
 ```
 
-注意区分两种写法：指定 key 只容忍特定污点；`operator: Exists` 不限定 key，容忍一切匹配 effect 的污点，通常只有 kube-proxy / CNI 这种"不上就无法工作"的组件才需要。
+指定 key 只容忍特定污点；`operator: Exists` 不限 key、容忍一切匹配 effect 的污点——通常只有 kube-proxy / CNI 这种"不上就无法工作"的组件才需要。
 
 ### nodeSelector / nodeAffinity：选择性覆盖
 
 不是所有 DaemonSet 都要全覆盖。比如只在 SSD 节点跑本地缓存 Agent：
-
-- **nodeSelector**：最简单，节点标签完全匹配即调度
-- **nodeAffinity**（`requiredDuringSchedulingIgnoredDuringExecution`）：功能更强的硬性要求，支持 `In/NotIn/Exists/Gt/Lt`、多条件、权重（preferred 软偏好）
 
 ```yaml
 affinity:
@@ -75,55 +58,64 @@ affinity:
       nodeSelectorTerms:
         - matchExpressions:
             - key: disktype
-              operator: In
+              operator: In          # In / NotIn / Exists / Gt / Lt
               values: [ssd]
 ```
 
-关键特性：**标签变化会即时生效**。给节点打上 `disktype=ssd`，DaemonSet 控制器立刻在该节点创建 Pod；去掉标签，Pod 被自动删除。`daemonset.sh` 的 `label` 步骤演示了这一过程。
+关键特性：**标签变化即时生效**。给节点打上 `disktype=ssd`，控制器立刻在该节点创建 Pod；去掉标签，Pod 被自动删除——`daemonset.sh` 的 `label` 步骤演示了这一过程（见 §2 图下方的演示）。
 
-### hostPath 卷：把节点目录挂进 Pod
+## 5. hostPath：日志采集流水线
 
-日志采集的前提是"能看到节点上的日志文件"。kubelet 把容器 stdout/stderr 写到节点目录（`/var/log/pods`、`/var/lib/docker/containers/*-json.log`），DaemonSet Pod 用 hostPath 把这些目录只读挂进来：
+![daemonset hostpath](images/daemonset_hostpath.svg)
+
+采集的前提是"能看到节点上的日志文件"。kubelet 按 CRI 布局把容器 stdout/stderr 写到节点目录（`/var/log/pods/<ns>_<pod>_<uid>/<container>/*.log`），DaemonSet Pod 用 hostPath 把这些目录**只读**挂进来：
 
 ```yaml
 volumes:
   - name: varlog
     hostPath:
       path: /var/log
-  - name: dockerlog
+  - name: podlog
     hostPath:
-      path: /var/lib/docker/containers
-      type: Directory     # 目录不存在则报错, 避免静默挂错
+      path: /var/log/pods     # containerd (CRI) 日志目录; 老版 Docker 节点为
+      type: DirectoryOrCreate # /var/lib/docker/containers/*/*-json.log
 ```
 
-注意 hostPath 是"逃生舱"性质的卷类型，只有节点级 Agent 这种确实需要访问节点本身的场景才应该使用；普通业务 Pod 用 hostPath 既不安全也不可移植。
+注意：hostPath 是"逃生舱"性质的卷类型，只有节点级 Agent 这种确实需要访问节点本身的场景才该用；普通业务 Pod 用它既不安全也不可移植。另外 DaemonSet 每个节点都跑，**必须设置 resources**，否则节点数一多就是全集群的资源放大。
 
-## DaemonSet vs Deployment 对比
+## 6. DaemonSet vs Deployment
 
 | 维度 | DaemonSet | Deployment |
 |------|-----------|------------|
 | 副本数 | 由匹配节点数决定，不可手动 scale | 手动声明 `replicas`，可 scale |
 | 分布 | 每个节点**恰好一个** Pod | 任意节点，可能堆积也可能空缺 |
 | 控制器 | DaemonSet controller（直接管理 Pod） | Deployment → ReplicaSet → Pod 三层 |
-| 滚动更新 | 支持（`RollingUpdate`/`OnDelete`，默认逐节点替换，maxUnavailable 可为百分比即按节点比例） | 支持（maxSurge/maxUnavailable） |
-| 典型场景 | 日志采集、监控 Agent、CNI、kube-proxy | Web 服务、API、无状态业务 |
+| 滚动更新 | 逐节点替换，maxUnavailable 可为百分比（按节点比例）；**没有 maxSurge**（每节点只能一个） | maxSurge / maxUnavailable |
 | 节点扩容 | 新节点自动获得 Pod | 副本数不变，需手动扩容 |
-| hostPath | 常用（读取节点文件） | 几乎不用（破坏可移植性） |
+| hostPath | 常用（读取节点文件） | 几乎不用 |
+| 典型场景 | 日志、监控 Agent、CNI、kube-proxy、设备插件 | Web / API 等无状态业务 |
 
-## 可视化
+## 7. 文件结构
 
-左图对比两种调度模型：DaemonSet 由节点数驱动、每节点一个（控制面节点需 toleration），Deployment 由 replicas 驱动、可以堆积也可以空缺；右图是日志采集流水线（app pods → 节点日志目录 → hostPath → DaemonSet Agent → 外部日志存储），以及 tolerations/nodeSelector/cordon 三道调度闸门如何筛选"合格节点"：
+```
+07_daemonset/
+├── README.md                    # 本文档
+├── daemonset.sh                 # apply / verify / label / rollout / clean
+├── manifests/
+│   └── daemonset.yaml           # 日志采集（全节点+tolerations）+ nodeAffinity 版
+└── images/
+    ├── daemonset_scheduling.svg # 调度模型（本文档 §2）
+    └── daemonset_hostpath.svg   # 日志采集流水线（本文档 §5）
+```
 
-![daemonset](images/daemonset_arch.png)
+## 8. 面试要点
 
-## 面试要点
+1. **如何保证每节点一个**：daemon pod controller 为每个"匹配且可调度"的节点确保恰好一个 Pod——缺失则建、多余则删；节点加入/移除或标签变化时自动增删。DESIRED 永远等于合格节点数。
+2. **为什么需要 toleration 才能上 master**：控制面默认打 `node-role.kubernetes.io/control-plane:NoSchedule` 污点保护关键组件；Agent 要全覆盖所以必须容忍。`operator: Exists` 容忍一切，一般只有 CNI/kube-proxy 需要。
+3. **典型场景**：日志采集、节点监控、CNI、kube-proxy、安全 Agent、GPU Device Plugin——共同点是"节点级守护进程"，与节点一一对应。
+4. **如何滚动更新**：改 Pod 模板即触发；默认 RollingUpdate 逐节点杀旧建新，maxUnavailable（默认 1）可写百分比；OnDelete 完全手动。`rollout status/undo/history` 与 Deployment 相同。注意 **DaemonSet 没有 maxSurge**——每节点只能有一个 Pod，无法"先建新再杀旧"。
+5. **加分辨析**：节点被 cordon/drain 后 DaemonSet 不会往上补 Pod；drain 会驱逐 DaemonSet Pod（默认忽略 DaemonSet 空 pod 需 `--ignore-daemonsets`），控制器随后决定是否重建。
 
-1. **DaemonSet 如何保证每个节点一个 Pod**：daemon pod controller 监听节点与 DaemonSet 变化，为每个"匹配且可调度"的节点确保恰好一个 Pod——缺失则创建、多余则删除；节点加入/移除或标签变化时自动增删。它不经过默认调度器的"总数"逻辑（新版本由调度器带 `NodeAffinity` 默认注入配合完成），desired 永远等于合格节点数。
-2. **为什么需要 toleration 才能上 master**：控制面节点默认打 `node-role.kubernetes.io/control-plane:NoSchedule` 污点以保护关键组件；Pod 必须显式容忍该污点才可能被调度上去。日志/监控 Agent 要全覆盖，所以要加 tolerations；`operator: Exists` 容忍一切污点，一般只有 CNI/kube-proxy 需要。
-3. **典型使用场景**：日志采集（Fluent Bit/Filebeat）、节点监控（Node Exporter）、网络插件（Calico/Cilium）、kube-proxy、安全 Agent（入侵检测）、GPU 设备插件（Device Plugin）。共同点：都是"节点级守护进程"，与节点一一对应。
-4. **如何滚动更新 DaemonSet**：改 Pod 模板（如镜像）即触发；默认策略 `RollingUpdate`，先逐节点杀旧建新，`maxUnavailable`（默认 1）控制同时不可用的节点数，`maxUnavailable` 可写百分比（按节点数取整）；`OnDelete` 则完全手动。`kubectl rollout status/undo/history` 用法与 Deployment 相同。注意 DaemonSet 没有 maxSurge（每节点只能有一个，无法"先建新再杀旧"）。
-5. **加分手辨析**：节点被 `cordon`/`drain` 或处于不可调度状态时，DaemonSet 不会往上补 Pod；`drain` 会自动驱逐 DaemonSet Pod 并由控制器决定是否重建。
+## 9. 总结
 
-## 总结
-
-DaemonSet = "以节点为刻度的 Deployment"。记住一条主线：**desired 由节点数决定，覆盖面由 tolerations/nodeSelector/nodeAffinity 决定，数据面靠 hostPath 触达节点本身**。配合 `daemonset.sh` 里"节点数 vs Pod 数对比"和"打标签即时增删 Pod"的演示，能直观体会"节点驱动调度"与 Deployment"replicas 驱动调度"的本质差异。
+DaemonSet = "以节点为刻度的 Deployment"：**desired 由节点数决定，覆盖面由 tolerations/nodeAffinity 决定，数据面靠 hostPath 触达节点本身**。配合 `daemonset.sh` 里"节点数 vs Pod 数对比"和"打标签即时增删 Pod"的演示，直观体会"节点驱动"与"replicas 驱动"的本质差异。

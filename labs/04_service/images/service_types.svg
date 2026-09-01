@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="820" height="640" viewBox="0 0 820 640" font-family="-apple-system,'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#57606a"/>
+    </marker>
+    <marker id="arrowBlue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#326ce5"/>
+    </marker>
+    <marker id="arrowGreen" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#2da44e"/>
+    </marker>
+    <marker id="arrowAmber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#d4a72c"/>
+    </marker>
+  </defs>
+
+  <rect width="820" height="640" fill="#ffffff"/>
+  <text x="40" y="42" font-size="21" font-weight="700" fill="#1f2328">Service 四种类型：流量入口层层叠加</text>
+
+  <!-- pods column -->
+  <text x="680" y="116" font-size="11.5" font-weight="700" fill="#1f2328" text-anchor="middle">后端：3 × nginx Pod</text>
+  <g font-size="10" fill="#1f2328" text-anchor="middle">
+    <rect x="620" y="124" width="120" height="32" rx="6" fill="#f0fff4" stroke="#2da44e" stroke-width="1.4"/>
+    <text x="680" y="144">nginx Pod</text>
+    <rect x="620" y="176" width="120" height="32" rx="6" fill="#f0fff4" stroke="#2da44e" stroke-width="1.4"/>
+    <text x="680" y="196">nginx Pod</text>
+    <rect x="620" y="228" width="120" height="32" rx="6" fill="#f0fff4" stroke="#2da44e" stroke-width="1.4"/>
+    <text x="680" y="248">nginx Pod</text>
+  </g>
+  <text x="680" y="282" font-size="9.5" fill="#7d4e00" text-anchor="middle">targetPort :80（容器端口）</text>
+  <text x="680" y="70" font-size="9" fill="#57606a" text-anchor="middle">label: app=nginx</text>
+
+  <!-- layering bracket -->
+  <line x1="56" y1="100" x2="56" y2="372" stroke="#8b949e" stroke-width="1.3"/>
+  <line x1="56" y1="132" x2="70" y2="132" stroke="#8b949e" stroke-width="1.3"/>
+  <line x1="56" y1="236" x2="70" y2="236" stroke="#8b949e" stroke-width="1.3"/>
+  <line x1="56" y1="340" x2="70" y2="340" stroke="#8b949e" stroke-width="1.3"/>
+  <text x="56" y="396" font-size="9.5" fill="#8b949e" text-anchor="middle">层层叠加（外→内）</text>
+
+  <!-- entry boxes -->
+  <rect x="70" y="100" width="300" height="64" rx="10" fill="#fff8e6" stroke="#d4a72c" stroke-width="1.6"/>
+  <text x="86" y="124" font-size="12.5" font-weight="700" fill="#7d4e00">LoadBalancer（最外层）</text>
+  <text x="86" y="146" font-size="9.5" fill="#57606a">云厂商分配外部 IP · kind 里一直 &lt;pending&gt;</text>
+
+  <rect x="70" y="204" width="300" height="64" rx="10" fill="#f0fff4" stroke="#2da44e" stroke-width="1.6"/>
+  <text x="86" y="228" font-size="12.5" font-weight="700" fill="#1a7f37">NodePort（中间层）</text>
+  <text x="86" y="250" font-size="9.5" fill="#57606a">每个节点开静态端口 30000–32767</text>
+
+  <rect x="70" y="308" width="300" height="64" rx="10" fill="#eff5ff" stroke="#326ce5" stroke-width="1.6"/>
+  <text x="86" y="332" font-size="12.5" font-weight="700" fill="#326ce5">ClusterIP（最内层 · 默认）</text>
+  <text x="86" y="354" font-size="9.5" fill="#57606a">虚拟 IP，仅集群内可路由</text>
+
+  <rect x="70" y="430" width="300" height="64" rx="10" fill="#f6f8fa" stroke="#8b949e" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text x="86" y="454" font-size="12.5" font-weight="700" fill="#57606a">Headless（无入口的反例）</text>
+  <text x="86" y="476" font-size="9.5" fill="#57606a">clusterIP: None —— 没有 VIP</text>
+
+  <!-- traffic arrows -->
+  <path d="M 370 132 C 480 132, 500 138, 616 141" fill="none" stroke="#d4a72c" stroke-width="1.6" marker-end="url(#arrowAmber)"/>
+  <text x="495" y="124" font-size="9.5" fill="#7d4e00" text-anchor="middle" stroke="#ffffff" stroke-width="3" paint-order="stroke">转发到 nodePort</text>
+
+  <path d="M 370 236 C 480 236, 500 198, 616 193" fill="none" stroke="#2da44e" stroke-width="1.6" marker-end="url(#arrowGreen)"/>
+  <text x="485" y="216" font-size="9.5" fill="#1a7f37" text-anchor="middle" stroke="#ffffff" stroke-width="3" paint-order="stroke">&lt;节点IP&gt;:30080</text>
+
+  <path d="M 370 340 C 480 340, 500 246, 616 242" fill="none" stroke="#326ce5" stroke-width="1.6" marker-end="url(#arrowBlue)"/>
+  <text x="490" y="300" font-size="9.5" fill="#326ce5" text-anchor="middle" stroke="#ffffff" stroke-width="3" paint-order="stroke">VIP :80</text>
+
+  <path d="M 370 462 C 560 462, 600 300, 618 262" fill="none" stroke="#8b949e" stroke-width="1.4" stroke-dasharray="5 3" marker-end="url(#arrow)"/>
+  <text x="495" y="443" font-size="9.5" fill="#57606a" text-anchor="middle" stroke="#ffffff" stroke-width="3" paint-order="stroke">DNS → 直接返回 Pod IP</text>
+
+  <!-- bottom notes -->
+  <rect x="40" y="512" width="740" height="92" rx="8" fill="#ffffff" stroke="#d0d7de"/>
+  <text x="56" y="536" font-size="10.5" fill="#1f2328">‣ 集群内互访直接用 Service 名（DNS 解析规则见下图）</text>
+  <text x="56" y="558" font-size="10.5" fill="#1f2328">‣ 本地 kind：LoadBalancer 的 EXTERNAL-IP 一直 &lt;pending&gt;，用 NodePort 或 port-forward 访问</text>
+  <text x="56" y="580" font-size="10.5" fill="#1f2328">‣ StatefulSet / gRPC 长连接 / 主从选举 → 选 Headless</text>
+</svg>

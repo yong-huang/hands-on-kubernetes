@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="540" height="690" viewBox="0 0 540 690" font-family="-apple-system,'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif">
+<defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#57606a"/>
+    </marker>
+    <marker id="arrowBlue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#326ce5"/>
+    </marker>
+    <marker id="arrowGreen" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#2da44e"/>
+    </marker>
+  </defs>
+<rect width="540" height="690" fill="#ffffff"/>
+<text x="40" y="42" font-size="21" font-weight="700" fill="#1f2328">setup.sh 六步流程：从依赖检查到可用集群</text>
+<g transform="translate(-690,0)">
+<!-- ==================== 右侧：六步流程 ==================== -->
+
+  <line x1="766" y1="118" x2="766" y2="588" stroke="#d0d7de" stroke-width="2.5"/>
+
+  <g>
+    <circle cx="766" cy="118" r="15" fill="#326ce5"/>
+    <text x="766" y="123" font-size="12" font-weight="700" fill="#ffffff" text-anchor="middle">1</text>
+    <text x="796" y="114" font-size="12.5" font-weight="600" fill="#1f2328">检查依赖</text>
+    <text x="796" y="132" font-size="10" fill="#57606a">docker / kubectl / kind；docker info 探活 daemon</text>
+
+    <circle cx="766" cy="204" r="15" fill="#326ce5"/>
+    <text x="766" y="209" font-size="12" font-weight="700" fill="#ffffff" text-anchor="middle">2</text>
+    <text x="796" y="200" font-size="12.5" font-weight="600" fill="#1f2328">生成集群配置</text>
+    <text x="796" y="218" font-size="10" fill="#57606a">heredoc 写 manifests/kind-config.yaml（1 cp + 2 worker）</text>
+
+    <circle cx="766" cy="290" r="15" fill="#326ce5"/>
+    <text x="766" y="295" font-size="12" font-weight="700" fill="#ffffff" text-anchor="middle">3</text>
+    <text x="796" y="286" font-size="12.5" font-weight="600" fill="#1f2328">创建集群 --wait 120s</text>
+    <text x="796" y="304" font-size="10" fill="#57606a">起 3 容器 → kubeadm init/join → kindnet → 写 kubeconfig</text>
+
+    <circle cx="766" cy="376" r="15" fill="#326ce5"/>
+    <text x="766" y="381" font-size="12" font-weight="700" fill="#ffffff" text-anchor="middle">4</text>
+    <text x="796" y="372" font-size="12.5" font-weight="600" fill="#1f2328">验证</text>
+    <text x="796" y="390" font-size="10" fill="#57606a">kubectl get nodes / cluster-info / wait Ready（轮询代替 sleep）</text>
+
+    <circle cx="766" cy="462" r="15" fill="#d4a72c"/>
+    <text x="766" y="467" font-size="12" font-weight="700" fill="#ffffff" text-anchor="middle">5</text>
+    <text x="796" y="458" font-size="12.5" font-weight="600" fill="#1f2328">预载测试镜像（国内网络）</text>
+    <text x="796" y="476" font-size="10" fill="#57606a">镜像源 pull → docker save | ctr images import 进每个节点</text>
+
+    <circle cx="766" cy="548" r="15" fill="#1a7f37"/>
+    <text x="766" y="553" font-size="12" font-weight="700" fill="#ffffff" text-anchor="middle">6</text>
+    <text x="796" y="544" font-size="12.5" font-weight="600" fill="#1f2328">部署测试负载</text>
+    <text x="796" y="562" font-size="10" fill="#57606a">Deployment nginx + NodePort Service，验证数据面可用</text>
+  </g>
+
+  <!-- footer -->
+  <rect x="740" y="600" width="420" height="66" rx="8" fill="#f6f8fa" stroke="#d0d7de"/>
+  <text x="756" y="620" font-size="10.5" fill="#1f2328">‣ 这套集群（k8s-learn）是后续 30 个实验的运行底座</text>
+  <text x="756" y="638" font-size="10.5" fill="#1f2328">‣ 镜像预载统一走仓库根的 scripts/load_images.sh</text>
+  <text x="756" y="656" font-size="9.5" fill="#57606a">步骤圆点：蓝=标准步骤 · 黄=国内网络适配 · 绿=部署并验证</text>
+</g>
+</svg>
