@@ -1,0 +1,181 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "DaemonSet：DESIRED = 合格节点数",
+    "locale": "zh-CN",
+    "output": "labs/07_daemonset/images/daemonset_scheduling.html",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    {
+      "id": "dsc",
+      "type": "backend",
+      "label": "DaemonSet controller",
+      "sublabel": "为每个合格节点保 1 个 Pod",
+      "pos": [
+        60,
+        210
+      ],
+      "size": [
+        230,
+        84
+      ],
+      "tag": "缺失建 · 多余删"
+    },
+    {
+      "id": "cp",
+      "type": "cloud",
+      "label": "control-plane 节点",
+      "sublabel": "taint NoSchedule · 容忍才上得去",
+      "pos": [
+        400,
+        60
+      ],
+      "size": [
+        240,
+        84
+      ],
+      "tag": "也有 Agent"
+    },
+    {
+      "id": "w1",
+      "type": "backend",
+      "label": "worker-1",
+      "sublabel": "Agent ✓ 恰好一个",
+      "pos": [
+        400,
+        200
+      ],
+      "size": [
+        240,
+        78
+      ]
+    },
+    {
+      "id": "w2",
+      "type": "backend",
+      "label": "worker-2",
+      "sublabel": "Agent ✓ 新节点自动补",
+      "pos": [
+        400,
+        340
+      ],
+      "size": [
+        240,
+        78
+      ]
+    },
+    {
+      "id": "gate1",
+      "type": "security",
+      "label": "闸门 · 污点容忍",
+      "sublabel": "tolerations 精确 key 或 Exists",
+      "pos": [
+        740,
+        60
+      ],
+      "size": [
+        240,
+        78
+      ]
+    },
+    {
+      "id": "gate2",
+      "type": "security",
+      "label": "闸门 · 亲和匹配",
+      "sublabel": "nodeSelector / nodeAffinity",
+      "pos": [
+        740,
+        200
+      ],
+      "size": [
+        240,
+        78
+      ],
+      "tag": "标签即时生效"
+    },
+    {
+      "id": "gate3",
+      "type": "security",
+      "label": "闸门 · 可调度",
+      "sublabel": "cordon/drain 的节点不补 Pod",
+      "pos": [
+        740,
+        340
+      ],
+      "size": [
+        240,
+        78
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "集群节点",
+      "wraps": [
+        "cp",
+        "w1",
+        "w2"
+      ],
+      "pad": 24
+    },
+    {
+      "kind": "security-group",
+      "label": "合格节点的三道闸",
+      "wraps": [
+        "gate1",
+        "gate2",
+        "gate3"
+      ],
+      "pad": 20
+    }
+  ],
+  "connections": [
+    {
+      "from": "dsc",
+      "to": "cp",
+      "variant": "dashed"
+    },
+    {
+      "from": "dsc",
+      "to": "w1",
+      "variant": "emphasis"
+    },
+    {
+      "from": "dsc",
+      "to": "w2",
+      "variant": "emphasis"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "核心语义",
+      "items": [
+        "DESIRED = 当前合格节点数，不是声明出来的数字",
+        "节点扩容自动补 Agent，无需任何操作",
+        "节点打/摘标签即时增删 Pod（nodeAffinity 演示）"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "对比 Deployment",
+      "items": [
+        "每节点恰好一个，不可手动 scale",
+        "滚动更新逐节点替换，没有 maxSurge（每节点只能一个）",
+        "hostPath 常用（读节点文件）；业务 Pod 别用"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "典型场景",
+      "items": [
+        "日志采集 Fluent Bit / Node Exporter 监控",
+        "CNI、kube-proxy、安全 Agent、GPU Device Plugin",
+        "共同点：节点级守护进程，与节点一一对应"
+      ]
+    }
+  ]
+}

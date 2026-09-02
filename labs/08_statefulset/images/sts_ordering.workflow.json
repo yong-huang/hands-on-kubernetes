@@ -1,0 +1,39 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "OrderedReady：正序建、逆序删、更新从最大序号开始",
+    "locale": "zh-CN",
+    "output": "labs/08_statefulset/images/sts_ordering.html",
+    "quality_profile": "showcase"
+  },
+  "lanes": [
+    { "id": "main", "label": "正序创建（OrderedReady）" },
+    { "id": "ops", "label": "缩容 / 更新", "variant": "exception" }
+  ],
+  "phases": [
+    { "id": "p1", "label": "链式创建", "fromCol": 0, "toCol": 2, "variant": "emphasis" },
+    { "id": "p2", "label": "稳态", "fromCol": 3, "toCol": 3 }
+  ],
+  "mainPath": ["c0", "c1", "c2", "steady"],
+  "nodes": [
+    { "id": "c0", "lane": "main", "col": 0, "type": "backend", "label": "① 创建 web-0", "sublabel": "主库 · init 跳过克隆", "tag": "Ready 后", "width": 140 },
+    { "id": "c1", "lane": "main", "col": 1, "type": "backend", "label": "② 创建 web-1", "sublabel": "init 从 web-0 克隆数据", "width": 145 },
+    { "id": "c2", "lane": "main", "col": 2, "type": "backend", "label": "③ 创建 web-2", "sublabel": "init 从 web-1 克隆数据", "width": 145 },
+    { "id": "steady", "lane": "main", "col": 3, "type": "frontend", "label": "3/3 Running", "sublabel": "主从就位 · 集群可用", "width": 130 },
+    { "id": "scale", "lane": "ops", "col": 2, "type": "security", "label": "缩容 2→1→0", "sublabel": "先删从库 · PVC 保留", "tag": "扩容回来复用数据", "width": 155 },
+    { "id": "upd", "lane": "ops", "col": 3, "type": "security", "label": "更新从 web-2 开始", "sublabel": "partition 金丝雀：只发序号 ≥ N", "tag": "主库最后动", "width": 175 }
+  ],
+  "edges": [
+    { "from": "c0", "to": "c1", "label": "Ready 后" },
+    { "from": "c1", "to": "c2", "label": "Ready 后" },
+    { "from": "c2", "to": "steady" },
+    { "from": "steady", "to": "scale", "label": "kubectl scale", "variant": "security", "role": "error" },
+    { "from": "steady", "to": "upd", "label": "改 template", "variant": "security" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "OrderedReady", "items": ["前一个 Ready 才建下一个——从库启动时主库已就绪", "initContainer 天然串行，与 OrderedReady 组成链式依赖", "Parallel 策略并行建删，但更新仍逆序"] },
+    { "dot": "rose", "title": "逆序删除", "items": ["先删最大序号：永远先动从库，后动主库", "被删 Pod 的 PVC 保留（数据不丢）", "再扩容回来：新 Pod 复用旧 PVC 里的数据"] },
+    { "dot": "emerald", "title": "滚动更新与金丝雀", "items": ["更新从最大序号开始，主库（web-0）最后动", "partition=2 只更新 web-2，验证后降为 0 全量", "对比 Deployment maxSurge：粒度粗但身份可控"] }
+  ]
+}

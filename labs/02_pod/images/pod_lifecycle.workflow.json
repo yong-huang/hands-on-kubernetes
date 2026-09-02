@@ -1,0 +1,134 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "Pod 生命周期与三类探针（kubelet 视角）",
+    "locale": "zh-CN",
+    "output": "labs/02_pod/images/pod_lifecycle.html",
+    "quality_profile": "showcase"
+  },
+  "lanes": [
+    {
+      "id": "main",
+      "label": "生命周期主线"
+    },
+    {
+      "id": "crash",
+      "label": "故障与自愈",
+      "variant": "exception"
+    }
+  ],
+  "phases": [
+    {
+      "id": "p1",
+      "label": "创建",
+      "fromCol": 0,
+      "toCol": 1,
+      "variant": "emphasis"
+    },
+    {
+      "id": "p2",
+      "label": "运行：探针周期执行",
+      "fromCol": 2,
+      "toCol": 2
+    }
+  ],
+  "mainPath": [
+    "pending",
+    "creating",
+    "running"
+  ],
+  "nodes": [
+    {
+      "id": "pending",
+      "lane": "main",
+      "col": 0,
+      "type": "frontend",
+      "label": "Pending",
+      "sublabel": "已提交 · 等调度器选节点",
+      "width": 130
+    },
+    {
+      "id": "creating",
+      "lane": "main",
+      "col": 1,
+      "type": "backend",
+      "label": "ContainerCreating",
+      "sublabel": "拉镜像 · 建容器 · 接网络",
+      "width": 155
+    },
+    {
+      "id": "running",
+      "lane": "main",
+      "col": 2,
+      "type": "frontend",
+      "label": "Running",
+      "sublabel": "kubelet 周期执行三类探针",
+      "tag": "探针: httpGet/tcpSocket/exec",
+      "width": 150
+    },
+    {
+      "id": "crash",
+      "lane": "crash",
+      "col": 2,
+      "type": "security",
+      "label": "CrashLoopBackOff",
+      "sublabel": "退避 10s→20s→40s 封顶 5min",
+      "tag": "liveness 连续失败",
+      "width": 155
+    }
+  ],
+  "edges": [
+    {
+      "from": "pending",
+      "to": "creating"
+    },
+    {
+      "from": "creating",
+      "to": "running"
+    },
+    {
+      "from": "running",
+      "to": "crash",
+      "label": "连续失败",
+      "variant": "security",
+      "role": "error"
+    },
+    {
+      "from": "crash",
+      "to": "running",
+      "label": "退避后重启",
+      "variant": "dashed",
+      "role": "return"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "三类探针各治一症",
+      "items": [
+        "liveness 治\"卡死\"：失败 → 重启容器",
+        "readiness 治\"没长大\"：失败 → Service 摘除流量，不重启",
+        "startup 治\"慢热\"：成功前屏蔽上两个，30×2s=容忍 60s 启动"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "CrashLoopBackOff 排查",
+      "items": [
+        "logs --previous 看上一次崩溃日志（最关键）",
+        "describe 看 Last State：OOMKilled → 调大 memory",
+        "检查 command/args 与探针配置是否过严"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "labels 与排查",
+      "items": [
+        "-l app=nginx 按标签筛选，--show-labels 查看",
+        "label --overwrite 运行时改标签",
+        "jsonpath 提取 restartCount / containerStatuses"
+      ]
+    }
+  ]
+}

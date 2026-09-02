@@ -15,6 +15,7 @@ Service 为解决这三个问题而生：提供**稳定的虚拟 IP（ClusterIP�
 ## 2. 总览：四种类型与流量路径
 
 ![service types](images/service_types.svg)
+> 🌐 **交互版**：[在线打开（GitHub Pages）](https://yong-huang.github.io/hands-on-kubernetes/labs/04_service/images/service_types.html)（或本地打开 [`images/service_types.html`](images/service_types.html)）。
 
 四种类型不是并列关系，而是**层层叠加**：LoadBalancer 在每个节点上开 NodePort，NodePort 在集群内 VIP（ClusterIP）之外加了一层节点端口；Headless 则是反例——`clusterIP: None`，连 VIP 都不要，DNS 直接返回 Pod IP 列表。
 
@@ -44,6 +45,7 @@ nginx-headless       ClusterIP      None         80/TCP         ← 没有 VIP�
 ### 4.1 selector → Endpoints：Service 怎么记住 Pod
 
 ![service mechanism](images/service_mechanism.svg)
+> 🌐 **交互版**：[在线打开（GitHub Pages）](https://yong-huang.github.io/hands-on-kubernetes/labs/04_service/images/service_mechanism.html)（或本地打开 [`images/service_mechanism.html`](images/service_mechanism.html)）。
 
 Service 本身不直接"记住"Pod，链路是：
 
@@ -59,6 +61,7 @@ Service 本身不直接"记住"Pod，链路是：
 ### 4.2 ClusterDNS：Service 名怎么变成 IP
 
 ![service dns](images/service_dns.svg)
+> 🌐 **交互版**：[在线打开（GitHub Pages）](https://yong-huang.github.io/hands-on-kubernetes/labs/04_service/images/service_dns.html)（或本地打开 [`images/service_dns.html`](images/service_dns.html)）。
 
 创建 Service 时，CoreDNS 自动注册一条记录，集群内任何 Pod 都可以直接用短名访问：
 
@@ -90,9 +93,15 @@ ports:
 ├── manifests/
 │   └── service.yaml        # Deployment + 4 种 Service（ClusterIP/NodePort/LB/Headless）
 └── images/
-    ├── service_types.svg      # 四种类型与流量路径（本文档 §2）
-    ├── service_mechanism.svg  # selector → Endpoints → kube-proxy（本文档 §4.1）
-    └── service_dns.svg        # ClusterDNS 解析规则（本文档 §4.2）
+    ├── service_types.workflow.json          # 图源（Archify Typed JSON IR）
+    ├── service_types.html        # 交互版（浏览器打开）
+    └── service_types.svg          # 双主题矢量版      
+    ├── service_mechanism.workflow.json          # 图源（Archify Typed JSON IR）
+    ├── service_mechanism.html        # 交互版（浏览器打开）
+    └── service_mechanism.svg          # 双主题矢量版  
+    ├── service_dns.workflow.json          # 图源（Archify Typed JSON IR）
+    ├── service_dns.html        # 交互版（浏览器打开）
+    └── service_dns.svg          # 双主题矢量版        
 ```
 
 ## 7. 面试要点

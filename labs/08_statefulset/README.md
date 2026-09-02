@@ -26,6 +26,7 @@ StatefulSet 的三大保证正对着这三点：**稳定的网络标识 + 每副
 ## 3. 总览：序号即身份
 
 ![sts identity](images/sts_identity.svg)
+> 🌐 **交互版**：[在线打开（GitHub Pages）](https://yong-huang.github.io/hands-on-kubernetes/labs/08_statefulset/images/sts_identity.html)（或本地打开 [`images/sts_identity.html`](images/sts_identity.html)）。
 
 抓住"**序号即身份**"这条主线：Pod 名 `web-N` 固定，带来三样东西固定——
 
@@ -64,6 +65,7 @@ PVC 名 = <模板名>-<Pod名>   =>   data-web-0 / data-web-1 / data-web-2
 ## 6. 有序性：正序建、逆序删、逆序更新
 
 ![sts ordering](images/sts_ordering.svg)
+> 🌐 **交互版**：[在线打开（GitHub Pages）](https://yong-huang.github.io/hands-on-kubernetes/labs/08_statefulset/images/sts_ordering.html)（或本地打开 [`images/sts_ordering.html`](images/sts_ordering.html)）。
 
 默认 `podManagementPolicy: OrderedReady` 下：
 
@@ -96,8 +98,12 @@ PVC 名 = <模板名>-<Pod名>   =>   data-web-0 / data-web-1 / data-web-2
 ├── manifests/
 │   └── statefulset.yaml   # Headless Service + StatefulSet（volumeClaimTemplates / initContainer）
 └── images/
-    ├── sts_identity.svg   # 序号即身份，对比 Deployment（本文档 §3）
-    └── sts_ordering.svg   # 有序创建/删除/更新时序（本文档 §6）
+    ├── sts_identity.workflow.json          # 图源（Archify Typed JSON IR）
+    ├── sts_identity.html        # 交互版（浏览器打开）
+    └── sts_identity.svg          # 双主题矢量版   
+    ├── sts_ordering.workflow.json          # 图源（Archify Typed JSON IR）
+    ├── sts_ordering.html        # 交互版（浏览器打开）
+    └── sts_ordering.svg          # 双主题矢量版   
 ```
 
 ## 9. 面试要点

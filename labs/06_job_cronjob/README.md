@@ -23,6 +23,7 @@
 ## 3. Job：completions × parallelism 的矩阵
 
 ![job completions](images/job_completions.svg)
+> 🌐 **交互版**：[在线打开（GitHub Pages）](https://yong-huang.github.io/hands-on-kubernetes/labs/06_job_cronjob/images/job_completions.html)（或本地打开 [`images/job_completions.html`](images/job_completions.html)）。
 
 Job 的核心语义是"**保证 N 个 Pod 成功结束**"，由三个字段共同决定：
 
@@ -52,6 +53,7 @@ Job 的 Pod 模板里 `restartPolicy` 只允许 `Never` 或 `OnFailure`（Deploy
 ## 4. CronJob：schedule 与 concurrencyPolicy
 
 ![cronjob policy](images/cronjob_policy.svg)
+> 🌐 **交互版**：[在线打开（GitHub Pages）](https://yong-huang.github.io/hands-on-kubernetes/labs/06_job_cronjob/images/cronjob_policy.html)（或本地打开 [`images/cronjob_policy.html`](images/cronjob_policy.html)）。
 
 CronJob 每个调度周期（tick）按 `jobTemplate` 创建一个 Job。schedule 是标准五段 cron（分 时 日 月 周），注意**时区取决于控制器所在时区，通常 UTC**。
 
@@ -106,8 +108,12 @@ spec:
 ├── manifests/
 │   └── job_cronjob.yaml       # 三个示例：一次性 Job / 并行 Job / CronJob 定时备份
 └── images/
-    ├── job_completions.svg    # Job 语义与执行时间线（本文档 §3）
-    └── cronjob_policy.svg     # CronJob 并发策略（本文档 §4）
+    ├── job_completions.workflow.json          # 图源（Archify Typed JSON IR）
+    ├── job_completions.html        # 交互版（浏览器打开）
+    └── job_completions.svg          # 双主题矢量版    
+    ├── cronjob_policy.workflow.json          # 图源（Archify Typed JSON IR）
+    ├── cronjob_policy.html        # 交互版（浏览器打开）
+    └── cronjob_policy.svg          # 双主题矢量版     
 ```
 
 ## 7. 面试要点

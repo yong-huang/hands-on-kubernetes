@@ -1,0 +1,152 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "CronJob：定时建 Job，并发策略三分支",
+    "locale": "zh-CN",
+    "output": "labs/06_job_cronjob/images/cronjob_policy.html",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    {
+      "id": "cron",
+      "type": "backend",
+      "label": "CronJob · db-backup",
+      "sublabel": "schedule: 0 * * * *（每小时 · UTC）",
+      "pos": [
+        60,
+        220
+      ],
+      "size": [
+        240,
+        90
+      ],
+      "tag": "每次 tick 建一个 Job"
+    },
+    {
+      "id": "allow",
+      "type": "backend",
+      "label": "Allow（默认）",
+      "sublabel": "上一轮没跑完，新 Job 照建",
+      "pos": [
+        400,
+        50
+      ],
+      "size": [
+        250,
+        84
+      ],
+      "tag": "并发执行"
+    },
+    {
+      "id": "forbid",
+      "type": "security",
+      "label": "Forbid",
+      "sublabel": "跳过本次调度",
+      "pos": [
+        400,
+        350
+      ],
+      "size": [
+        250,
+        84
+      ],
+      "tag": "备份类绝不允许重叠"
+    },
+    {
+      "id": "replace",
+      "type": "security",
+      "label": "Replace",
+      "sublabel": "杀掉旧 Job，新 Job 顶上",
+      "pos": [
+        400,
+        200
+      ],
+      "size": [
+        250,
+        84
+      ],
+      "tag": "只认最新一次"
+    },
+    {
+      "id": "deadline",
+      "type": "external",
+      "label": "startingDeadlineSeconds",
+      "sublabel": "错过的 tick 期限内补跑，超期跳过",
+      "pos": [
+        720,
+        200
+      ],
+      "size": [
+        240,
+        90
+      ],
+      "tag": "控制器宕机恢复场景"
+    }
+  ],
+  "connections": [
+    {
+      "from": "cron",
+      "to": "allow"
+    },
+    {
+      "from": "cron",
+      "to": "forbid"
+    },
+    {
+      "from": "cron",
+      "to": "replace"
+    },
+    {
+      "from": "cron",
+      "to": "deadline",
+      "label": "错过 tick",
+      "variant": "dashed",
+      "fromSide": "top",
+      "toSide": "top",
+      "via": [
+        [
+          180,
+          180
+        ],
+        [
+          840,
+          180
+        ]
+      ],
+      "labelAt": [
+        450,
+        173
+      ]
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "时间语义",
+      "items": [
+        "tick 精度分钟级；时区是控制器所在时区（通常 UTC）",
+        "suspend: true 暂停所有后续调度，配置与历史保留",
+        "手动触发一次：kubectl create job --from=cronjob/X"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "至少一次触发",
+      "items": [
+        "控制器恢复后可能连补多个错过的 tick",
+        "任务必须写成幂等的",
+        "配 concurrencyPolicy 决定重叠时的行为"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "历史管理",
+      "items": [
+        "successfulJobsHistoryLimit 保留成功 Job 供查日志",
+        "failedJobsHistoryLimit 保留失败 Job 便于排查",
+        "超出的历史 Job 自动删除，防 etcd 膨胀"
+      ]
+    }
+  ]
+}

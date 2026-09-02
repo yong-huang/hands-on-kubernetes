@@ -1,0 +1,148 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "日志采集：hostPath 触达节点本身",
+    "locale": "zh-CN",
+    "output": "labs/07_daemonset/images/daemonset_hostpath.html",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    {
+      "id": "app",
+      "type": "backend",
+      "label": "业务 Pod",
+      "sublabel": "只往 stdout 打印",
+      "pos": [
+        60,
+        80
+      ],
+      "size": [
+        190,
+        74
+      ]
+    },
+    {
+      "id": "logf",
+      "type": "database",
+      "label": "/var/log/pods/*.log",
+      "sublabel": "kubelet 按 CRI 布局落盘",
+      "pos": [
+        45,
+        210
+      ],
+      "size": [
+        220,
+        78
+      ]
+    },
+    {
+      "id": "agent",
+      "type": "backend",
+      "label": "DaemonSet Agent",
+      "sublabel": "tail -F + hostPath 只读挂载",
+      "pos": [
+        380,
+        140
+      ],
+      "size": [
+        230,
+        88
+      ],
+      "tag": "每节点一个"
+    },
+    {
+      "id": "es",
+      "type": "database",
+      "label": "Elasticsearch / Loki",
+      "sublabel": "集中检索与聚合",
+      "pos": [
+        700,
+        140
+      ],
+      "size": [
+        220,
+        80
+      ]
+    },
+    {
+      "id": "api",
+      "type": "cloud",
+      "label": "API Server",
+      "sublabel": "kubernetes filter 反查元数据",
+      "pos": [
+        380,
+        320
+      ],
+      "size": [
+        230,
+        78
+      ],
+      "tag": "RBAC 只读 pods/ns"
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "节点（hostPath 的边界就在这里）",
+      "wraps": [
+        "app",
+        "logf",
+        "agent"
+      ],
+      "pad": 26
+    }
+  ],
+  "connections": [
+    {
+      "from": "logf",
+      "to": "agent",
+      "label": "hostPath 只读挂载",
+      "variant": "emphasis"
+    },
+    {
+      "from": "agent",
+      "to": "es",
+      "label": "转发"
+    },
+    {
+      "from": "agent",
+      "to": "api",
+      "label": "反查 Pod 元数据",
+      "variant": "dashed",
+      "labelAt": [
+        500,
+        274
+      ]
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "为什么 tail 文件",
+      "items": [
+        "应用只往 stdout 打印，不感知采集器",
+        "容器崩溃日志仍在磁盘；换运行时管道不变",
+        "老版 Docker 节点日志在 /var/lib/docker/containers/"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "hostPath 是逃生舱",
+      "items": [
+        "只有节点级 Agent 该用；业务 Pod 用它不安全不可移植",
+        "type: DirectoryOrCreate 避免目录不存在挂载失败",
+        "Agent 必须设 resources——节点数一多就是全集群放大"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "全覆盖",
+      "items": [
+        "tolerations Exists：控制面节点日志也要采",
+        "cordon/drain 节点不补 Pod（覆盖出现缺口）",
+        "采集器崩溃不影响应用——应用只管写 stdout"
+      ]
+    }
+  ]
+}

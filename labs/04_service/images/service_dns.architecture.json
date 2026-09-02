@@ -1,0 +1,135 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "ClusterDNS：Service 名如何变成 IP",
+    "locale": "zh-CN",
+    "output": "labs/04_service/images/service_dns.html",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    {
+      "id": "pod",
+      "type": "backend",
+      "label": "集群内任意 Pod",
+      "sublabel": "curl nginx-clusterip",
+      "pos": [
+        60,
+        80
+      ],
+      "size": [
+        200,
+        74
+      ]
+    },
+    {
+      "id": "dns",
+      "type": "backend",
+      "label": "CoreDNS",
+      "sublabel": "创建 Service 即自动注册",
+      "pos": [
+        330,
+        80
+      ],
+      "size": [
+        200,
+        74
+      ],
+      "tag": ":53"
+    },
+    {
+      "id": "vip",
+      "type": "database",
+      "label": "ClusterIP Service",
+      "sublabel": "返回 VIP（一条 A 记录）",
+      "pos": [
+        600,
+        60
+      ],
+      "size": [
+        240,
+        70
+      ]
+    },
+    {
+      "id": "hless",
+      "type": "database",
+      "label": "Headless Service",
+      "sublabel": "返回所有 Ready Pod IP",
+      "pos": [
+        600,
+        180
+      ],
+      "size": [
+        240,
+        70
+      ],
+      "tag": "多条 A 记录"
+    },
+    {
+      "id": "fqdn",
+      "type": "backend",
+      "label": "FQDN 构成",
+      "sublabel": "svc.ns.svc.cluster.local",
+      "pos": [
+        600,
+        300
+      ],
+      "size": [
+        240,
+        70
+      ],
+      "tag": "短名先拼搜索域"
+    }
+  ],
+  "connections": [
+    {
+      "from": "pod",
+      "to": "dns",
+      "label": "查询"
+    },
+    {
+      "from": "dns",
+      "to": "vip"
+    },
+    {
+      "from": "dns",
+      "to": "hless"
+    },
+    {
+      "from": "pod",
+      "to": "fqdn",
+      "label": "按 search 域补全",
+      "variant": "dashed"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "FQDN 构成",
+      "items": [
+        "<svc>.<ns>.svc.cluster.local 四段",
+        "同 ns 可直接用短名；跨 ns 至少写 svc.ns",
+        "ndots:5：点数少于 5 先拼搜索域（外部域名变慢的根源）"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "普通 vs Headless",
+      "items": [
+        "普通：一条 A 记录指向 VIP，kube-proxy DNAT 到具体 Pod",
+        "Headless：无 VIP，DNS 直接返回全部 Ready Pod IP",
+        "客户端自己负载均衡 / 按名直连实例时用 Headless"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Pod 级记录",
+      "items": [
+        "StatefulSet：web-0.web-h.default.svc.cluster.local 自动生成",
+        "普通 Pod 要 hostname + subdomain 两个条件（subdomain 须是真实 Headless）",
+        "kube-dns 是 Service 名，实现早已换成 CoreDNS"
+      ]
+    }
+  ]
+}

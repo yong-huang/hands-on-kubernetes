@@ -1,0 +1,145 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "StatefulSet：序号即身份，对比 Deployment",
+    "locale": "zh-CN",
+    "output": "labs/08_statefulset/images/sts_identity.html",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    {
+      "id": "hless",
+      "type": "database",
+      "label": "Headless Service mysql-h",
+      "sublabel": "clusterIP: None · 无 VIP",
+      "pos": [
+        60,
+        60
+      ],
+      "size": [
+        230,
+        74
+      ]
+    },
+    {
+      "id": "sts",
+      "type": "backend",
+      "label": "StatefulSet web",
+      "sublabel": "replicas 3 · OrderedReady",
+      "pos": [
+        60,
+        200
+      ],
+      "size": [
+        230,
+        84
+      ],
+      "tag": "volumeClaimTemplates: data"
+    },
+    {
+      "id": "web0",
+      "type": "backend",
+      "label": "web-0（主库）",
+      "sublabel": "域名固定 · data-web-0 专属",
+      "pos": [
+        400,
+        60
+      ],
+      "size": [
+        230,
+        84
+      ],
+      "tag": "① 正序创建 · 主库"
+    },
+    {
+      "id": "web1",
+      "type": "backend",
+      "label": "web-1（从库）",
+      "sublabel": "initContainer 从 web-0 克隆",
+      "pos": [
+        400,
+        200
+      ],
+      "size": [
+        230,
+        84
+      ],
+      "tag": "② Ready 后建"
+    },
+    {
+      "id": "web2",
+      "type": "backend",
+      "label": "web-2（从库）",
+      "sublabel": "initContainer 从 web-1 克隆",
+      "pos": [
+        400,
+        340
+      ],
+      "size": [
+        230,
+        84
+      ],
+      "tag": "③ 最后建"
+    },
+    {
+      "id": "deploy",
+      "type": "external",
+      "label": "Deployment（对照）",
+      "sublabel": "随机名 · 无独立 DNS · 副本可互换",
+      "pos": [
+        720,
+        200
+      ],
+      "size": [
+        240,
+        84
+      ],
+      "tag": "管数量不管身份"
+    }
+  ],
+  "connections": [
+    {
+      "from": "sts",
+      "to": "web0",
+      "variant": "emphasis"
+    },
+    {
+      "from": "sts",
+      "to": "web1"
+    },
+    {
+      "from": "sts",
+      "to": "web2"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "三大保证",
+      "items": [
+        "稳定网络标识：web-N 名与 Pod DNS 跨重建不变",
+        "稳定持久化：VCT 每副本专属 PVC，重建绑回原 PV",
+        "有序编排：正序建、逆序删、更新从最大序号开始"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "为什么必须 Headless",
+      "items": [
+        "普通 Service VIP 随机转发，无法指定连哪个实例",
+        "有状态应用必须按名寻址：客户端连 web-0、从库连主库",
+        "DNS 直接解析每个 Pod 的 A 记录才有\"按 Pod 名寻址\""
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "PVC 生命周期",
+      "items": [
+        "PVC 名 = 模板名-Pod 名：data-web-0/1/2",
+        "删 Pod / 缩容 / 删 StatefulSet 都不删 PVC",
+        "代价是手工清理——宁可麻烦也不丢数据"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,165 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "滚动更新时间线：maxSurge=1 / maxUnavailable=0",
+    "locale": "zh-CN",
+    "output": "labs/03_deploy/images/deploy_rolling.html",
+    "quality_profile": "showcase"
+  },
+  "lanes": [
+    {
+      "id": "main",
+      "label": "nginx 1.25 → 1.26（replicas=3）"
+    },
+    {
+      "id": "safe",
+      "label": "安全阀",
+      "variant": "exception"
+    }
+  ],
+  "phases": [
+    {
+      "id": "p0",
+      "label": "稳态",
+      "fromCol": 0,
+      "toCol": 0
+    },
+    {
+      "id": "p1",
+      "label": "滚动：先扩新再缩旧",
+      "fromCol": 1,
+      "toCol": 3,
+      "variant": "emphasis"
+    },
+    {
+      "id": "p2",
+      "label": "收敛",
+      "fromCol": 4,
+      "toCol": 4,
+      "variant": "dashed"
+    }
+  ],
+  "mainPath": [
+    "t0",
+    "t1",
+    "t2",
+    "t3",
+    "t4"
+  ],
+  "nodes": [
+    {
+      "id": "t0",
+      "lane": "main",
+      "col": 0,
+      "type": "frontend",
+      "label": "稳态 v1 × 3",
+      "sublabel": "全部 Ready",
+      "width": 110
+    },
+    {
+      "id": "t1",
+      "lane": "main",
+      "col": 1,
+      "type": "backend",
+      "label": " surge 1 个 v2",
+      "sublabel": "总数 4 · 容量不降",
+      "tag": "maxSurge=1",
+      "width": 130
+    },
+    {
+      "id": "t2",
+      "lane": "main",
+      "col": 2,
+      "type": "backend",
+      "label": "杀 1 个 v1",
+      "sublabel": "v2 Ready 后才杀 · 3/4",
+      "tag": "maxUnavailable=0",
+      "width": 135
+    },
+    {
+      "id": "t3",
+      "lane": "main",
+      "col": 3,
+      "type": "backend",
+      "label": "循环替换",
+      "sublabel": "如 v2/v1/v1 → v2/v2/v1",
+      "width": 130
+    },
+    {
+      "id": "t4",
+      "lane": "main",
+      "col": 4,
+      "type": "frontend",
+      "label": "完成 v2 × 3",
+      "sublabel": "新 RS=3 · 旧 RS=0 保留",
+      "width": 125
+    },
+    {
+      "id": "notready",
+      "lane": "safe",
+      "col": 2,
+      "type": "security",
+      "label": "v2 未 Ready",
+      "sublabel": "就不杀 v1 —— 自动等待",
+      "tag": "readiness 安全阀",
+      "width": 150
+    }
+  ],
+  "edges": [
+    {
+      "from": "t0",
+      "to": "t1",
+      "label": "改镜像"
+    },
+    {
+      "from": "t1",
+      "to": "t2",
+      "label": "v2 Ready"
+    },
+    {
+      "from": "t2",
+      "to": "t3"
+    },
+    {
+      "from": "t3",
+      "to": "t4"
+    },
+    {
+      "from": "t2",
+      "to": "notready",
+      "label": "未就绪",
+      "variant": "security",
+      "role": "error"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "数量约束区间",
+      "items": [
+        "任意时刻 Pod 总数 ∈ [replicas-maxUnavailable, replicas+maxSurge]",
+        "maxSurge 大 → 快但多占资源；maxUnavailable 大 → 快但容量降",
+        "两者不可同时为 0"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Recreate 对比",
+      "items": [
+        "Recreate：先杀全部旧 Pod 再建新 Pod，有中断窗口",
+        "适合不允许多版本共存的场景（争抢同一数据卷）",
+        "清单里 nginx-recreate 就是对照示例"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "操作命令",
+      "items": [
+        "rollout status 盯进度 / history 看修订版",
+        "undo（--to-revision=N）回滚，秒级完成",
+        "pause / resume：累积多处改动一次性发布"
+      ]
+    }
+  ]
+}

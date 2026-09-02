@@ -22,6 +22,7 @@
 ## 2. 架构总览
 
 ![kind arch](images/kind_arch.svg)
+> 🌐 **交互版**：[在线打开（GitHub Pages）](https://yong-huang.github.io/hands-on-kubernetes/labs/01_setup_env/images/kind_arch.html)（或本地打开 [`images/kind_arch.html`](images/kind_arch.html)）。
 
 kubectl 通过 `~/.kube/config` 里的 context（`kind-k8s-learn`）连向宿主机 Docker daemon（OrbStack 或 Docker Desktop 均可）；daemon 里跑着 3 个容器——1 个 control-plane（apiserver / etcd / scheduler / controller-manager，外加 CoreDNS Pod）和 2 个 worker（kubelet + containerd + kindnet，里面跑 nginx 测试 Pod）。实线是调度下发，虚线是 kubelet 上报状态。
 
@@ -44,6 +45,7 @@ kubectl get pods,svc -l app=nginx   # 测试负载已就绪
 ## 4. 六步拆解
 
 ![setup flow](images/setup_flow.svg)
+> 🌐 **交互版**：[在线打开（GitHub Pages）](https://yong-huang.github.io/hands-on-kubernetes/labs/01_setup_env/images/setup_flow.html)（或本地打开 [`images/setup_flow.html`](images/setup_flow.html)）。
 
 六个步骤：检查依赖 → 生成配置 → 创建集群 → 验证 → 预载镜像（国内网络适配，黄色）→ 部署测试负载（绿色）。逐步看关键代码：
 
@@ -133,8 +135,12 @@ kind delete cluster --name k8s-learn   # 等价 ./setup.sh down
 ├── manifests/
 │   └── kind-config.yaml      # 集群拓扑: 1 control-plane + 2 worker（脚本每次会重新生成）
 └── images/
-    ├── kind_arch.svg         # kind 架构图（本文档 §2）
-    └── setup_flow.svg        # setup.sh 六步流程图（本文档 §4）
+    ├── kind_arch.architecture.json          # 图源（Archify Typed JSON IR）
+    ├── kind_arch.html        # 交互版（浏览器打开）
+    └── kind_arch.svg          # 双主题矢量版         
+    ├── setup_flow.workflow.json          # 图源（Archify Typed JSON IR）
+    ├── setup_flow.html        # 交互版（浏览器打开）
+    └── setup_flow.svg          # 双主题矢量版        
 ```
 
 ## 6. 常见问题

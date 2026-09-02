@@ -1,0 +1,148 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Service 四种类型：入口层层叠加",
+    "locale": "zh-CN",
+    "output": "labs/04_service/images/service_types.html",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    {
+      "id": "lb",
+      "type": "external",
+      "label": "LoadBalancer",
+      "sublabel": "云外部 IP · kind 里 <pending>",
+      "pos": [
+        60,
+        60
+      ],
+      "size": [
+        230,
+        74
+      ]
+    },
+    {
+      "id": "nodeport",
+      "type": "backend",
+      "label": "NodePort",
+      "sublabel": "每节点 :30000-32767",
+      "pos": [
+        60,
+        180
+      ],
+      "size": [
+        230,
+        74
+      ]
+    },
+    {
+      "id": "clusterip",
+      "type": "backend",
+      "label": "ClusterIP（默认）",
+      "sublabel": "VIP · 仅集群内可路由",
+      "pos": [
+        60,
+        300
+      ],
+      "size": [
+        230,
+        74
+      ]
+    },
+    {
+      "id": "headless",
+      "type": "external",
+      "label": "Headless",
+      "sublabel": "clusterIP: None · 无 VIP",
+      "pos": [
+        60,
+        420
+      ],
+      "size": [
+        230,
+        74
+      ]
+    },
+    {
+      "id": "pods",
+      "type": "backend",
+      "label": "3 × nginx Pod",
+      "sublabel": "targetPort :80 · label app=nginx",
+      "pos": [
+        700,
+        200
+      ],
+      "size": [
+        220,
+        96
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "from": "lb",
+      "to": "pods",
+      "variant": "emphasis",
+      "labelAt": [
+        320,
+        90
+      ]
+    },
+    {
+      "from": "nodeport",
+      "to": "pods",
+      "labelAt": [
+        320,
+        210
+      ]
+    },
+    {
+      "from": "clusterip",
+      "to": "pods",
+      "labelAt": [
+        320,
+        330
+      ]
+    },
+    {
+      "from": "headless",
+      "to": "pods",
+      "label": "DNS 直接返回 Pod IP",
+      "variant": "dashed",
+      "labelAt": [
+        430,
+        440
+      ]
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "层层叠加（外 → 内）",
+      "items": [
+        "LoadBalancer 在每节点开 NodePort，NodePort 在 VIP 之外加节点端口",
+        "ClusterIP 是最内层：虚拟 IP，仅集群内可路由",
+        "Headless 是反例：无 VIP，DNS 直接返回 Pod IP 列表"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "怎么选",
+      "items": [
+        "集群内互访：直接用 Service 名（DNS）",
+        "本地 kind：LB 一直 <pending>，用 NodePort 或 port-forward",
+        "StatefulSet / gRPC 长连接 / 主从选举 → Headless"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "三个端口",
+      "items": [
+        "port：Service 的门牌号（对外）",
+        "targetPort：容器房间号（转发终点）",
+        "nodePort：大楼侧门（仅 NodePort/LB 有意义，30000-32767）"
+      ]
+    }
+  ]
+}

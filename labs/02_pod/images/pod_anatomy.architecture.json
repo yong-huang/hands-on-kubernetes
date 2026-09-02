@@ -1,0 +1,193 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Pod 解剖：pause 底座 + 主容器 + sidecar + 共享卷",
+    "locale": "zh-CN",
+    "output": "labs/02_pod/images/pod_anatomy.html",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    {
+      "id": "pause",
+      "type": "external",
+      "label": "pause 容器",
+      "sublabel": "持有网络 / IPC 命名空间",
+      "pos": [
+        70,
+        70
+      ],
+      "size": [
+        200,
+        66
+      ],
+      "tag": "最先启动"
+    },
+    {
+      "id": "nginx",
+      "type": "backend",
+      "label": "nginx（主容器）",
+      "sublabel": "写日志 → /var/log/nginx",
+      "pos": [
+        65,
+        190
+      ],
+      "size": [
+        210,
+        84
+      ]
+    },
+    {
+      "id": "sidecar",
+      "type": "backend",
+      "label": "log-tailer（sidecar）",
+      "sublabel": "tail -f 共享卷上的日志",
+      "pos": [
+        330,
+        190
+      ],
+      "size": [
+        210,
+        84
+      ]
+    },
+    {
+      "id": "vol",
+      "type": "database",
+      "label": "emptyDir · shared-logs",
+      "sublabel": "两容器同挂 /var/log/nginx，Pod 删即消失",
+      "pos": [
+        70,
+        330
+      ],
+      "size": [
+        470,
+        60
+      ]
+    },
+    {
+      "id": "init1",
+      "type": "backend",
+      "label": "init ① 等依赖",
+      "sublabel": "nslookup 轮询 Service",
+      "pos": [
+        640,
+        70
+      ],
+      "size": [
+        190,
+        74
+      ]
+    },
+    {
+      "id": "init2",
+      "type": "backend",
+      "label": "init ② 写配置",
+      "sublabel": "写入共享卷",
+      "pos": [
+        870,
+        70
+      ],
+      "size": [
+        180,
+        74
+      ]
+    },
+    {
+      "id": "mainc",
+      "type": "backend",
+      "label": "业务容器启动",
+      "sublabel": "读取 init 产物",
+      "pos": [
+        740,
+        220
+      ],
+      "size": [
+        200,
+        74
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Pod · nginx-sidecar-pod（同生共死 · 同节点 · 1 个 IP）",
+      "wraps": [
+        "pause",
+        "nginx",
+        "sidecar",
+        "vol"
+      ],
+      "pad": 26
+    }
+  ],
+  "connections": [
+    {
+      "from": "pause",
+      "to": "nginx",
+      "label": "共享网络 ns",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        280,
+        148
+      ]
+    },
+    {
+      "from": "nginx",
+      "to": "vol",
+      "label": "挂载",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "from": "sidecar",
+      "to": "vol",
+      "label": "挂载",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "from": "init1",
+      "to": "init2",
+      "label": "exit 0"
+    },
+    {
+      "from": "init2",
+      "to": "mainc",
+      "label": "exit 0",
+      "fromSide": "bottom",
+      "toSide": "top"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "pause 的意义",
+      "items": [
+        "kubectl 看到的容器比节点上 docker ps 少一个——差的就是 pause",
+        "主容器重启 IP 不变：是 pause 在撑着网络",
+        "同 Pod 容器端口不能冲突（共享一套端口空间）"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "sidecar vs initContainer",
+      "items": [
+        "init：主容器前串行执行，必须 exit 0 才继续",
+        "sidecar：与主容器并行长期运行（日志/代理）",
+        "一个管\"出生前的准备\"，一个管\"一生中的陪伴\""
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "labels 的意义",
+      "items": [
+        "labels 是 Service / Deployment 找到 Pod 的唯一线索",
+        "selector 精确匹配，多租户靠 instance 标签隔离",
+        "emptyDir：Pod 级临时卷，容器间共享的默认选择"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,140 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Service 如何找到 Pod：selector → Endpoints → kube-proxy",
+    "locale": "zh-CN",
+    "output": "labs/04_service/images/service_mechanism.html",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    {
+      "id": "svc",
+      "type": "backend",
+      "label": "Service",
+      "sublabel": "VIP: 10.96.0.10:80 · selector",
+      "pos": [
+        60,
+        80
+      ],
+      "size": [
+        210,
+        80
+      ]
+    },
+    {
+      "id": "epc",
+      "type": "backend",
+      "label": "Endpoints Controller",
+      "sublabel": "watch Pod · 只收 Ready",
+      "pos": [
+        340,
+        80
+      ],
+      "size": [
+        215,
+        84
+      ]
+    },
+    {
+      "id": "ep",
+      "type": "database",
+      "label": "Endpoints 对象",
+      "sublabel": "Ready Pod 的 IP:port 列表",
+      "pos": [
+        620,
+        80
+      ],
+      "size": [
+        220,
+        84
+      ],
+      "tag": "为空 = 没匹配上"
+    },
+    {
+      "id": "proxy",
+      "type": "backend",
+      "label": "kube-proxy（每节点）",
+      "sublabel": "watch SVC + EP → 同步规则",
+      "pos": [
+        60,
+        300
+      ],
+      "size": [
+        215,
+        84
+      ],
+      "tag": "iptables / ipvs"
+    },
+    {
+      "id": "pods",
+      "type": "backend",
+      "label": "Pod × 3",
+      "sublabel": "包在节点被 DNAT 改写目的 IP",
+      "pos": [
+        400,
+        300
+      ],
+      "size": [
+        230,
+        84
+      ],
+      "tag": "VIP 无进程监听"
+    }
+  ],
+  "connections": [
+    {
+      "from": "svc",
+      "to": "epc",
+      "label": "触发"
+    },
+    {
+      "from": "epc",
+      "to": "ep",
+      "label": "写入"
+    },
+    {
+      "from": "ep",
+      "to": "proxy",
+      "label": "watch",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "from": "proxy",
+      "to": "pods",
+      "label": "DNAT 转发",
+      "variant": "emphasis"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "排查第一站",
+      "items": [
+        "kubectl get endpoints：为空 = selector 不匹配或无 Ready Pod",
+        "ClusterIP ping 不通、curl 通：VIP 只做 TCP/UDP DNAT",
+        "VIP 上没有任何进程监听——包在节点上被直接改写"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "iptables vs ipvs",
+      "items": [
+        "iptables：DNAT 规则线性匹配，数千条 Service 时变慢",
+        "ipvs：内核哈希表 O(1)，支持 rr/lc/sh 等算法",
+        "大规模集群首选 ipvs"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "集群 DNS",
+      "items": [
+        "创建 Service 即注册 <svc>.<ns>.svc.cluster.local",
+        "Headless 返回所有 Ready Pod IP（多条 A 记录）",
+        "StatefulSet 每 Pod 独立域名：web-0.svc.ns.svc.cluster.local"
+      ]
+    }
+  ]
+}

@@ -14,6 +14,7 @@ K8s 提供两个专门的对象：
 ## 2. 总览：四种注入方式
 
 ![cm secret inject](images/cm_secret_inject.svg)
+> 🌐 **交互版**：[在线打开（GitHub Pages）](https://yong-huang.github.io/hands-on-kubernetes/labs/05_cm_secret/images/cm_secret_inject.html)（或本地打开 [`images/cm_secret_inject.html`](images/cm_secret_inject.html)）。
 
 ConfigMap（蓝）与 Secret（红）各自有两条路径进入容器，共四种组合：
 
@@ -81,6 +82,7 @@ kubelet 周期性检查（默认约 1 分钟）被挂载的 ConfigMap/Secret，�
 ## 6. Secret 的安全真相
 
 ![secret base64](images/secret_base64.svg)
+> 🌐 **交互版**：[在线打开（GitHub Pages）](https://yong-huang.github.io/hands-on-kubernetes/labs/05_cm_secret/images/secret_base64.html)（或本地打开 [`images/secret_base64.html`](images/secret_base64.html)）。
 
 写入链路：`stringData` 明文 → API Server 自动 base64 编码 → etcd 落盘；读取时 env / volume 自动解码为明文。**任何人** `echo 'UEBzc3cwcmQtMTIz' | base64 -d` 都能秒解——Secret 的"安全"来自配套设施：
 
@@ -121,8 +123,12 @@ volumes:
 ├── manifests/
 │   └── cm_secret.yaml      # 2 个 ConfigMap + 1 个 Secret + 1 个消费 Pod
 └── images/
-    ├── cm_secret_inject.svg   # 四种注入方式与热更新（本文档 §2）
-    └── secret_base64.svg      # 存储链路与安全真相（本文档 §6）
+    ├── cm_secret_inject.workflow.json          # 图源（Archify Typed JSON IR）
+    ├── cm_secret_inject.html        # 交互版（浏览器打开）
+    └── cm_secret_inject.svg          # 双主题矢量版   
+    ├── secret_base64.workflow.json          # 图源（Archify Typed JSON IR）
+    ├── secret_base64.html        # 交互版（浏览器打开）
+    └── secret_base64.svg          # 双主题矢量版      
 ```
 
 ## 9. 面试要点

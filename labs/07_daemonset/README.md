@@ -9,6 +9,7 @@
 ## 2. 总览：调度模型
 
 ![daemonset scheduling](images/daemonset_scheduling.svg)
+> 🌐 **交互版**：[在线打开（GitHub Pages）](https://yong-huang.github.io/hands-on-kubernetes/labs/07_daemonset/images/daemonset_scheduling.html)（或本地打开 [`images/daemonset_scheduling.html`](images/daemonset_scheduling.html)）。
 
 DaemonSet 控制器（kube-controller-manager 内的 daemon pod controller）的逻辑：
 
@@ -67,6 +68,7 @@ affinity:
 ## 5. hostPath：日志采集流水线
 
 ![daemonset hostpath](images/daemonset_hostpath.svg)
+> 🌐 **交互版**：[在线打开（GitHub Pages）](https://yong-huang.github.io/hands-on-kubernetes/labs/07_daemonset/images/daemonset_hostpath.html)（或本地打开 [`images/daemonset_hostpath.html`](images/daemonset_hostpath.html)）。
 
 采集的前提是"能看到节点上的日志文件"。kubelet 按 CRI 布局把容器 stdout/stderr 写到节点目录（`/var/log/pods/<ns>_<pod>_<uid>/<container>/*.log`），DaemonSet Pod 用 hostPath 把这些目录**只读**挂进来：
 
@@ -104,8 +106,12 @@ volumes:
 ├── manifests/
 │   └── daemonset.yaml           # 日志采集（全节点+tolerations）+ nodeAffinity 版
 └── images/
-    ├── daemonset_scheduling.svg # 调度模型（本文档 §2）
-    └── daemonset_hostpath.svg   # 日志采集流水线（本文档 §5）
+    ├── daemonset_scheduling.workflow.json          # 图源（Archify Typed JSON IR）
+    ├── daemonset_scheduling.html        # 交互版（浏览器打开）
+    └── daemonset_scheduling.svg          # 双主题矢量版 
+    ├── daemonset_hostpath.workflow.json          # 图源（Archify Typed JSON IR）
+    ├── daemonset_hostpath.html        # 交互版（浏览器打开）
+    └── daemonset_hostpath.svg          # 双主题矢量版   
 ```
 
 ## 8. 面试要点

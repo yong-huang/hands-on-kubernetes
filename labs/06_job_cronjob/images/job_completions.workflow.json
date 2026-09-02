@@ -1,0 +1,41 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "Job：completions=6 × parallelism=2 分批消费",
+    "locale": "zh-CN",
+    "output": "labs/06_job_cronjob/images/job_completions.html",
+    "quality_profile": "showcase"
+  },
+  "lanes": [
+    { "id": "main", "label": "工作队列（work-queue）" },
+    { "id": "fail", "label": "失败重试", "variant": "exception" }
+  ],
+  "phases": [
+    { "id": "p1", "label": "提交", "fromCol": 0, "toCol": 0, "variant": "emphasis" },
+    { "id": "p2", "label": "分批消费（每批 2 个）", "fromCol": 1, "toCol": 3 },
+    { "id": "p3", "label": "完成", "fromCol": 4, "toCol": 4, "variant": "dashed" }
+  ],
+  "mainPath": ["submit", "batch1", "batch2", "batch3", "done"],
+  "nodes": [
+    { "id": "submit", "lane": "main", "col": 0, "type": "frontend", "label": "提交 Job", "sublabel": "completions 6 · parallelism 2", "width": 145 },
+    { "id": "batch1", "lane": "main", "col": 1, "type": "backend", "label": "第 1 批 · 2 个", "sublabel": "跑完 exit 0 计成功", "tag": "2/6", "width": 135 },
+    { "id": "batch2", "lane": "main", "col": 2, "type": "backend", "label": "第 2 批 · 2 个", "sublabel": "失败的重试后再计", "tag": "4/6", "width": 135 },
+    { "id": "batch3", "lane": "main", "col": 3, "type": "backend", "label": "第 3 批 · 2 个", "sublabel": "最后一批", "tag": "6/6", "width": 125 },
+    { "id": "done", "lane": "main", "col": 4, "type": "frontend", "label": "Job Complete", "sublabel": "Pod 保留可查日志", "tag": "TTL 清理", "width": 130 },
+    { "id": "failpod", "lane": "fail", "col": 1, "type": "security", "label": "Pod 失败", "sublabel": "Never 换新 Pod / OnFailure 原地重启", "tag": "指数退避 10/20/40s", "width": 175 }
+  ],
+  "edges": [
+    { "from": "submit", "to": "batch1" },
+    { "from": "batch1", "to": "batch2" },
+    { "from": "batch2", "to": "batch3" },
+    { "from": "batch3", "to": "done" },
+    { "from": "batch1", "to": "failpod", "label": "exit ≠ 0", "variant": "security", "role": "error" },
+    { "from": "failpod", "to": "batch2", "label": "重试（计入 backoffLimit）", "variant": "dashed", "role": "return" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "三参数矩阵", "items": ["completions：总共要成功几个；parallelism：并发度", "1+1 = 一次性任务；N+M = 工作队列；只写 parallelism = 竞速", "kubectl scale job 只能调大 parallelism，不能改 completions"] },
+    { "dot": "rose", "title": "Never vs OnFailure", "items": ["Never：失败 Pod 标 Failed 留现场，Job 新建 Pod 重试", "OnFailure：原 Pod 内重启容器（RESTARTS+1），省资源", "Always 对 Job 非法——Job 靠\"Pod 结束\"论成败"] },
+    { "dot": "emerald", "title": "退出码语义", "items": ["exit 0 → Succeeded 计入 completions", "exit ≠ 0 → 失败触发重试（指数退避 10/20/40s）", "activeDeadlineSeconds 整体死线，优先于 backoffLimit"] }
+  ]
+}

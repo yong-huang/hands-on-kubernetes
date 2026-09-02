@@ -1,0 +1,138 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "kind：节点即容器（Docker-in-Docker）",
+    "locale": "zh-CN",
+    "output": "labs/01_setup_env/images/kind_arch.html",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    {
+      "id": "kubectl",
+      "type": "external",
+      "label": "kubectl",
+      "sublabel": "context: kind-k8s-learn",
+      "pos": [
+        50,
+        80
+      ],
+      "size": [
+        190,
+        70
+      ]
+    },
+    {
+      "id": "cp",
+      "type": "backend",
+      "label": "control-plane",
+      "sublabel": "apiserver · etcd · scheduler · controller-manager",
+      "pos": [
+        330,
+        60
+      ],
+      "size": [
+        260,
+        90
+      ],
+      "tag": "CoreDNS Pod"
+    },
+    {
+      "id": "w1",
+      "type": "backend",
+      "label": "worker-1",
+      "sublabel": "kubelet · containerd · kindnet",
+      "pos": [
+        660,
+        60
+      ],
+      "size": [
+        230,
+        88
+      ],
+      "tag": "nginx Pod"
+    },
+    {
+      "id": "w2",
+      "type": "backend",
+      "label": "worker-2",
+      "sublabel": "kubelet · containerd · kindnet",
+      "pos": [
+        660,
+        200
+      ],
+      "size": [
+        230,
+        88
+      ],
+      "tag": "nginx Pod"
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "宿主机 Docker（OrbStack / Docker Desktop）",
+      "wraps": [
+        "cp",
+        "w1",
+        "w2"
+      ],
+      "pad": 26
+    }
+  ],
+  "connections": [
+    {
+      "from": "kubectl",
+      "to": "cp",
+      "label": "6443",
+      "variant": "emphasis",
+      "labelAt": [
+        272,
+        88
+      ]
+    },
+    {
+      "from": "cp",
+      "to": "w1",
+      "label": "调度 Pod",
+      "variant": "dashed"
+    },
+    {
+      "from": "cp",
+      "to": "w2",
+      "label": "调度 Pod",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "left"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "节点 = 容器",
+      "items": [
+        "docker ps 能直接看到这 3 个\"节点\"",
+        "kind delete cluster = 删 3 个容器，零残留",
+        "容器里 kubeadm 组装真实集群，行为与生产一致"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "连接方式",
+      "items": [
+        "kind 自动写入 kubeconfig 并切换 context",
+        "宿主机端口映射到节点 6443（API Server）",
+        "与生产集群同一套 API，kubectl 无差别使用"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "访问 Service",
+      "items": [
+        "NodePort 在容器网络里，宿主机不可直达",
+        "port-forward 最简单；或建集群时配 extraPortMappings",
+        "Ingress 需 controller + 端口映射（见 11）"
+      ]
+    }
+  ]
+}

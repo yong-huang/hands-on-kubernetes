@@ -1,0 +1,42 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "setup.sh 六步：从依赖检查到可用集群",
+    "locale": "zh-CN",
+    "output": "labs/01_setup_env/images/setup_flow.html",
+    "quality_profile": "showcase"
+  },
+  "lanes": [
+    { "id": "main", "label": "一键建集群" },
+    { "id": "clean", "label": "随时重来", "variant": "exception" }
+  ],
+  "phases": [
+    { "id": "p1", "label": "前置", "fromCol": 0, "toCol": 1, "variant": "emphasis" },
+    { "id": "p2", "label": "创建与验证", "fromCol": 2, "toCol": 3 },
+    { "id": "p3", "label": "国内适配与负载", "fromCol": 4, "toCol": 5, "variant": "dashed" }
+  ],
+  "mainPath": ["deps", "config", "create", "verify", "preload", "deploy"],
+  "nodes": [
+    { "id": "deps", "lane": "main", "col": 0, "type": "frontend", "label": "检查依赖", "sublabel": "docker/kubectl/kind · info 探活", "width": 150 },
+    { "id": "config", "lane": "main", "col": 1, "type": "backend", "label": "生成 kind-config", "sublabel": "1 cp + 2 worker · k8s-learn", "width": 150 },
+    { "id": "create", "lane": "main", "col": 2, "type": "backend", "label": "创建集群", "sublabel": "--wait 120s · kubeadm init/join", "tag": "kindnet CNI", "width": 150 },
+    { "id": "verify", "lane": "main", "col": 3, "type": "backend", "label": "验证", "sublabel": "get nodes · wait Ready 180s", "width": 140 },
+    { "id": "preload", "lane": "main", "col": 4, "type": "backend", "label": "预载镜像（国内）", "sublabel": "daocloud 拉取 → ctr import", "tag": "load_images.sh", "width": 150 },
+    { "id": "deploy", "lane": "main", "col": 5, "type": "frontend", "label": "部署 nginx 测试", "sublabel": "Deployment + NodePort", "width": 140 },
+    { "id": "clean", "lane": "clean", "col": 5, "type": "security", "label": "kind delete cluster", "sublabel": "零残留，随时重来", "width": 145 }
+  ],
+  "edges": [
+    { "from": "deps", "to": "config" },
+    { "from": "config", "to": "create" },
+    { "from": "create", "to": "verify" },
+    { "from": "verify", "to": "preload" },
+    { "from": "preload", "to": "deploy" },
+    { "from": "deploy", "to": "clean", "label": "实验结束", "variant": "security", "role": "error" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "为什么是 kind", "items": ["K8s 官方 CI 同款，行为与生产最接近", "多节点 = 配置文件里多几行 role: worker", "多集群并存：--name 即可，kubeconfig 多 context"] },
+    { "dot": "rose", "title": "国内网络适配", "items": ["节点内直连 registry-1.docker.io 会 TLS 超时", "镜像源拉取 + ctr import 灌节点，绕开直连", "非 latest 标签 imagePullPolicy=IfNotPresent，有镜像就不再拉"] },
+    { "dot": "emerald", "title": "脚本工程约定", "items": ["set -euo pipefail：任何一步失败立刻退出", "创建前先删同名集群，保证可重复执行", "kubectl wait 代替 sleep，就绪即返回"] }
+  ]
+}

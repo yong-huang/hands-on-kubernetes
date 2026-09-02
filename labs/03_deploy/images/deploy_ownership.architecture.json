@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Deployment 三层 ownership：改 template 即滚动更新",
+    "locale": "zh-CN",
+    "output": "labs/03_deploy/images/deploy_ownership.html",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    { "id": "deploy", "type": "backend", "label": "Deployment · nginx-rolling", "sublabel": "replicas: 3 · RollingUpdate", "pos": [60, 60], "size": [240, 84], "tag": "改 template = 触发更新" },
+    { "id": "rsold", "type": "backend", "label": "ReplicaSet · 旧", "sublabel": "desired=0 · 缩容但保留", "pos": [400, 60], "size": [220, 84], "tag": "回滚的原材料" },
+    { "id": "rsnew", "type": "backend", "label": "ReplicaSet · 新", "sublabel": "desired=3 · 扩容中", "pos": [400, 210], "size": [220, 84], "tag": "revision 递增" },
+    { "id": "oldpods", "type": "database", "label": "Pod × 3（v1）", "sublabel": "已被替换 · 虚线保留", "pos": [720, 60], "size": [220, 84] },
+    { "id": "newpods", "type": "backend", "label": "Pod × 3（v2）", "sublabel": "pod-template-hash 认主", "pos": [720, 210], "size": [220, 84] }
+  ],
+  "connections": [
+    { "from": "deploy", "to": "rsold", "variant": "dashed" },
+    { "from": "deploy", "to": "rsnew", "variant": "emphasis", "label": "owns" },
+    { "from": "rsold", "to": "oldpods" },
+    { "from": "rsnew", "to": "newpods", "label": "＋1 / －1 同步" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "三层 ownership", "items": ["Deployment 不直接管 Pod：改 template → 新建 RS → 扩新缩旧", "Pod 靠 pod-template-hash 标签认主；selector 创建后不可改", "三大能力：自愈 / 扩缩容（改 replicas）/ 滚动更新 + 回滚"] },
+    { "dot": "rose", "title": "滚动更新参数", "items": ["maxSurge / maxUnavailable 可为数字或百分比（默认 25%）", "两者不可同时为 0；容量区间 [replicas-最大不可用, replicas+最大超额]", "readinessProbe 是安全阀：新 Pod 不 Ready 就不杀旧 Pod"] },
+    { "dot": "emerald", "title": "回滚的本质", "items": ["rollout undo = 把旧 RS 的 template 拷回 Deployment 再正向滚一次", "revisionHistoryLimit 控制保留几个旧 RS（默认 10）", "旧 RS 缩到 0 但不删除——这就是 rollout history"] }
+  ]
+}

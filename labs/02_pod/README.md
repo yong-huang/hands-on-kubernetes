@@ -15,6 +15,7 @@ K8s 不会单独调度某个容器——调度的原子单位永远是 Pod。
 ## 2. 架构总览
 
 ![pod anatomy](images/pod_anatomy.svg)
+> 🌐 **交互版**：[在线打开（GitHub Pages）](https://yong-huang.github.io/hands-on-kubernetes/labs/02_pod/images/pod_anatomy.html)（或本地打开 [`images/pod_anatomy.html`](images/pod_anatomy.html)）。
 
 一个多容器 Pod 的内部——`pause` 容器最先启动、持有网络/IPC 命名空间，业务容器全部加入它的命名空间，所以同 Pod 容器共享一个 IP、用 `localhost` 互访；nginx 主容器与 log-tailer sidecar 通过 `emptyDir` 共享卷交换日志。下方的 initContainer 链展示了另一种附加容器时机：串行执行、必须 `exit 0` 才轮到业务容器。
 
@@ -74,6 +75,7 @@ manifests 里的 `nginx-sidecar-pod` 演示了经典 sidecar：nginx 写日志�
 记忆方法：liveness 治"病"，readiness 治"没长大"，startup 治"慢热"。
 
 ![pod lifecycle](images/pod_lifecycle.svg)
+> 🌐 **交互版**：[在线打开（GitHub Pages）](https://yong-huang.github.io/hands-on-kubernetes/labs/02_pod/images/pod_lifecycle.html)（或本地打开 [`images/pod_lifecycle.html`](images/pod_lifecycle.html)）。
 
 kubelet 视角的完整机制：Pod 走 Pending（等调度）→ ContainerCreating（拉镜像/建容器）→ Running；容器崩溃则进入 CrashLoopBackOff 退避循环（10s→20s→40s…封顶 5min），由 kubelet 重启。Running 期间三类探针各司其职——startup 成功前屏蔽另外两个，liveness 失败触发重启，readiness 失败只把 Pod 从 Service endpoints 摘除。
 
@@ -124,8 +126,12 @@ spec:
 ├── manifests/
 │   └── pod.yaml       # 4 个 Pod 示例：单容器 / sidecar / initContainer / 探针
 └── images/
-    ├── pod_anatomy.svg      # Pod 内部结构图（本文档 §2）
-    └── pod_lifecycle.svg    # 生命周期与探针图（本文档 §4）
+    ├── pod_anatomy.workflow.json          # 图源（Archify Typed JSON IR）
+    ├── pod_anatomy.html        # 交互版（浏览器打开）
+    └── pod_anatomy.svg          # 双主题矢量版      
+    ├── pod_lifecycle.workflow.json          # 图源（Archify Typed JSON IR）
+    ├── pod_lifecycle.html        # 交互版（浏览器打开）
+    └── pod_lifecycle.svg          # 双主题矢量版    
 ```
 
 ## 6. 面试要点

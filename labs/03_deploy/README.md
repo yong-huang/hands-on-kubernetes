@@ -15,6 +15,7 @@ Deployment 是解决这三个问题的上层控制器。我们只需声明"期�
 ## 2. 架构总览
 
 ![deploy ownership](images/deploy_ownership.svg)
+> 🌐 **交互版**：[在线打开（GitHub Pages）](https://yong-huang.github.io/hands-on-kubernetes/labs/03_deploy/images/deploy_ownership.html)（或本地打开 [`images/deploy_ownership.html`](images/deploy_ownership.html)）。
 
 Deployment 不直接管理 Pod——它管理 ReplicaSet，RS 再按 Pod 模板创建 Pod。每次修改 Pod 模板（镜像、环境变量等）就**新建一个 RS**，并按 `maxSurge` / `maxUnavailable` 约束同步地"扩新 RS、缩旧 RS"（图中的 ＋1 / －1）。旧 RS 被缩到 0 但**不删除**（图中虚线 Pod），这就是 rollout history，也是回滚的原材料。
 
@@ -89,6 +90,7 @@ spec:
 ### 滚动更新过程详解
 
 ![deploy rolling](images/deploy_rolling.svg)
+> 🌐 **交互版**：[在线打开（GitHub Pages）](https://yong-huang.github.io/hands-on-kubernetes/labs/03_deploy/images/deploy_rolling.html)（或本地打开 [`images/deploy_rolling.html`](images/deploy_rolling.html)）。
 
 以图中的 `replicas=3, maxSurge=1, maxUnavailable=0`、nginx 1.25 → 1.26 为例，任意时刻新旧 Pod 总数被约束在 `[replicas - maxUnavailable, replicas + maxSurge]` 区间内：
 
@@ -125,8 +127,12 @@ kubectl rollout resume deployment/nginx-rolling       # 恢复后一次性发布
 ├── manifests/
 │   └── deploy.yaml      # 两个 Deployment 示例：RollingUpdate vs Recreate
 └── images/
-    ├── deploy_ownership.svg   # 三层 ownership 图（本文档 §2）
-    └── deploy_rolling.svg     # 滚动更新时间线图（本文档 §4）
+    ├── deploy_ownership.workflow.json          # 图源（Archify Typed JSON IR）
+    ├── deploy_ownership.html        # 交互版（浏览器打开）
+    └── deploy_ownership.svg          # 双主题矢量版   
+    ├── deploy_rolling.workflow.json          # 图源（Archify Typed JSON IR）
+    ├── deploy_rolling.html        # 交互版（浏览器打开）
+    └── deploy_rolling.svg          # 双主题矢量版     
 ```
 
 ## 6. 面试要点
