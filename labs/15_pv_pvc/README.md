@@ -1,12 +1,12 @@
 # Kubernetes PV/PVC 详解：静态供给、绑定机制与回收策略
 
-## 引言
+## 1. 引言
 
 容器里的文件系统是易失的：Pod 一删，写在容器可写层里的数据就没了；哪怕只是 Pod 被调度到另一个节点，本地路径也对不上。朴素的办法是把数据直接塞进 hostPath，但这样 Pod 和节点路径强耦合，计算和存储没有分离。
 
 Kubernetes 的解法是 **PV/PVC 两层抽象**：管理员用 PersistentVolume 声明"集群里有哪些存储"（供给侧），用户用 PersistentVolumeClaim 声明"我需要什么样的存储"（需求侧），控制器负责把二者**绑定**。Pod 只引用 PVC，完全不知道底层是 hostPath、local 盘还是云盘——计算与存储就此解耦。
 
-## 文件结构
+## 2. 文件结构
 
 ```
 15_pv_pvc/
@@ -20,7 +20,7 @@ Kubernetes 的解法是 **PV/PVC 两层抽象**：管理员用 PersistentVolume 
     └── pvc_binding.svg                # 双主题矢量版（本文档 §可视化 内嵌）
 ```
 
-## 核心概念
+## 3. 核心概念
 
 ### PV 与 PVC 的关系
 
@@ -60,7 +60,7 @@ PVC 被删除后，PV 何去何由 `persistentVolumeReclaimPolicy` 决定：
 - **静态供给（本项目）**：管理员手动创建 PV（hostPath/local），PVC 靠 capacity/accessModes/storageClassName 匹配。`storageClassName: manual` 只是一个匹配标记，背后没有任何控制器
 - **动态供给（生产默认）**：只定义 StorageClass（指定 CSI driver 与参数），PVC 创建后控制器按需自动创建 PV 并绑定；PVC 删除时按 reclaimPolicy 自动回收。PVC 里留空 `storageClassName` 即使用默认 StorageClass
 
-## YAML 关键字段
+## 4. YAML 关键字段
 
 ```yaml
 # PV（供给侧）
@@ -97,7 +97,7 @@ volumes:
 - `local` 类型 PV 必须配 `nodeAffinity`（K8s 强制），否则连创建都不过；hostPath PV 不强制，但若数据只存在于部分节点，仍应配 `nodeAffinity` 引导 Pod 调度到有数据的节点，避免挂载失败
 - PV 的 capacity 只是声明值，hostPath 并不会真的限额——配额由底层存储实现（如云盘、LVM）
 
-## 可视化
+## 5. 可视化
 
 ![PV/PVC 绑定](images/pvc_binding.svg)
 
@@ -105,7 +105,7 @@ volumes:
 
 > 🌐 **交互版**：[在线打开（GitHub Pages）](https://yong-huang.github.io/hands-on-kubernetes/labs/15_pv_pvc/images/pvc_binding.html)（或本地打开 [`images/pvc_binding.html`](images/pvc_binding.html)）。
 
-## 面试要点
+## 6. 面试要点
 
 1. **PVC 和 PV 的绑定条件有哪些**：① PV capacity ≥ PVC 请求量；② PV 的 accessModes 包含 PVC 请求的模式；③ storageClassName 一致（PVC 留空则用默认 SC，走动态供给）；此外 PVC 还可用 label selector 和 `volumeName` 进一步约束挑选范围。绑定一对一独占，记录在 PV 的 claimRef 里。
 2. **Retain vs Delete 的语义**：Retain——删 PVC 后 PV 进入 Released，数据和 claimRef 保留，需管理员手动删 PV 并清数据才能复用，最安全；Delete——PV 连同底层存储一起删（动态供给默认），依赖 CSI 插件。Released 不是 Available，不会再被自动绑走。
@@ -113,6 +113,6 @@ volumes:
 4. **PV 的节点亲和性是干什么的**：hostPath/local 类存储只存在于特定节点，PV 的 `nodeAffinity` 把"数据在哪"这个拓扑约束交给调度器：调度器把 PV 的 nodeAffinity 与 Pod 的资源请求合并过滤节点，保证 Pod 落在能挂到这块存储的节点上。没有它，Pod 可能调度到无数据的节点导致挂载失败。
 5. **StatefulSet 的 volumeClaimTemplates 和直接写 PVC 有什么区别**：直接 PVC 是 Pod 模板里引用同一个 PVC（Deployment 常用，所有副本共享、无身份）；volumeClaimTemplates 为**每个副本自动生成独立的 PVC**（`data-web-0`、`data-web-1`...），副本重建后仍绑定回自己原来的 PVC，从而获得"稳定存储身份"——这正是有状态应用的核心需求。缩容时 PVC 保留（扩容回来数据还在），需手动删除。
 
-## 总结
+## 7. 总结
 
 PV/PVC 的本质是把存储拆成"供给"与"需求"两个角色，用绑定机制把二者对接，让 Pod 彻底与底层存储解耦。记住三条主线：绑定三条件（capacity/accessModes/storageClass）、生命周期状态机（Available → Bound → Released 及 Retain/Delete 两条出路）、静态 vs 动态供给（manual 标记 vs StorageClass+CSI）。配合 `pv.sh` 里"删 Pod 数据还在、删 PVC 变 Released"的演示，能直观感受到"数据属于 PV 而不属于 Pod"这一设计意图。

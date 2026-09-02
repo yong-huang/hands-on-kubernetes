@@ -1,6 +1,6 @@
 # Kubernetes DNS 与服务发现详解：ClusterIP、Headless 与 Pod 级域名
 
-## 引言
+## 1. 引言
 
 集群里有 3 个 nginx Pod，客户端该连哪个 IP？答案是"一个都别连"。Pod IP 是易变的（重建、漂移、扩缩容都会变），把 IP 写死等于把脆弱性写进代码。Kubernetes 的解法是**用 DNS 做服务发现**：每个 Service 创建时，CoreDNS 自动为它生成一条域名记录，客户端只需要记名字。
 
@@ -8,7 +8,7 @@
 
 本项目在 kind 集群里实测三种 DNS 记录（ClusterIP / Headless / Pod 级），并演示自定义 dnsConfig 注入。
 
-## 文件结构
+## 2. 文件结构
 
 ```
 14_dns_discovery/
@@ -22,7 +22,7 @@
     └── dns_resolution.svg            # 双主题矢量版（本文档 §可视化 内嵌）
 ```
 
-## 核心概念
+## 3. 核心概念
 
 ### CoreDNS 与 Corefile
 
@@ -68,7 +68,7 @@ options ndots:5
 - `dnsPolicy: None`：完全忽略集群 DNS，必须配合 `dnsConfig` 自定义 nameservers
 - `dnsConfig`：无论哪种 policy 都可追加 nameservers / searches / options（如把 ndots 调低）
 
-## YAML 关键字段
+## 4. YAML 关键字段
 
 ```yaml
 # Headless Service：DNS 直接返回 Pod IP，无 VIP、无 kube-proxy 规则
@@ -98,7 +98,7 @@ spec:
 - StatefulSet 的 Pod 记录只在 Pod Running 时存在，且（默认 `publishNotReadyAddresses: false`）只包含 Ready 的 Pod
 - `dnsPolicy: None` 而不写 dnsConfig 是非法配置，Pod 起不来
 
-## 实测结果
+## 5. 实测结果
 
 `./dns.sh test` 的关键输出（IP 以实际集群为准）：
 
@@ -118,7 +118,7 @@ nslookup web-1.web-h ->  Address: 10.244.2.8
 nslookup kube-dns.kube-system.svc.cluster.local -> 10.96.0.10
 ```
 
-## 可视化
+## 6. 可视化
 
 ![DNS 解析流水线](images/dns_resolution.svg)
 
@@ -126,7 +126,7 @@ nslookup kube-dns.kube-system.svc.cluster.local -> 10.96.0.10
 
 > 🌐 **交互版**：[在线打开（GitHub Pages）](https://yong-huang.github.io/hands-on-kubernetes/labs/14_dns_discovery/images/dns_resolution.html)（或本地打开 [`images/dns_resolution.html`](images/dns_resolution.html)）。
 
-## 面试要点
+## 7. 面试要点
 
 1. **ndots:5 的坑**：外部域名如 `api.github.com` 只有 2 个点 < 5，解析器会先把它拼上 3 个搜索域各查一遍（全部 NXDOMAIN），最后才查绝对域名——一次本可直接命中的解析变成了 4 次查询。高频外部调用的优化手段：用 `dnsConfig` 调低 ndots、写全 FQDN、或结尾加点（`api.github.com.`）表示绝对域名。
 2. **Headless 的使用场景**① 有状态集群的节点间互相发现（MySQL 主从、Cassandra、Kafka broker 用 `<pod>.<headless-svc>` 找到固定对端）；② 客户端自己做负载均衡（gRPC 长连接会粘住 VIP 后的单个 Pod，Headless 让客户端拿到全量 IP 列表自选）；③ Service Mesh 中 sidecar 直连。
@@ -134,6 +134,6 @@ nslookup kube-dns.kube-system.svc.cluster.local -> 10.96.0.10
 4. **自定义 DNS 注入**：`dnsPolicy` 控制整体策略（ClusterFirst / None 等），`dnsConfig` 做增量注入（nameservers/searches/options）。典型用法：给特定 Pod 配私有 DNS、调 ndots、追加搜索域；`dnsPolicy: None` + `dnsConfig` 可完全接管解析。
 5. **CoreDNS 与 kube-dns 的关系**：CoreDNS 是 CNCF 毕业项目，自 1.13 起取代 kube-dns 成为默认；但 Service 名仍叫 `kube-dns`（兼容存量配置），面试时要能说清这层历史。
 
-## 总结
+## 8. 总结
 
 Kubernetes 服务发现的本质是"声明式 API 的 DNS 副产品"：创建 Service 即自动获得 `<svc>.<ns>.svc.cluster.local`。记住三条主线——**FQDN 结构**（service.namespace.svc.cluster.local）、**三种记录的差异**（VIP vs Pod IP 列表 vs 单 Pod IP）、**解析路径**（resolv.conf 搜索域 + ndots → CoreDNS 插件链 → forward 兜底）。配合 `dns.sh` 里的五组 nslookup 实测，能把"为什么 Headless 返回多个 IP"、"ndots:5 为什么慢"这类问题落到看得见的输出上。

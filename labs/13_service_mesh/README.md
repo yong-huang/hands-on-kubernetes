@@ -1,6 +1,6 @@
 # Kubernetes Service Mesh 详解：Istio 与金丝雀发布
 
-## 引言
+## 1. 引言
 
 前面 03_deploy 的滚动更新虽然能"逐个替换 Pod"，但流量切分粒度很粗：kube-proxy 只会无差别轮询所有 Ready 的 Pod，你无法说"新版本只放 10% 的流量进来"。微服务一多，更多流量治理需求冒出来：
 
@@ -11,7 +11,7 @@
 
 在 Service Mesh 出现之前，这些能力要么塞进业务代码（SDK，如 Spring Cloud），要么靠部署多套 Service 做粗粒度切分。**Sidecar 模式**给出了第三条路：给每个 Pod 注入一个代理容器（envoy），接管该 Pod 的全部进出流量，把"流量治理"从业务代码里剥离到基础设施层——业务进程对此完全无感。
 
-## 文件结构
+## 2. 文件结构
 
 ```
 13_service_mesh/
@@ -25,7 +25,7 @@
     └── istio_canary.svg                # 双主题矢量版（本文档 §可视化 内嵌）
 ```
 
-## 核心概念
+## 3. 核心概念
 
 ### 数据面 vs 控制面
 
@@ -73,7 +73,7 @@ Namespace 打上 `istio-injection=enabled` 标签后，Istio 预先注册的 **M
 
 金丝雀发布的标准节奏：镜像 → header 白名单 → 1% → 10% → 50% → 100%，每一步观察错误率/延迟指标，异常则改权重秒级回切。
 
-## YAML 关键字段
+## 4. YAML 关键字段
 
 ```yaml
 # Namespace: 一行标签开启自动注入
@@ -110,7 +110,7 @@ http:
 - **流量劫持可能干扰某些应用**：所有 TCP 流量都被 iptables 重定向到 envoy，对协议有特殊假设的程序（如需要拿到真实源 IP）需要额外配置
 - 注入只对**新建** Pod 生效，存量 Pod 要 `rollout restart` 才有 sidecar
 
-## 国内网络注意（镜像预载清单）
+## 5. 国内网络注意（镜像预载清单）
 
 Istio 本体和 sidecar 都以容器镜像交付，而 kind 节点内 containerd 无法直连 docker.io，必须先在宿主机拉取再导入（参见 `../../scripts/load_images.sh` 的通用流程）：
 
@@ -130,7 +130,7 @@ docker tag  docker.m.daocloud.io/istio/proxyv2:${ISTIO_VERSION} docker.io/istio/
 - `proxyv2` = envoy sidecar 镜像（**每个业务节点**都需要，因为 Pod 调度到哪、sidecar 就在哪拉镜像）
 - `istioctl` 本体从 github release 下载，国内直连易超时——macOS 用 `brew install istioctl` 成功率更高；脚本里两条途径都做了，若都失败，**清单与文档仍可作为学习材料**，换个网络环境再实操
 
-## 可视化
+## 6. 可视化
 
 ![Istio 金丝雀](images/istio_canary.svg)
 
@@ -138,13 +138,13 @@ docker tag  docker.m.daocloud.io/istio/proxyv2:${ISTIO_VERSION} docker.io/istio/
 
 > 🌐 **交互版**：[在线打开（GitHub Pages）](https://yong-huang.github.io/hands-on-kubernetes/labs/13_service_mesh/images/istio_canary.html)（或本地打开 [`images/istio_canary.html`](images/istio_canary.html)）。
 
-## 面试要点
+## 7. 面试要点
 
 1. **Service Mesh 解决什么问题**：把微服务的流量治理（灰度、重试、超时、熔断、mTLS、遥测）从业务代码/SDK 下沉到基础设施层，业务无侵入、语言无关。代价是每 Pod 多一个代理（资源 + 一跳延迟）和更高的运维复杂度——小团队用 K8s 原生能力往往够了。
 2. **Sidecar 注入原理**：Namespace 打 `istio-injection=enabled` 标签 → Istio 注册的 MutatingWebhook 在 **Pod 创建时**改写 Pod spec，追加 istio-proxy 容器和配置 iptables 的 init 容器；存量 Pod 不受影响，需重启重建。数据面拦截靠 iptables 把进出流量重定向到 envoy 的 15001 等端口。
 3. **和 K8s Service/Ingress 的关系**：Service 依然存在，但它退化成"名字 → Pod 集合"的服务发现载体，负载均衡被 sidecar 接管（kube-proxy 被"架空"但不必删除）；Ingress 只治理南北向（边缘）流量，mesh 治理东西向（服务间）流量，二者可共存（Istio 也提供自己的 Ingress Gateway 替代 Ingress）。
 4. **灰度发布策略对比**：权重路由（按比例放真实流量，最常用）、header/cookie 匹配（白名单灰度，定向到新版本）、镜像（复制流量、响应丢弃，零风险验证）。进阶：结合指标观测的自动化渐进式发布（如 Argo Rollouts/Flagger）。
 
-## 总结
+## 8. 总结
 
 Service Mesh = Sidecar（数据面 envoy）+ 控制面（istiod），核心思想是"把流量治理做成基础设施"。本项目的最小闭环只有三步：Namespace 打注入标签、Deployment 打 version 标签、VirtualService 写权重——就能实现 K8s 原生做不到的 90/10 精确灰度。配合 `istio.sh` 的 test 步骤（20 次请求统计 v1/v2 命中数）可以直观看到分流效果；镜像和 header 路由的写法也以注释形式留在 YAML 里，改几行即可切换策略。

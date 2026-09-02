@@ -1,12 +1,12 @@
 # Kubernetes NetworkPolicy 详解：默认拒绝与白名单隔离
 
-## 引言
+## 1. 引言
 
 Service 提供的是"找到并负载均衡"，但默认情况下 Kubernetes 集群里**任何 Pod 都能访问任何 Pod**——数据库能被任意命名空间里跑偏的脚本连上，一个被攻破的 Pod 可以横向扫遍整个集群。微服务架构下的零信任（Zero Trust）理念要求"默认不信任，按需放行"，这正是 NetworkPolicy 的职责：它在 IP/端口层声明"谁能访问谁"，让 backend 只接受 frontend 的流量，让"恶意" Pod 连不上任何东西。
 
 要注意的一点前提：**NetworkPolicy 只是声明，执行者是 CNI 插件**。API server 只做格式校验，真正在节点上编程 iptables/eBPF 的是 Calico、Cilium 这类 CNI（见后文 kind/kindnet 的坑）。
 
-## 文件结构
+## 2. 文件结构
 
 ```
 12_network_policy/
@@ -27,7 +27,7 @@ kubectl apply -f manifests/network_policy.yaml -l tier=workload   # 先只部署
 kubectl apply -f manifests/network_policy.yaml -l tier=policy     # 再上隔离策略
 ```
 
-## 核心概念
+## 3. 核心概念
 
 ### NetworkPolicy 的作用机制：选中 + 加规则
 
@@ -97,7 +97,7 @@ egress:
 
 本文 YAML 里这段作为可选示例注释保留，三个 Egress 策略（deny-all + allow-dns + allow-to-backend）必须一起启用，缺一个就会"莫名其妙"断网。
 
-## YAML 关键字段
+## 4. YAML 关键字段
 
 ```yaml
 spec:
@@ -122,7 +122,7 @@ spec:
 - NetworkPolicy 是**命名空间级别**的对象，`from.podSelector` 只在**同命名空间**内选；跨命名空间必须配合 `namespaceSelector`
 - 策略叠加是并集：多条策略选中同一 Pod 时，任一条放行即放行，没有 deny 规则（K8s 原生没有"黑名单"，要黑名单得用 CNI 扩展策略，如 Calico 的 `GlobalNetworkPolicy`（projectcalico.org/v3，支持集群级策略与 deny 规则），或 Cilium 的 `CiliumNetworkPolicy`（基于 eBPF，支持 L3-L7 规则））
 
-## kind/kindnet 不生效问题与 Calico 方案
+## 5. kind/kindnet 不生效问题与 Calico 方案
 
 kind 默认的 CNI 是 kindnet，**不支持 NetworkPolicy**：`kubectl apply` 能成功（API server 只做 schema 校验），`kubectl get networkpolicy` 也能看到对象，但节点上不会有任何 iptables 规则——隔离完全不存在，脚本里 evil Pod 的 wget 照样通。`network_policy.sh` 启动时会自动检测 CNI 并给出警告。
 
@@ -141,7 +141,7 @@ kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.28.0/
 kubectl -n kube-system rollout status ds/calico-node
 ```
 
-## 可视化
+## 6. 可视化
 
 ![NetworkPolicy 隔离](images/netpol_isolation.svg)
 
@@ -149,13 +149,13 @@ kubectl -n kube-system rollout status ds/calico-node
 
 > 🌐 **交互版**：[在线打开（GitHub Pages）](https://yong-huang.github.io/hands-on-kubernetes/labs/12_network_policy/images/netpol_isolation.html)（或本地打开 [`images/netpol_isolation.html`](images/netpol_isolation.html)）。
 
-## 面试要点
+## 7. 面试要点
 
 1. **NetworkPolicy 由谁执行？** CNI 插件（Calico/Cilium 等），不是 API server、不是 kube-proxy。API server 只负责存储和校验对象；节点上的 CNI 把策略编程成 iptables/IPSet 或 eBPF 规则。所以 kindnet 这类不支持策略的 CNI 下，对象能创建但毫无效果——"写了策略≠有隔离"，换 CNI 前需验证。
 2. **Pod 一旦被 Ingress 策略选中，其他流量全拒绝吗？** 是的。该方向一旦存在选中它的策略，就从"默认全放行"切换为"只放行规则匹配的流量"；多条策略之间是并集叠加，且 K8s 原生没有 deny 规则（黑名单需 CNI 扩展实现）。没有被任何策略选中的 Pod 该方向保持全放行。
 3. **命名空间之间默认隔离吗？** 网络层默认**不隔离**——跨命名空间的 Pod 可以直接互访（除非 CNI 有额外配置）。要隔离需用 namespaceSelector：跨命名空间放行时 `from` 里必须写 namespaceSelector（可再叠 podSelector 表示"该命名空间里的某些 Pod"）；NetworkPolicy 对象本身也只作用于自己所在的命名空间。
 4. **NetworkPolicy 与 RBAC 的区别？** 完全不同层的东西：RBAC 管 **Kubernetes API 的访问控制**（谁能 kubectl get/watch/edit 什么资源），主体是用户/ServiceAccount；NetworkPolicy 管 **Pod 之间的网络流量**（L3/L4，谁能连谁的哪个端口），主体是 Pod/IP。RBAC 挡不住 Pod 之间的 TCP 连接，NetworkPolicy 也挡不住某人调 API。
 
-## 总结
+## 8. 总结
 
 NetworkPolicy = podSelector（选中受影响的 Pod）+ 分方向的规则（Ingress 的 from/ports、Egress 的 to/ports）。记住三条判定主线：无策略全放行、有策略只放行匹配流量、策略叠加取并集。生产实践先打 default-deny 再按需开洞，开 Egress 时别忘了放行 kube-dns 的 53 端口。最后切记执行者是 CNI 插件——在 kindnet 上"验证通过"的隔离可能是假的。配合 `network_policy.sh` 的 before/after 对比演示，能直观看到白名单放行 frontend、拦截 evil 的效果。
