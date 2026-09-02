@@ -1,20 +1,20 @@
 # 分布式追踪（Jaeger）
 
-## 文件结构
+## 1. 文件结构
 
 ```
 25_jaeger_tracing/
-├── README.md     # 本文档
-├── jaeger_tracing.sh # 全流程演示脚本（步骤见脚本头部注释）
+├── README.md                # 本文档
+├── jaeger_tracing.sh        # 全流程演示脚本（步骤见脚本头部注释）
 ├── manifests/
 │   └── jaeger_tracing.yaml  # 演示用的 K8s 清单
-├── scripts/
-│   └── gen_arch.py   # 架构图生成脚本 (python3 scripts/gen_arch.py)
 └── images/
-    └── jaeger_tracing_arch.png   # 架构图（gen_arch.py 生成）
+    ├── trace_waterfall.architecture.json  # 图源（Archify Typed JSON IR）
+    ├── trace_waterfall.html               # 交互版架构图
+    └── trace_waterfall.svg                # 双主题矢量版（本文档 §5 内嵌）
 ```
 
-## 项目概述
+## 2. 项目概述
 
 指标告诉你"慢了"，日志告诉你"错了"，但跨三个服务的请求到底慢在哪一跳？本项目（`jaeger_tracing.yaml` + `jaeger_tracing.sh`）部署 Jaeger all-in-one，给三个真实微服务（front → order → payment，代码放 ConfigMap、镜像用 `python:3.12-slim`）接入 OTel SDK（容器内 pip 安装，等价于 Operator 自动注入），span 经 OTLP 上报 Jaeger——目标是让微服务调用链在 Jaeger UI 上以瀑布图完整呈现。
 
@@ -22,7 +22,7 @@
 
 ---
 
-## 核心机制解析
+## 3. 核心机制解析
 
 ### 1. Trace 与 Span：给调用栈拍 X 光
 
@@ -82,17 +82,17 @@ Jaeger 1.5x 原生开放 OTLP gRPC 入口（4317），CR 里的 `exporter.endpoi
 
 ---
 
-## 可视化分析
+## 4. 可视化
 
-![jaeger](images/jaeger_tracing_arch.png)
+![Trace 瀑布](images/trace_waterfall.svg)
 
-上图两面板：
-- **左图 Trace 瀑布图**：模拟一条 182ms 请求的 span 树，缩进表示父子层级、宽度表示耗时，虚线连接父子 span；payment 的 db INSERT 一眼可见为瓶颈段
-- **右图 数据流**：client 生成 trace-id → frontend/order/payment 建 span（自装 SDK 与 operator 注入等价） 并透传 header → OTLP gRPC 批量上报 → Jaeger Collector 入库 → Query UI 检索；附采样率控制说明
+左侧是本实验那条 182ms 请求的 span 瀑布（阶梯缩进=父子层级，宽度=自身耗时）：svc-front 182ms → svc-order 150ms → svc-payment 95ms → db INSERT 40ms——瓶颈一眼可见。虚线是 **traceparent 透传**，链路得以延续的唯一前提。右侧是上报链：三个服务的 OTel SDK（自装与 Operator 注入等价）经 OTLP gRPC :4317 批量上报 Jaeger，采样率阀门控制成本。
+
+> 🌐 **交互版**：[在线打开（GitHub Pages）](https://yong-huang.github.io/hands-on-kubernetes/labs/25_jaeger_tracing/images/trace_waterfall.html)（或本地打开 [`images/trace_waterfall.html`](images/trace_waterfall.html)）。
 
 ---
 
-## 工程延伸
+## 5. 工程延伸
 
 - **尾部采样**: OTel Tail Sampling Processor 按 status/duration/路由动态决策，错误与慢请求全保
 - **Trace↔Log 关联**: 日志里打 trace-id、span 注入 log correlation 字段，Jaeger 点进 span 能跳日志

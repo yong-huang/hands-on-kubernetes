@@ -1,0 +1,191 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Velero：双平面备份进对象存储，restore 反向展开",
+    "locale": "zh-CN",
+    "output": "labs/18_velero_migration/images/velero_planes.html",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    {
+      "id": "ctrl",
+      "type": "backend",
+      "label": "velero controller",
+      "sublabel": "watch · 导出全部 API 对象",
+      "pos": [
+        60,
+        80
+      ],
+      "size": [
+        210,
+        80
+      ],
+      "tag": "① API 对象面"
+    },
+    {
+      "id": "agent",
+      "type": "backend",
+      "label": "node agent（kopia）",
+      "sublabel": "DaemonSet · 打包 PVC 文件",
+      "pos": [
+        60,
+        215
+      ],
+      "size": [
+        210,
+        80
+      ],
+      "tag": "② 卷数据面"
+    },
+    {
+      "id": "pvc",
+      "type": "database",
+      "label": "PVC 数据",
+      "sublabel": "StatefulSet 卷 · marker.log",
+      "pos": [
+        60,
+        370
+      ],
+      "size": [
+        210,
+        78
+      ],
+      "tag": "hostPath 除外 *"
+    },
+    {
+      "id": "s3",
+      "type": "external",
+      "label": "对象存储 S3 / MinIO",
+      "sublabel": "BackupStorageLocation · bucket",
+      "pos": [
+        440,
+        210
+      ],
+      "size": [
+        220,
+        90
+      ],
+      "tag": "中立地带"
+    },
+    {
+      "id": "restore",
+      "type": "backend",
+      "label": "velero restore",
+      "sublabel": "--from-backup · 目标集群",
+      "pos": [
+        820,
+        213
+      ],
+      "size": [
+        210,
+        84
+      ],
+      "tag": "③ 反向展开"
+    },
+    {
+      "id": "nsout",
+      "type": "backend",
+      "label": "velero-demo-restored",
+      "sublabel": "对象重建 · PVC 重新供给 · 数据回灌",
+      "pos": [
+        820,
+        383
+      ],
+      "size": [
+        230,
+        84
+      ],
+      "tag": "namespace mapping"
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "源集群（kind）",
+      "wraps": [
+        "ctrl",
+        "agent",
+        "pvc"
+      ],
+      "pad": 24
+    },
+    {
+      "kind": "region",
+      "label": "目标集群",
+      "wraps": [
+        "restore",
+        "nsout"
+      ],
+      "pad": 24
+    }
+  ],
+  "connections": [
+    {
+      "from": "pvc",
+      "to": "agent",
+      "label": "读取卷文件",
+      "variant": "dashed",
+      "fromSide": "top",
+      "toSide": "bottom"
+    },
+    {
+      "from": "ctrl",
+      "to": "s3",
+      "label": "API 对象 tarball",
+      "variant": "emphasis",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "from": "agent",
+      "to": "s3",
+      "variant": "emphasis",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "from": "s3",
+      "to": "restore",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "from": "restore",
+      "to": "nsout",
+      "label": "改名重建",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "两条数据平面",
+      "items": [
+        "API 对象面：controller 导出对象打 tarball，只依赖 API server",
+        "文件系统备份：node agent 打包 PVC 文件，跨集群迁移主力",
+        "CSI 快照：最快但留在原存储，跨集群读不到（17 的主题）"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "迁移的灵魂：namespace mapping",
+      "items": [
+        "--namespace-mappings 源:目标，对象改名后重建",
+        "PVC 重新动态供给，node agent 把文件数据灌回去",
+        "--exclude-resources events,endpoints：垃圾对象不要恢复"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "诚实预期与一致性",
+      "items": [
+        "hostPath 卷不支持文件级备份（kind local-path 的限制）",
+        "备份一致性靠 hooks：pre 打快照/锁表，post 解锁",
+        "RPO=备份频率（schedule 定时）；RTO≈恢复+重供给+回灌"
+      ]
+    }
+  ]
+}

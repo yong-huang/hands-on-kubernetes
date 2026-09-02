@@ -1,26 +1,26 @@
 # Kubernetes StorageClass：动态供给、延迟绑定与 CSI
 
-## 引言
+## 1. 引言
 
 上一篇（15_pv_pvc）的静态供给有个明显的运维痛点：**PV 要管理员手动创建**。用户提一个 500Mi 的 PVC，管理员得先估算容量、选节点路径、写 YAML、apply 一个 PV；容量给大了浪费（绑定"就大不就小"且整块独占），给小了绑不上；用户一多，管理员就成了人肉供给器。而且静态 PV 的拓扑（hostPath 在哪个节点）要手动配 nodeAffinity，配错就挂载失败。
 
 动态供给把"建卷"这一步交给控制器：管理员只定义一次 **StorageClass**（用哪个供给器、什么参数），之后用户只写 PVC——控制器按需**自动创建精确大小的 PV 并绑定**，PVC 删除时按 reclaimPolicy 自动回收。一次配置，终身供给。
 
-## 文件结构
+## 2. 文件结构
 
 ```
 16_storageclass/
-├── README.md    # 本文档
-├── sc.sh                 # 全流程演示脚本: deploy/test/reclaim/clean
+├── README.md                # 本文档
+├── sc.sh                    # 全流程演示脚本: deploy/test/reclaim/clean
 ├── manifests/
-│   └── storageclass.yaml     # StorageClass(fast-local) + PVC + 挂载 Pod
-├── scripts/
-│   └── gen_arch.py        # 架构图生成脚本 (python3 scripts/gen_arch.py)
+│   └── storageclass.yaml    # StorageClass(fast-local) + PVC + 挂载 Pod
 └── images/
-       └── storageclass_arch.png # 供给流程与绑定模式示意图
+    ├── sc_provisioning.workflow.json  # 图源（Archify Typed JSON IR）
+    ├── sc_provisioning.html           # 交互版流程图
+    └── sc_provisioning.svg            # 双主题矢量版（本文档 §可视化 内嵌）
 ```
 
-## 核心概念
+## 3. 核心概念
 
 ### StorageClass 的四个关键字段
 
@@ -65,7 +65,7 @@ external-provisioner 等 sidecar ──gRPC──▶ CSI plugin (kubelet 节点�
 
 创建/删除卷走控制面 sidecar，挂载/卸载走节点上的 CSI plugin（kubelet 通过 gRPC 调它）。K8s 只认接口不认厂商——新增一种存储只需装一个 CSI 驱动，不用改 Kubernetes 代码。
 
-## YAML 关键字段
+## 4. YAML 关键字段
 
 ```yaml
 # StorageClass（管理员定义一次）
@@ -88,17 +88,19 @@ spec:
 - PVC 删除卡 Terminating 通常是因为还有 Pod 在用它（pvc-protection finalizer）
 - `allowVolumeExpansion: true` 才能在线扩容 PVC，且取决于 CSI 驱动是否支持
 
-## kind 的 local-path 与云 CSI 的差异
+## 5. kind 的 local-path 与云 CSI 的差异
 
 kind 集群自带的 `standard` StorageClass 由 rancher/local-path-provisioner 驱动：它**不是 CSI 驱动**，而是一个独立的 external-provisioner，建卷动作只是在 Pod 所在的 kind 节点容器里 `mkdir` 一个目录，再生成 hostPath PV。但**动态供给的完整流程（SC → PVC Pending → Pod 调度 → 自动建 PV → Bound → Delete 回收）与云上 CSI 完全一致**，所以用 kind 学动态供给是零成本的。生产云上的差别在于：provisioner 换成 CSI 驱动（真的会调云 API 开一块盘）、parameters 有意义（卷类型/IOPS）、topology 从"节点"升级为"可用区"。
 
-## 可视化
+## 6. 可视化
 
-左图对比静态（15）与动态（16）供给流程：静态是管理员先手工建 PV、控制器再绑定；动态是 PVC → StorageClass → provisioner/CSI 插件 → PV 自动创建。右图是 Immediate vs WaitForFirstConsumer 的时间线（PVC Pending → Pod 调度 → 建 PV → Bound → Running）与常见云 CSI 驱动的参数/拓扑示例表：
+![StorageClass 动态供给](images/sc_provisioning.svg)
 
-![storageclass](images/storageclass_arch.png)
+动态供给流水线：用户只写 PVC（500Mi · sc=fast-local）→ PV controller 发现无可绑 PV、SC 有 provisioner → **WaitForFirstConsumer 等 Pod 先调度**（PVC Pending = 正常状态）→ Pod 调度完成后自动建卷、生成精确大小的 PV → Bound（claimRef 一对一）→ kubelet 挂载、Pod Running。回收分支：`reclaimPolicy: Delete` 下删 PVC 连 PV 与数据一起删。
 
-## 面试要点
+> 🌐 **交互版**：[在线打开（GitHub Pages）](https://yong-huang.github.io/hands-on-kubernetes/labs/16_storageclass/images/sc_provisioning.html)（或本地打开 [`images/sc_provisioning.html`](images/sc_provisioning.html)）。
+
+## 7. 面试要点
 
 1. **动态绑定的完整流程**：用户创建 PVC（指定 SC 或留空用默认）→ PV controller 发现该 PVC 无 PV 可绑且 SC 有 provisioner → 等待绑定条件满足（WFFC 时等 Pod 调度）→ external-provisioner/CSI sidecar 调供给器建卷 → 生成 PV 对象 → 控制器把 PV 与 PVC 绑定（claimRef）→ kubelet 挂载。全程无人工介入。
 2. **WaitForFirstConsumer 为什么存在**：为了拓扑正确。云盘绑定可用区、local 盘绑定节点，只有先知道 Pod 调度到哪，才能把卷建在"够得着"的地方；Immediate 先建卷后调度，可能跨区导致永久挂载失败。
@@ -106,6 +108,6 @@ kind 集群自带的 `standard` StorageClass 由 rancher/local-path-provisioner 
 4. **CSI 是什么**：Container Storage Interface，一套 gRPC 标准接口（CreateVolume/DeleteVolume/ControllerPublish/NodeStage/NodePublish 等），把存储驱动从 K8s in-tree 代码解耦成独立组件（控制面 sidecar + 节点 DaemonSet）。K8s 通过 sidecar 与 CSI plugin 交互，新增存储后端无需改 K8s 源码。
 5. **动态供给下 reclaimPolicy 的选择**：默认 Delete——PVC 删了卷和数据一起没，干净但危险；数据库类卷应显式设 `Retain`（或依赖快照/备份），避免误删 PVC 导致数据蒸发。
 
-## 总结
+## 8. 总结
 
 StorageClass 把存储供给从"管理员手工运维"变成"声明式自助服务"：管理员定义一次供给模板，用户只管提 PVC，卷的创建、精确容量、拓扑放置、回收全部自动化。与 15 对照着看最直观：静态供给里我们手写 PV、手动清数据；这里 PVC Pending → Pod 调度 → PV 冒出来 → 删 PVC 连 PV 一起消失，一条命令都没多敲。记住三个关键词：provisioner（谁来建卷）、volumeBindingMode（什么时候建，为什么等 Pod）、is-default-class（留空用谁）。

@@ -1,0 +1,242 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "CSI 快照链路：对象能建 ≠ 快照存在，判据是 readyToUse",
+    "locale": "zh-CN",
+    "output": "labs/17_csi_snapshot/images/snapshot_chain.html",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    {
+      "id": "vsnap",
+      "type": "database",
+      "label": "VolumeSnapshot",
+      "sublabel": "source: PVC snap-source",
+      "pos": [
+        60,
+        80
+      ],
+      "size": [
+        200,
+        80
+      ],
+      "tag": "namespaced · 用户请求"
+    },
+    {
+      "id": "ctrl",
+      "type": "backend",
+      "label": "snapshot-controller",
+      "sublabel": "external-snapshotter 项目",
+      "pos": [
+        340,
+        80
+      ],
+      "size": [
+        210,
+        84
+      ],
+      "tag": "只做转发，不做快照"
+    },
+    {
+      "id": "driver",
+      "type": "cloud",
+      "label": "CSI 驱动",
+      "sublabel": "CreateSnapshot gRPC（可选实现）",
+      "pos": [
+        620,
+        80
+      ],
+      "size": [
+        210,
+        84
+      ],
+      "tag": "kind local-path 无此接口 ✗"
+    },
+    {
+      "id": "snap",
+      "type": "database",
+      "label": "存储后端快照",
+      "sublabel": "增量 · 秒级 · COW/ROW",
+      "pos": [
+        900,
+        80
+      ],
+      "size": [
+        200,
+        84
+      ],
+      "tag": "数据在这里"
+    },
+    {
+      "id": "class",
+      "type": "database",
+      "label": "VolumeSnapshotClass",
+      "sublabel": "driver + deletionPolicy",
+      "pos": [
+        340,
+        240
+      ],
+      "size": [
+        210,
+        78
+      ],
+      "tag": "类比 StorageClass"
+    },
+    {
+      "id": "content",
+      "type": "database",
+      "label": "VolumeSnapshotContent",
+      "sublabel": "snapshotHandle 绑定后端快照",
+      "pos": [
+        735,
+        240
+      ],
+      "size": [
+        210,
+        78
+      ],
+      "tag": "集群级 · 类比 PV"
+    },
+    {
+      "id": "restore",
+      "type": "database",
+      "label": "还原 PVC（新卷）",
+      "sublabel": "dataSource: VolumeSnapshot",
+      "pos": [
+        60,
+        400
+      ],
+      "size": [
+        220,
+        84
+      ],
+      "tag": "≥ restoreSize"
+    },
+    {
+      "id": "newpv",
+      "type": "database",
+      "label": "新 PV（clone 出的卷）",
+      "sublabel": "从快照供给新卷",
+      "pos": [
+        400,
+        400
+      ],
+      "size": [
+        210,
+        84
+      ]
+    },
+    {
+      "id": "podnew",
+      "type": "backend",
+      "label": "新 Pod 挂新卷",
+      "sublabel": "验证后切流 · 回滚=换卷",
+      "pos": [
+        700,
+        400
+      ],
+      "size": [
+        210,
+        84
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "from": "vsnap",
+      "to": "ctrl",
+      "label": "① apply 快照请求",
+      "variant": "emphasis",
+      "labelAt": [
+        300,
+        174
+      ]
+    },
+    {
+      "from": "ctrl",
+      "to": "driver",
+      "label": "② CreateSnapshot",
+      "labelAt": [
+        585,
+        178
+      ]
+    },
+    {
+      "from": "driver",
+      "to": "snap",
+      "label": "③ 后端创建快照",
+      "labelAt": [
+        865,
+        178
+      ]
+    },
+    {
+      "from": "class",
+      "to": "ctrl",
+      "label": "提供 driver 名",
+      "variant": "dashed",
+      "fromSide": "top",
+      "toSide": "bottom"
+    },
+    {
+      "from": "snap",
+      "to": "content",
+      "label": "④ 回填 handle",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "right",
+      "labelAt": [
+        955,
+        332
+      ]
+    },
+    {
+      "from": "vsnap",
+      "to": "restore",
+      "label": "⑤ dataSource 引用",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "from": "restore",
+      "to": "newpv",
+      "label": "⑥ 触发 clone"
+    },
+    {
+      "from": "newpv",
+      "to": "podnew",
+      "label": "⑦ Bound 后挂载"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "三层 CRD = PV/PVC 的时间维度复刻",
+      "items": [
+        "VolumeSnapshot：用户请求（namespaced，指向源 PVC）",
+        "VolumeSnapshotContent：集群级句柄，对应后端真实快照",
+        "VolumeSnapshotClass：driver + deletionPolicy（Delete/Retain）"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "谁实现了快照接口",
+      "items": [
+        "snapshot-controller 只做转发：找 Class 里的 driver 调 gRPC",
+        "CreateSnapshot 是 CSI 驱动的可选实现（EBS/Longhorn/Ceph 有）",
+        "kind local-path 没实现 → readyToUse 永远 false，还原 PVC 一直 Pending"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "还原与分工",
+      "items": [
+        "dataSource 三种：VolumeSnapshot / PVC 克隆 / Content",
+        "恢复 = 新建 PVC 换卷，不能原地灌回（一致性无法保证）",
+        "CSI 快照管卷数据同集群；Velero 管对象 + 跨集群"
+      ]
+    }
+  ]
+}

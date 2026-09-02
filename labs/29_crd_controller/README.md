@@ -1,27 +1,27 @@
 # 自定义资源（CRD）与 Controller
 
-## 文件结构
+## 1. 文件结构
 
 ```
 29_crd_controller/
-├── README.md     # 本文档
-├── crd_controller.sh # 全流程演示脚本（步骤见脚本头部注释）
-├── controller.py    # Database CRD Controller（Reconcile 循环）
+├── README.md              # 本文档
+├── crd_controller.sh      # 全流程演示脚本（步骤见脚本头部注释）
+├── controller.py          # Database CRD Controller（Reconcile 循环）
 ├── manifests/
 │   └── database_crd.yaml  # 演示用的 K8s 清单
-├── scripts/
-│   └── gen_arch.py   # 架构图生成脚本 (python3 scripts/gen_arch.py)
 └── images/
-    └── crd_controller_arch.png   # 架构图（gen_arch.py 生成）
+    ├── reconcile_loop.workflow.json  # 图源（Archify Typed JSON IR）
+    ├── reconcile_loop.html           # 交互版流程图
+    └── reconcile_loop.svg            # 双主题矢量版（本文档 §5 内嵌）
 ```
 
-## 项目概述
+## 2. 项目概述
 
 K8s 的可扩展性核心在于：API Server 不需要内置所有概念。本项目（`database_crd.yaml` + `controller.py`）自定义一个 `Database` CRD——用户声明"我要一个 postgres/10Gi"，**Controller 的 Reconcile 循环**负责创建对应的 StatefulSet 并回写 status——目标是亲手实现 Operator Pattern 的最小闭环，并理解"调谐"与"命令式部署"的本质区别。
 
 ---
 
-## 核心机制解析
+## 3. 核心机制解析
 
 ### 1. CRD：给 API Server 长出新端点
 
@@ -62,17 +62,17 @@ Controller 不关心"发生了什么事件"（边缘触发），只对比"期望
 
 ---
 
-## 可视化分析
+## 4. 可视化
 
-![crd](images/crd_controller_arch.png)
+![Reconcile 循环](images/reconcile_loop.svg)
 
-上图两面板：
-- **左图 API 扩展结构**：CRD 把自定义组挂进 API Server 后形成的 REST 路径 / kubectl 别名 / schema 校验 / spec-status 分权四要素；右侧是一份完整的 Database CR 示例
-- **右图 Reconcile 循环**：Informer → 队列去重 → Reconcile → 对比期望与实际 → 创建/更新 → 回写 status → 重入队的完整闭环，附水平触发的本质说明
+最小闭环画成了循环：用户提交 Database CR → API Server 校验存储（openAPIV3Schema + /status 子资源）→ controller **读期望 vs 查实际** → 缺则建、漂移则 patch → 回写 status → 虚线"周期重入队"让循环持续运转。异常泳道是自愈演示：手动把 STS 副本改成 2，下一轮对比自动拉回 3——水平触发的本质一图看懂。
+
+> 🌐 **交互版**：[在线打开（GitHub Pages）](https://yong-huang.github.io/hands-on-kubernetes/labs/29_crd_controller/images/reconcile_loop.html)（或本地打开 [`images/reconcile_loop.html`](images/reconcile_loop.html)）。
 
 ---
 
-## 工程延伸
+## 5. 工程延伸
 
 - **Operator SDK**: 用 kubebuilder/controller-runtime 替代裸 client-go，自动生成 informer/rbac/webhook 骨架
 - **Webhook 准入**: 给 Database 加 defaulting/validation webhook，CR 提交时自动补默认值

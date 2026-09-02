@@ -1,26 +1,26 @@
 # Kubernetes CSI 快照与还原：VolumeSnapshot、dataSource 与 kind 上的诚实预期
 
-## 引言
+## 1. 引言
 
 有了 PV/PVC 和动态供给，数据的"存放"问题解决了，但"出事怎么办"没有：误执行 `DELETE FROM`、发布引入数据损坏、想给生产库克隆一份测试环境——这些场景的共同需求是**把某一时刻的卷状态保存下来，需要时再变回一个可用的卷**。这就是 CSI Snapshot 的使命：备份、回滚、克隆，三个场景一套机制。
 
 快照的特殊之处在于它**发生在存储后端**而不是 Pod 里：增量、秒级、不占用 Pod 的计算资源。要理解它，关键是搞清楚"谁实现了什么"——这正好也是 kind 集群上最容易踩的认知坑。
 
-## 文件结构
+## 2. 文件结构
 
 ```
 17_csi_snapshot/
-├── README.md    # 本文档
+├── README.md               # 本文档
 ├── snapshot.sh             # 分步演示: crd | deploy | snapshot | restore | verify | clean
 ├── manifests/
-│   └── csi_snapshot.yaml       # PVC+Pod / VolumeSnapshotClass / VolumeSnapshot / 还原 PVC
-├── scripts/
-│   └── gen_arch.py        # 架构图生成脚本 (python3 scripts/gen_arch.py)
+│   └── csi_snapshot.yaml   # PVC+Pod / VolumeSnapshotClass / VolumeSnapshot / 还原 PVC
 └── images/
-       └── csi_snapshot_arch.png   # 快照/还原链路 + 备份策略光谱图
+    ├── snapshot_chain.architecture.json  # 图源（Archify Typed JSON IR）
+    ├── snapshot_chain.html               # 交互版架构图
+    └── snapshot_chain.svg                # 双主题矢量版（本文档 §6 内嵌）
 ```
 
-## 核心概念
+## 3. 核心概念
 
 ### 三层 CRD 体系
 
@@ -70,7 +70,7 @@ dataSource:
 
 控制器从快照 clone 出一个新卷，新 PVC Bound 后 Pod 挂载读到的就是快照时刻的数据。要求快照 `readyToUse: true`，且新 PVC 的 `storage >= restoreSize`。
 
-## YAML 关键字段
+## 4. YAML 关键字段
 
 ```yaml
 # VolumeSnapshotClass —— 快照配方
@@ -92,13 +92,15 @@ spec:
     apiGroup: snapshot.storage.k8s.io
 ```
 
-## 可视化
+## 5. 可视化
 
-左图是快照链路（VolumeSnapshot → snapshot-controller → CSI 驱动 → 存储后端快照）与还原链路（dataSource → clone → 新 PV），并标注 kind local-path 的能力边界；右图是备份策略光谱（CSI 快照 / Velero / 应用级备份）与驱动支持矩阵：
+![CSI 快照链路](images/snapshot_chain.svg)
 
-![csi_snapshot](images/csi_snapshot_arch.png)
+图中①-⑦是完整链路：apply VolumeSnapshot → snapshot-controller 转发 → CSI 驱动执行 CreateSnapshot → 存储后端生成快照并回填 handle → VolumeSnapshotContent 绑定；还原走 ⑤-⑦：新 PVC 以 dataSource 引用快照 → clone 出新卷 → 新 Pod 挂新卷。CSI 驱动节点上标出了 **kind local-path 的能力断点**——没有 CreateSnapshot 实现，链路在②断掉，readyToUse 永远不会变 true。
 
-## 面试要点
+> 🌐 **交互版**：[在线打开（GitHub Pages）](https://yong-huang.github.io/hands-on-kubernetes/labs/17_csi_snapshot/images/snapshot_chain.html)（或本地打开 [`images/snapshot_chain.html`](images/snapshot_chain.html)）。
+
+## 6. 面试要点
 
 1. **快照 vs 备份**：快照存在存储后端，通常是增量 COW/ROW 实现，创建秒级、空间省，但与源卷同生命周期、同故障域（存储阵列挂了快照也没了）；备份是把数据复制到独立介质，慢且占空间，但能对抗存储级故障。正确姿势是"快照保 RPO + 定期把快照导出到备份存储"。
 2. **快照存在哪**：不在 etcd（那里只有 VolumeSnapshot/Content 这些元数据对象），不在节点，而在存储后端（EBS 快照、Ceph RBD snapshot、Longhorn 快照链）。`kubectl get volumesnapshot` 看到的只是后端快照的"句柄"。
@@ -106,6 +108,6 @@ spec:
 4. **与 Velero 的分工**：CSI 快照只管卷数据、同集群、秒级，不包含 Deployment/Service/ConfigMap 等 K8s 对象；Velero 备份"对象 + 数据"两层，能跨集群恢复、异地容灾，但通常更慢。生产常见组合：Velero 拉起对象，卷数据走 CSI 快照或对象存储插件（如 velero-plugin-for-aws 调 S3）。
 5. **VolumeSnapshotContent 和 deletionPolicy=Retain 的场景**：删除 namespaced 的 VolumeSnapshot 时想保留后端快照（比如 namespace 整体销毁但数据要留档），用 Retain——controller 只删 K8s 对象，后端快照及 Content 需手动清理，语义与 PV 的 Retain 一致。
 
-## 总结
+## 7. 总结
 
 CSI 快照体系 = PV/PVC 设计模式在"时间维度"上的复刻：VolumeSnapshotClass/VolumeSnapshot/VolumeSnapshotContent 三层对应 StorageClass/PVC/PV，dataSource 对应"从模板供给新卷"。核心认知是**能力分层**：CRD + snapshot-controller 是通用控制面（人人可装），CreateSnapshot 是驱动的可选实现（EBS/Longhorn/Ceph 有，kind local-path 没有）——所以"对象创建成功"绝不等于"快照真的存在"，判断标准只有一个：`status.readyToUse: true`。配合 `snapshot.sh` 在 kind 上亲眼看到"永远不 ready"的诚实演示，比在云上一次跑通记得更牢。

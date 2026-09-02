@@ -1,0 +1,224 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "分布式追踪：span 瀑布定位慢在哪一跳，OTLP 汇入 Jaeger",
+    "locale": "zh-CN",
+    "output": "labs/25_jaeger_tracing/images/trace_waterfall.html",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    {
+      "id": "front",
+      "type": "backend",
+      "label": "svc-front · GET /",
+      "sublabel": "span 182ms（整条请求）",
+      "pos": [
+        60,
+        80
+      ],
+      "size": [
+        420,
+        70
+      ],
+      "tag": "trace-id 根"
+    },
+    {
+      "id": "order",
+      "type": "backend",
+      "label": "svc-order · POST /order",
+      "sublabel": "span 150ms",
+      "pos": [
+        130,
+        180
+      ],
+      "size": [
+        350,
+        70
+      ]
+    },
+    {
+      "id": "pay",
+      "type": "backend",
+      "label": "svc-payment · /pay",
+      "sublabel": "span 95ms",
+      "pos": [
+        200,
+        280
+      ],
+      "size": [
+        280,
+        70
+      ]
+    },
+    {
+      "id": "db",
+      "type": "database",
+      "label": "db INSERT",
+      "sublabel": "40ms",
+      "pos": [
+        270,
+        380
+      ],
+      "size": [
+        210,
+        66
+      ],
+      "tag": "瓶颈一眼可见"
+    },
+    {
+      "id": "sdk",
+      "type": "backend",
+      "label": "OTel SDK（自装/注入等价）",
+      "sublabel": "TracerProvider + OTLP exporter",
+      "pos": [
+        640,
+        80
+      ],
+      "size": [
+        220,
+        84
+      ],
+      "tag": "W3C traceparent"
+    },
+    {
+      "id": "collector",
+      "type": "messagebus",
+      "label": "Jaeger Collector",
+      "sublabel": "OTLP gRPC :4317",
+      "pos": [
+        640,
+        210
+      ],
+      "size": [
+        220,
+        80
+      ]
+    },
+    {
+      "id": "jaeger",
+      "type": "database",
+      "label": "Jaeger 存储 + Query",
+      "sublabel": "瀑布图 UI · trace 检索",
+      "pos": [
+        640,
+        340
+      ],
+      "size": [
+        220,
+        84
+      ]
+    },
+    {
+      "id": "sample",
+      "type": "security",
+      "label": "采样率阀门",
+      "sublabel": "head 1~10% + tail 保错误慢请求",
+      "pos": [
+        920,
+        340
+      ],
+      "size": [
+        230,
+        70
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "from": "front",
+      "to": "order",
+      "label": "traceparent 透传",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        288,
+        164
+      ]
+    },
+    {
+      "from": "order",
+      "to": "pay",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "from": "pay",
+      "to": "db",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "from": "front",
+      "to": "sdk",
+      "label": "span 上报（OTLP）",
+      "variant": "emphasis",
+      "labelAt": [
+        504,
+        164
+      ]
+    },
+    {
+      "from": "sdk",
+      "to": "collector",
+      "label": "批量异步上报",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        762,
+        187
+      ]
+    },
+    {
+      "from": "collector",
+      "to": "jaeger",
+      "label": "入库",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        750,
+        304
+      ]
+    },
+    {
+      "from": "sample",
+      "to": "sdk",
+      "label": "控制成本",
+      "variant": "dashed",
+      "fromSide": "top",
+      "toSide": "right"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Trace / Span",
+      "items": [
+        "trace-id 全局唯一，span 记录耗时并以 parent 构成树",
+        "瀑布图宽度 = 自身耗时：db INSERT 40ms 一眼见瓶颈",
+        "断链症状：大量单 span 孤儿 trace——某层没透传 traceparent"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "埋点两条路（殊途同归）",
+      "items": [
+        "生产：OTel Operator 注解注入 init 容器拷 agent，零代码侵入",
+        "本实验：容器内 pip 自装 SDK，显式 init Provider/exporter/透传",
+        "service.name 决定 Jaeger 服务名；换语言只是换注解"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "OTLP 与采样",
+      "items": [
+        "OTLP gRPC :4317 厂商中立，换后端（Jaeger→Tempo）只改 collector",
+        "head 采样 1~10% 控制存储成本",
+        "tail 采样把错误与慢请求 100% 保留——排障最需要的正是它们"
+      ]
+    }
+  ]
+}

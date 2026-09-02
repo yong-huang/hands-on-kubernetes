@@ -1,26 +1,26 @@
 # 多集群联邦管理（Karmada）
 
-## 文件结构
+## 1. 文件结构
 
 ```
 30_multicluster_federation/
-├── README.md     # 本文档
-├── karmada.sh       # 全流程演示脚本（步骤见脚本头部注释）
+├── README.md           # 本文档
+├── karmada.sh          # 全流程演示脚本（步骤见脚本头部注释）
 ├── manifests/
-│   └── karmada.yaml  # 演示用的 K8s 清单
-├── scripts/
-│   └── gen_arch.py   # 架构图生成脚本 (python3 scripts/gen_arch.py)
+│   └── karmada.yaml    # 演示用的 K8s 清单
 └── images/
-    └── multicluster_federation_arch.png   # 架构图（gen_arch.py 生成）
+    ├── karmada_flow.architecture.json  # 图源（Archify Typed JSON IR）
+    ├── karmada_flow.html               # 交互版架构图
+    └── karmada_flow.svg                # 双主题矢量版（本文档 §5 内嵌）
 ```
 
-## 项目概述
+## 2. 项目概述
 
 单集群的天花板很快会到：跨地域延迟、容灾隔离、爆炸半径控制、多供应商议价。本项目（`karmada.yaml` + `karmada.sh`）用 **Karmada** 实现联邦编排——一份 Deployment 声明配合 PropagationPolicy，6 个副本按 4:2 权重自动拆到 member-us 和 member-ap 两个集群，并演练失联故障转移——目标是掌握"一个 API 管所有集群"的多集群范式。
 
 ---
 
-## 核心机制解析
+## 3. 核心机制解析
 
 ### 1. 控制面架构：聚合 API 而非代理转发
 
@@ -70,24 +70,24 @@ clusterTolerations:
 
 ---
 
-## 可视化分析
+## 4. 可视化
 
-![karmada](images/multicluster_federation_arch.png)
+![Karmada 流水线](images/karmada_flow.svg)
 
-上图两面板：
-- **左图 控制面传播链**：apiserver → controller → scheduler → execution 四级流水线把声明送达两个成员集群；标注 push 模式下成员零侵入
-- **右图 调度与转移**：初始 4:2 拆分 → 扩容 12 再平衡为 8:4 → member-ap 失联后份额迁回 us 的完整时间线；底部总结四类策略对象的分工
+上行是控制面四级流水线：kubectl 原样提交 → karmada-apiserver（原生 API 兼容）→ 生成 ResourceBinding → scheduler 按 **staticWeight 4:2** 拆分 → execution push 下发（成员集群零侵入）。下行是两类策略对象：PropagationPolicy 定拆分权重、OverridePolicy 让 member-ap 把镜像 Tag 覆成 1.26——应用模板保持单一事实源。member-ap 带着失联标签：心跳超时 60s 后份额自动迁回 member-us。
+
+> 🌐 **交互版**：[在线打开（GitHub Pages）](https://yong-huang.github.io/hands-on-kubernetes/labs/30_multicluster_federation/images/karmada_flow.html)（或本地打开 [`images/karmada_flow.html`](images/karmada_flow.html)）。
 
 ---
 
-## 工程延伸
+## 5. 工程延伸
 
 - **全局服务发现**: 配合 Multi-Cluster DNS / submariner 打通跨集群 Service 网络
 - **成本感知调度**: 用 Karmada 的 DynamicScheduler 按 realtime 资源价格/利用率选集群
 - **渐进交付**: ArgoCD (项目 28) 管 GitOps 同步 + Karmada 管跨集群编排的组合是常见生产形态
 - **Fleet 安全**: 每个 member 用独立 SA + 最小 RBAC；host 集群即最高权限资产，重点加固
 
-## 多集群环境搭建（实测记录）
+## 6. 多集群环境搭建（实测记录）
 
 脚本假设 Karmada 控制面与两个成员集群已就绪。以下为一次完整搭建的实测步骤：
 

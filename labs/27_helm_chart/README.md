@@ -1,28 +1,28 @@
 # Helm Chart 开发
 
-## 文件结构
+## 1. 文件结构
 
 ```
 27_helm_chart/
-├── README.md     # 本文档
-├── install.sh       # 全流程演示脚本（步骤见脚本头部注释）
+├── README.md              # 本文档
+├── install.sh             # 全流程演示脚本（步骤见脚本头部注释）
 ├── manifests/
-│   └── demo-chart/            # Helm Chart: templates + values
+│   └── demo-chart/        # Helm Chart: templates + values
 │       ├── Chart.yaml / values.yaml
-│       └── templates/          # deployment/service/ingress/configmap + _helpers.tpl + NOTES.txt
-├── scripts/
-│   └── gen_arch.py   # 架构图生成脚本 (python3 scripts/gen_arch.py)
+│       └── templates/     # deployment/service/ingress/configmap + _helpers.tpl + NOTES.txt
 └── images/
-    └── helm_chart_arch.png   # 架构图（gen_arch.py 生成）
+    ├── helm_pipeline.workflow.json  # 图源（Archify Typed JSON IR）
+    ├── helm_pipeline.html           # 交互版流程图
+    └── helm_pipeline.svg            # 双主题矢量版（本文档 §5 内嵌）
 ```
 
-## 项目概述
+## 2. 项目概述
 
 裸 `kubectl apply -f` 部署一个应用要维护四五份 YAML，换个环境改得满地找补。本项目（`manifests/demo-chart/` + `./install.sh`）从零写一个标准 Helm Chart——Deployment、Service、ConfigMap、Ingress 四件套加 `_helpers.tpl` 命名约定——完整走一遍 lint → template → install → upgrade → rollback → package 的开发闭环。目标是掌握"用一个 Chart 部署一套应用，用 values 描述所有环境差异"。
 
 ---
 
-## 核心机制解析
+## 3. 核心机制解析
 
 ### 1. Chart 结构：模板与数据的分离
 
@@ -60,17 +60,17 @@ labels: app.kubernetes.io/{name,instance,version}
 
 ---
 
-## 可视化分析
+## 4. 可视化
 
-![helm](images/helm_chart_arch.png)
+![Helm 流水线](images/helm_pipeline.svg)
 
-上图两面板：
-- **左图 Chart 目录树**：每个文件对应什么职责；右侧速查模板内置对象（Release/Chart/Values/Capabilities）与 `_helpers.tpl` 命名约定
-- **右图 渲染流水线**：三层 values 按优先级合并成 `.Values` → Go template 引擎渲染（可 dry-run）→ 校验提交 K8s API；底部演示 release 版本链与 rollback 路径
+开发闭环画成流水线：三层 values 按优先级合并（chart 内置 < `-f` 文件 < `--set`）→ Go template 渲染成清单 → 校验提交 K8s API → 每次生成递增的 Release 快照（存集群 Secret）→ 工作负载运行。回滚分支点破一个认知：`helm rollback` 回滚的是**渲染产物**，真正的单一事实源仍应是 Git（见 28 ArgoCD）。
+
+> 🌐 **交互版**：[在线打开（GitHub Pages）](https://yong-huang.github.io/hands-on-kubernetes/labs/27_helm_chart/images/helm_pipeline.html)（或本地打开 [`images/helm_pipeline.html`](images/helm_pipeline.html)）。
 
 ---
 
-## 工程延伸
+## 5. 工程延伸
 
 - **子 chart 与依赖**: Chart.yaml 的 dependencies 字段声明 Redis/PG 子 chart，父 values 里按子 chart 名覆盖其值
 - **库 chart**: `type: library` 只提供模板不产生资源，把公共 deployment 模板抽给多个业务 chart 复用

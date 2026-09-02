@@ -1,26 +1,26 @@
 # Prometheus + Grafana 监控
 
-## 文件结构
+## 1. 文件结构
 
 ```
 23_prometheus_grafana/
-├── README.md     # 本文档
-├── monitoring.sh    # 全流程演示脚本（步骤见脚本头部注释）
+├── README.md              # 本文档
+├── monitoring.sh          # 全流程演示脚本（步骤见脚本头部注释）
 ├── manifests/
-│   └── monitoring.yaml  # 演示用的 K8s 清单
-├── scripts/
-│   └── gen_arch.py   # 架构图生成脚本 (python3 scripts/gen_arch.py)
+│   └── monitoring.yaml    # 演示用的 K8s 清单
 └── images/
-    └── monitoring_arch.png   # 架构图（gen_arch.py 生成）
+    ├── monitoring_flow.architecture.json  # 图源（Archify Typed JSON IR）
+    ├── monitoring_flow.html               # 交互版架构图
+    └── monitoring_flow.svg                # 双主题矢量版（本文档 §5 内嵌）
 ```
 
-## 项目概述
+## 2. 项目概述
 
 没有监控的集群等于盲飞。本项目（`monitoring.yaml` + `monitoring.sh`）用 **kube-prometheus-stack** 一键部署 Prometheus Operator + Alertmanager + Grafana 全栈，再以示例应用演示 Operator 模式下的声明式监控：`ServiceMonitor` 定义抓取、`PrometheusRule` 定义告警、ConfigMap 标签驱动 Grafana 数据源加载——目标是让"集群和应用指标可视化展示"只需提交几个 CR。
 
 ---
 
-## 核心机制解析
+## 3. 核心机制解析
 
 ### 1. Pull 模型：指标留在集群内
 
@@ -56,17 +56,17 @@ spec:
 
 ---
 
-## 可视化分析
+## 4. 可视化
 
-![monitoring](images/monitoring_arch.png)
+![监控双线](images/monitoring_flow.svg)
 
-上图两面板：
-- **左图 指标数据流**：Pod /metrics → Prometheus（TSDB 存储）→ Grafana 查询渲染；异常路径经 Alertmanager 分组去重后通知值班，超时沿升级链升级
-- **右图 CRD 对象关系**：ServiceMonitor/PodMonitor/PrometheusRule 三类 CR → Operator watch 并渲染 Secret → Prometheus 热加载；Grafana sidecar 按 ConfigMap 标签自动装配数据源与面板
+图中上行是**指标数据流**：应用暴露 /metrics → Prometheus 每 15s Pull 进 TSDB → Grafana 查询渲染；告警分支经 Alertmanager 分组去重后通知值班——出门的只有通知，原始数据不出集群。下行是 **Operator 声明式配置**：ServiceMonitor / PrometheusRule 被 Operator watch → 渲染成 Secret → Prometheus 热加载，"加一个应用的监控"= 提交一个 CR。
+
+> 🌐 **交互版**：[在线打开（GitHub Pages）](https://yong-huang.github.io/hands-on-kubernetes/labs/23_prometheus_grafana/images/monitoring_flow.html)（或本地打开 [`images/monitoring_flow.html`](images/monitoring_flow.html)）。
 
 ---
 
-## 工程延伸
+## 5. 工程延伸
 
 - **多副本 Prometheus**: 双副本 + Thanos/Cortex 远端存储，解决单点与长期保留
 - **SLO 工作流**: 用 Sloth 从 SLO 清单生成 burn-rate 告警规则，替代手写阈值

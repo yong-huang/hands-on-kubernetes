@@ -1,0 +1,195 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "GitOps 闭环：集群实际状态永远向 Git 期望状态收敛",
+    "locale": "zh-CN",
+    "output": "labs/28_gitops_argocd/images/gitops_loop.html",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    {
+      "id": "dev",
+      "type": "external",
+      "label": "开发者",
+      "sublabel": "git push = 部署",
+      "pos": [
+        60,
+        80
+      ],
+      "size": [
+        180,
+        74
+      ]
+    },
+    {
+      "id": "git",
+      "type": "database",
+      "label": "Git 仓库 · 期望状态",
+      "sublabel": "git log 即审计 · revert 即回滚",
+      "pos": [
+        320,
+        80
+      ],
+      "size": [
+        230,
+        90
+      ],
+      "tag": "唯一可信源"
+    },
+    {
+      "id": "argo",
+      "type": "backend",
+      "label": "ArgoCD 控制器",
+      "sublabel": "pull · diff · sync（每 ~3min）",
+      "pos": [
+        640,
+        80
+      ],
+      "size": [
+        230,
+        90
+      ],
+      "tag": "集群内 Pull 模型"
+    },
+    {
+      "id": "appcrd",
+      "type": "backend",
+      "label": "Application CRD",
+      "sublabel": "source / destination / syncPolicy",
+      "pos": [
+        320,
+        300
+      ],
+      "size": [
+        230,
+        84
+      ],
+      "tag": "必须建在 argocd ns"
+    },
+    {
+      "id": "k8s",
+      "type": "backend",
+      "label": "集群实际状态",
+      "sublabel": "Deployment / Service / PVC …",
+      "pos": [
+        640,
+        300
+      ],
+      "size": [
+        230,
+        84
+      ]
+    },
+    {
+      "id": "manual",
+      "type": "external",
+      "label": "有人手改集群",
+      "sublabel": "kubectl scale 副本数",
+      "pos": [
+        60,
+        300
+      ],
+      "size": [
+        190,
+        78
+      ],
+      "tag": "漂移 drift"
+    }
+  ],
+  "connections": [
+    {
+      "from": "dev",
+      "to": "git",
+      "label": "git push（声明式变更）",
+      "variant": "emphasis",
+      "labelAt": [
+        280,
+        184
+      ]
+    },
+    {
+      "from": "git",
+      "to": "argo",
+      "label": "pull 期望状态",
+      "variant": "dashed"
+    },
+    {
+      "from": "appcrd",
+      "to": "argo",
+      "variant": "dashed",
+      "fromSide": "top",
+      "toSide": "bottom"
+    },
+    {
+      "from": "argo",
+      "to": "k8s",
+      "label": "diff → sync",
+      "variant": "emphasis",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        800,
+        240
+      ]
+    },
+    {
+      "from": "k8s",
+      "to": "argo",
+      "variant": "dashed",
+      "fromSide": "left",
+      "toSide": "left"
+    },
+    {
+      "from": "manual",
+      "to": "k8s",
+      "label": "手改 = 漂移",
+      "variant": "security",
+      "fromSide": "bottom",
+      "toSide": "bottom",
+      "via": [
+        [
+          155,
+          420
+        ],
+        [
+          755,
+          420
+        ]
+      ],
+      "labelAt": [
+        400,
+        413
+      ]
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "sync 三个开关",
+      "items": [
+        "automated：检测到差异自动 apply，否则只标 OutOfSync",
+        "prune：Git 删 = 集群删，不留孤儿资源",
+        "selfHeal：手改会被改回 Git 版本；合法手改用 ignoreDifferences 豁免"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Pull vs Push",
+      "items": [
+        "Push：CI 拿 kubeconfig 推集群，凭据散落、漂移无人管",
+        "Pull：ArgoCD 在集群内自己拉取对比收敛，凭据不出集群",
+        "CI 只管构建镜像与提交 YAML，部署彻底解耦"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "回滚与密钥",
+      "items": [
+        "回滚 = git revert 一次 commit，ArgoCD 自动收敛回旧版",
+        "Git 不能存明文 Secret：Sealed Secrets / SOPS / External Secrets",
+        "坑：Application 必须建在 argocd ns；finalizer 会连带删资源"
+      ]
+    }
+  ]
+}

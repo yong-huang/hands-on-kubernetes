@@ -1,0 +1,222 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "镜像安全：供应链卡点 + 准入双重校验 + 持续重扫",
+    "locale": "zh-CN",
+    "output": "labs/21_image_security/images/supply_chain.html",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    {
+      "id": "build",
+      "type": "external",
+      "label": "构建 CI",
+      "sublabel": "docker build / push",
+      "pos": [
+        60,
+        80
+      ],
+      "size": [
+        170,
+        74
+      ]
+    },
+    {
+      "id": "scan",
+      "type": "backend",
+      "label": "Trivy 扫描",
+      "sublabel": "比对 CVE 库 · ignoreUnfixed",
+      "pos": [
+        300,
+        80
+      ],
+      "size": [
+        200,
+        84
+      ]
+    },
+    {
+      "id": "cosign",
+      "type": "security",
+      "label": "Cosign 签名",
+      "sublabel": "公钥验签 · 来源可信防篡改",
+      "pos": [
+        550,
+        80
+      ],
+      "size": [
+        200,
+        84
+      ]
+    },
+    {
+      "id": "reg",
+      "type": "database",
+      "label": "私有 Registry",
+      "sublabel": "签名镜像统一存放",
+      "pos": [
+        800,
+        80
+      ],
+      "size": [
+        190,
+        84
+      ]
+    },
+    {
+      "id": "kyv",
+      "type": "security",
+      "label": "Kyverno 准入",
+      "sublabel": "verifyImages 验签 + deny Critical",
+      "pos": [
+        390,
+        270
+      ],
+      "size": [
+        240,
+        90
+      ],
+      "tag": "webhook 拦截 Pod 创建"
+    },
+    {
+      "id": "pod",
+      "type": "backend",
+      "label": "Pod 运行",
+      "sublabel": "双重校验通过才放行",
+      "pos": [
+        700,
+        272
+      ],
+      "size": [
+        190,
+        84
+      ]
+    },
+    {
+      "id": "operator",
+      "type": "backend",
+      "label": "Trivy Operator",
+      "sublabel": "持续重扫运行中镜像",
+      "pos": [
+        700,
+        430
+      ],
+      "size": [
+        190,
+        84
+      ],
+      "tag": "报告即资源"
+    },
+    {
+      "id": "report",
+      "type": "database",
+      "label": "VulnerabilityReport",
+      "sublabel": "criticalCount / fixedVersion",
+      "pos": [
+        400,
+        430
+      ],
+      "size": [
+        220,
+        80
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "from": "build",
+      "to": "scan",
+      "label": "镜像产物"
+    },
+    {
+      "from": "scan",
+      "to": "cosign",
+      "label": "扫过才签"
+    },
+    {
+      "from": "cosign",
+      "to": "reg",
+      "label": "签名镜像"
+    },
+    {
+      "from": "reg",
+      "to": "kyv",
+      "label": "Pod 创建请求",
+      "variant": "emphasis",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        700,
+        210
+      ]
+    },
+    {
+      "from": "kyv",
+      "to": "pod",
+      "label": "放行",
+      "variant": "emphasis"
+    },
+    {
+      "from": "pod",
+      "to": "operator",
+      "label": "watch 运行中镜像",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        810,
+        398
+      ]
+    },
+    {
+      "from": "operator",
+      "to": "report",
+      "label": "生成 CRD",
+      "variant": "emphasis",
+      "fromSide": "left",
+      "toSide": "right"
+    },
+    {
+      "from": "report",
+      "to": "kyv",
+      "label": "策略引用字段",
+      "variant": "dashed",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "labelAt": [
+        530,
+        394
+      ]
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "报告即资源",
+      "items": [
+        "VulnerabilityReport 是 CRD：summary + CVE 明细 + fixedVersion",
+        "消费方不止人：Grafana 趋势 / Kyverno 判定 / CI jq 门禁",
+        "ignoreUnfixed=true 只留\"可行动\"的洞，避免告警疲劳"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "扫描 vs 验签",
+      "items": [
+        "扫描管已知漏洞（事后画像），验签管恶意篡改（来源可信）",
+        "verifyImages 在 webhook 路径做 cosign verify，Enforce 直接拒",
+        "两者互补：扫描有盲区，验签不看漏洞"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "灰度与坑",
+      "items": [
+        "Audit 先行收集违规面 → kubectl patch 切 Enforce",
+        "必须带 namespace exclude，否则误伤系统组件",
+        "演示按 tag 拦截模拟；生产应真接 VulnerabilityReport 做门禁"
+      ]
+    }
+  ]
+}

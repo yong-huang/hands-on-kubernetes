@@ -1,0 +1,142 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "RBAC：Subject 经 Binding 接到 Role，默认拒绝",
+    "locale": "zh-CN",
+    "output": "labs/19_rbac/images/rbac_model.html",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    {
+      "id": "sa",
+      "type": "external",
+      "label": "ServiceAccount dev-viewer",
+      "sublabel": "进程身份（Pod 内的 Token）",
+      "pos": [
+        60,
+        80
+      ],
+      "size": [
+        210,
+        80
+      ],
+      "tag": "Subject"
+    },
+    {
+      "id": "user",
+      "type": "external",
+      "label": "User / Group",
+      "sublabel": "OIDC / 证书 CN · 集群无此对象",
+      "pos": [
+        60,
+        200
+      ],
+      "size": [
+        210,
+        70
+      ],
+      "tag": "Subject"
+    },
+    {
+      "id": "rb",
+      "type": "security",
+      "label": "RoleBinding",
+      "sublabel": "subjects + roleRef",
+      "pos": [
+        380,
+        140
+      ],
+      "size": [
+        200,
+        84
+      ],
+      "tag": "ns 级 · roleRef 不可变"
+    },
+    {
+      "id": "role",
+      "type": "backend",
+      "label": "Role · pod-reader",
+      "sublabel": "pods, pods/log · get/list/watch",
+      "pos": [
+        670,
+        140
+      ],
+      "size": [
+        220,
+        84
+      ],
+      "tag": "rules 三要素"
+    },
+    {
+      "id": "apiserver",
+      "type": "cloud",
+      "label": "API Server 鉴权",
+      "sublabel": "任一规则匹配即放行，否则 403",
+      "pos": [
+        665,
+        330
+      ],
+      "size": [
+        230,
+        88
+      ],
+      "tag": "默认拒绝"
+    }
+  ],
+  "connections": [
+    {
+      "from": "sa",
+      "to": "rb",
+      "label": "subjects 绑定",
+      "variant": "emphasis"
+    },
+    {
+      "from": "user",
+      "to": "rb",
+      "variant": "dashed"
+    },
+    {
+      "from": "rb",
+      "to": "role",
+      "label": "roleRef"
+    },
+    {
+      "from": "role",
+      "to": "apiserver",
+      "label": "规则参与匹配",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "right"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "四件套矩阵",
+      "items": [
+        "Role / ClusterRole 是\"规则\"，Binding 决定\"生效范围\"",
+        "RoleBinding + ClusterRole = 规则复用但权限不出 ns（推荐）",
+        "ClusterRole + ClusterRoleBinding 才是全集群生效"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "规则三要素与坑",
+      "items": [
+        "apiGroups / resources / verbs；子资源 pods/log 要单独列出",
+        "deployments 在 apps 组；集群级资源用 Role 授权永不生效",
+        "roleRef 不可变：换角色只能删了重建；权限只加不减（并集）"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "验证三件套",
+      "items": [
+        "kubectl auth can-i 预演判定（无副作用，CI 断言利器）",
+        "--as 模拟真实请求，亲眼看 Forbidden",
+        "describe rolebinding 查绑定链两端"
+      ]
+    }
+  ]
+}

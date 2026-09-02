@@ -1,0 +1,202 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "EFK 日志链路：tail 落盘文件 → 元数据增强 → 索引检索",
+    "locale": "zh-CN",
+    "output": "labs/24_logging_efk/images/log_pipeline.html",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    {
+      "id": "app",
+      "type": "backend",
+      "label": "应用 Pod",
+      "sublabel": "只往 stdout 打印",
+      "pos": [
+        70,
+        80
+      ],
+      "size": [
+        180,
+        78
+      ]
+    },
+    {
+      "id": "logf",
+      "type": "database",
+      "label": "日志文件",
+      "sublabel": "/var/log/containers/*.log",
+      "pos": [
+        310,
+        80
+      ],
+      "size": [
+        215,
+        80
+      ],
+      "tag": "containerd 落盘"
+    },
+    {
+      "id": "fb",
+      "type": "backend",
+      "label": "Fluent Bit（DaemonSet）",
+      "sublabel": "tail · kubernetes filter · Merge_Log",
+      "pos": [
+        590,
+        80
+      ],
+      "size": [
+        215,
+        88
+      ],
+      "tag": "每节点一个"
+    },
+    {
+      "id": "es",
+      "type": "database",
+      "label": "Elasticsearch",
+      "sublabel": "倒排索引 · 按天分索引",
+      "pos": [
+        70,
+        320
+      ],
+      "size": [
+        230,
+        88
+      ],
+      "tag": "k8s-logs-YYYY.MM.DD"
+    },
+    {
+      "id": "kibana",
+      "type": "backend",
+      "label": "Kibana",
+      "sublabel": "检索 · 过滤 · 聚合",
+      "pos": [
+        380,
+        320
+      ],
+      "size": [
+        200,
+        84
+      ]
+    },
+    {
+      "id": "user",
+      "type": "external",
+      "label": "排障工程师",
+      "sublabel": "log.level:ERROR AND ns:\"logging-demo\"",
+      "pos": [
+        650,
+        320
+      ],
+      "size": [
+        210,
+        78
+      ]
+    },
+    {
+      "id": "api",
+      "type": "cloud",
+      "label": "API Server",
+      "sublabel": "kubernetes filter 反查元数据",
+      "pos": [
+        870,
+        320
+      ],
+      "size": [
+        200,
+        84
+      ],
+      "tag": "RBAC 只读 pods/ns"
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "每个节点（DaemonSet 覆盖全节点，含控制面）",
+      "wraps": [
+        "app",
+        "logf",
+        "fb"
+      ],
+      "pad": 26
+    }
+  ],
+  "connections": [
+    {
+      "from": "app",
+      "to": "logf",
+      "label": "stdout"
+    },
+    {
+      "from": "logf",
+      "to": "fb",
+      "label": "tail"
+    },
+    {
+      "from": "fb",
+      "to": "es",
+      "label": "输出：元数据 + JSON 展开",
+      "variant": "emphasis",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        440,
+        233
+      ]
+    },
+    {
+      "from": "es",
+      "to": "kibana",
+      "label": "索引"
+    },
+    {
+      "from": "user",
+      "to": "kibana",
+      "label": "KQL 检索",
+      "variant": "dashed"
+    },
+    {
+      "from": "fb",
+      "to": "api",
+      "label": "反查 Pod 元数据",
+      "variant": "dashed",
+      "fromSide": "right",
+      "toSide": "top",
+      "labelAt": [
+        975,
+        220
+      ]
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "为什么 tail 文件",
+      "items": [
+        "应用只往 stdout 打印，完全不感知采集器",
+        "容器崩溃后日志仍在磁盘不丢失",
+        "与运行时无关——docker/containerd 换来换去管道不变"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "kubernetes filter",
+      "items": [
+        "用 SA 反查 API Server：注入 ns/pod/container 元数据",
+        "Merge_Log On 把 JSON 日志体展开成结构化字段",
+        "RBAC 只授 pods/namespaces 只读，够用即最小权限"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "索引与覆盖",
+      "items": [
+        "按天分索引：删 30 天前数据 = 删整个索引（秒级），生产配 ILM",
+        "tolerations Exists：控制面节点的 kubelet/etcd 日志也要采",
+        "Mem_Buf_Limit 防打爆节点；高频 DEBUG 先采样丢弃"
+      ]
+    }
+  ]
+}

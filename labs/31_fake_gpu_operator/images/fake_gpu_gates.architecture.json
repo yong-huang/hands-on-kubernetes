@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Fake GPU：两条链路殊途同归，两道关卡决定命运",
+    "locale": "zh-CN",
+    "output": "labs/31_fake_gpu_operator/images/fake_gpu_gates.html",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    { "id": "real", "type": "cloud", "label": "真实链路", "sublabel": "driver → gpu-operator → device plugin", "pos": [60, 70], "size": [250, 84], "tag": "gRPC 上报 kubelet" },
+    { "id": "fake", "type": "security", "label": "模拟链路（本实验）", "sublabel": "DaemonSet updater 定时补写", "pos": [60, 210], "size": [250, 84], "tag": "patch nodes/status" },
+    { "id": "nodest", "type": "database", "label": "Node status", "sublabel": "allocatable: nvidia.com/gpu: 8", "pos": [400, 140], "size": [230, 90], "tag": "调度器只认数字" },
+    { "id": "jobreq", "type": "frontend", "label": "AI 任务 Job", "sublabel": "train-small 1 卡 · train-big 6 卡", "pos": [660, 140], "size": [190, 88] },
+    { "id": "gate1", "type": "security", "label": "① ResourceQuota", "sublabel": "团队额度 4 卡 · 超额准入即拒", "pos": [940, 60], "size": [240, 84], "tag": "train-big 6>4 ✗" },
+    { "id": "gate2", "type": "backend", "label": "② Scheduler Filter", "sublabel": "节点余量 ≥ requests", "pos": [940, 210], "size": [240, 84], "tag": "否则 Pending" },
+    { "id": "runout", "type": "backend", "label": "train-small → Running", "sublabel": "1/8 卡已用（12%）· describe 巡检", "pos": [940, 360], "size": [240, 84] }
+  ],
+  "connections": [
+    { "from": "real", "to": "nodest", "label": "gRPC 设备上报" },
+    { "from": "fake", "to": "nodest", "label": "patch status 字段", "variant": "dashed" },
+    { "from": "nodest", "to": "gate2", "label": "allocatable 对比", "variant": "dashed", "fromSide": "right", "toSide": "left", "labelAt": [830, 265] },
+    { "from": "jobreq", "to": "gate1", "label": "提交任务", "variant": "emphasis" },
+    { "from": "gate1", "to": "gate2", "label": "额度内", "fromSide": "bottom", "toSide": "top", "labelAt": [1050, 177] },
+    { "from": "gate2", "to": "runout", "label": "1 卡绑定", "fromSide": "bottom", "toSide": "top", "labelAt": [1050, 327] }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "扩展资源只是数字", "items": ["K8s 对 nvidia.com/gpu 只做算术：比较 requests 与 allocatable", "不验证资源物理存在——这正是 fake 方案合法性的来源", "Node status 会被 kubelet 心跳覆盖 → updater 需常驻补写"] },
+    { "dot": "rose", "title": "两种失败要分清", "items": ["train-big 6 卡：1 已用 + 6 > 额度 4，准入阶段就被 ResourceQuota 拒", "调度不满足则是 Pending——看事件文本区分两种失败", "扩展资源 requests 必须等于 limits（不可超卖）"] },
+    { "dot": "emerald", "title": "AI Ops 日常与延伸", "items": ["巡检：describe 看 Allocated resources；custom-columns 反查谁占卡", "时间片/MIG 一卡多用；gang scheduler 解决多卡同时就位", "接 DCGM 监控画利用率；Karmada 把训练分发到真 GPU 集群"] }
+  ]
+}

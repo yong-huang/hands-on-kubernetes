@@ -1,0 +1,204 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Vault 动态凭证：挂载瞬间生成，销毁即吊销",
+    "locale": "zh-CN",
+    "output": "labs/22_secrets_vault/images/vault_dynamic.html",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    {
+      "id": "pod",
+      "type": "backend",
+      "label": "demo-app Pod",
+      "sublabel": "ServiceAccount: demo-app",
+      "pos": [
+        50,
+        220
+      ],
+      "size": [
+        200,
+        84
+      ]
+    },
+    {
+      "id": "csi",
+      "type": "backend",
+      "label": "Secrets Store CSI 驱动",
+      "sublabel": "SecretProviderClass: vault",
+      "pos": [
+        310,
+        220
+      ],
+      "size": [
+        215,
+        84
+      ],
+      "tag": "挂载时触发"
+    },
+    {
+      "id": "auth",
+      "type": "security",
+      "label": "Vault K8s Auth",
+      "sublabel": "SA projected token → Vault token",
+      "pos": [
+        580,
+        220
+      ],
+      "size": [
+        210,
+        84
+      ],
+      "tag": "bound SA + ns"
+    },
+    {
+      "id": "vault",
+      "type": "database",
+      "label": "Vault 动态引擎",
+      "sublabel": "database/creds/demo-app",
+      "pos": [
+        850,
+        220
+      ],
+      "size": [
+        200,
+        84
+      ],
+      "tag": "TTL 1h · max 24h"
+    },
+    {
+      "id": "pg",
+      "type": "database",
+      "label": "PostgreSQL",
+      "sublabel": "现场 CREATE ROLE 临时账号",
+      "pos": [
+        850,
+        40
+      ],
+      "size": [
+        200,
+        78
+      ]
+    },
+    {
+      "id": "creds",
+      "type": "database",
+      "label": "临时凭证 · TTL 1h",
+      "sublabel": "写入挂载卷 /vault/secrets",
+      "pos": [
+        310,
+        430
+      ],
+      "size": [
+        215,
+        80
+      ]
+    },
+    {
+      "id": "sync",
+      "type": "backend",
+      "label": "secretObjects 同步",
+      "sublabel": "投影为普通 K8s Secret（可选）",
+      "pos": [
+        620,
+        430
+      ],
+      "size": [
+        215,
+        80
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "from": "pod",
+      "to": "csi",
+      "label": "挂载触发",
+      "variant": "emphasis"
+    },
+    {
+      "from": "csi",
+      "to": "auth",
+      "label": "SA token 换 token",
+      "labelAt": [
+        553,
+        180
+      ]
+    },
+    {
+      "from": "auth",
+      "to": "vault"
+    },
+    {
+      "from": "vault",
+      "to": "pg",
+      "label": "CREATE ROLE",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "labelAt": [
+        1075,
+        130
+      ]
+    },
+    {
+      "from": "pg",
+      "to": "vault",
+      "label": "返回临时凭证",
+      "variant": "dashed",
+      "fromSide": "left",
+      "toSide": "top",
+      "labelAt": [
+        740,
+        150
+      ]
+    },
+    {
+      "from": "vault",
+      "to": "creds",
+      "label": "下发凭证写文件",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "right"
+    },
+    {
+      "from": "creds",
+      "to": "sync",
+      "label": "可选投影",
+      "variant": "dashed",
+      "labelAt": [
+        620,
+        530
+      ]
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "三层关键对象",
+      "items": [
+        "SecretProviderClass：取数配置——去哪取、取什么（非 Secret 本身）",
+        "K8s Auth：bound_service_account 钉死信任范围，集群不存 Vault 凭证",
+        "动态引擎：database/creds/* 每次读取现场 CREATE ROLE，非 KV 路径"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "租约（Lease）是灵魂",
+      "items": [
+        "TTL 到期后文件保持陈旧值——CSI 不会替动态 Secret 续租",
+        "Pod 重建时才重新签发新凭证；销毁时主动 revoke",
+        "任何一份泄漏只在 TTL 窗口内有效，与静态 Secret 本质不同"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "双通道与提醒",
+      "items": [
+        "挂载文件对多数应用最友好；env/原生 Secret 走 secretObjects 同步",
+        "secretObjects 是投影非存储源，删除后随下次挂载重建",
+        "Vault 全挂：已挂载不受影响，但新 Pod 调度会失败"
+      ]
+    }
+  ]
+}

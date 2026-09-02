@@ -1,0 +1,164 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "StorageClass 动态供给：从 PVC 到 Bound 全自动",
+    "locale": "zh-CN",
+    "output": "labs/16_storageclass/images/sc_provisioning.html",
+    "quality_profile": "showcase"
+  },
+  "lanes": [
+    {
+      "id": "main",
+      "label": "动态供给流水线"
+    },
+    {
+      "id": "reclaim",
+      "label": "回收路径（删 PVC 之后）",
+      "variant": "exception"
+    }
+  ],
+  "phases": [
+    {
+      "id": "p1",
+      "label": "声明：用户只写 PVC",
+      "fromCol": 0,
+      "toCol": 0,
+      "variant": "emphasis"
+    },
+    {
+      "id": "p2",
+      "label": "全自动供给与绑定",
+      "fromCol": 1,
+      "toCol": 3
+    },
+    {
+      "id": "p3",
+      "label": "数据面",
+      "fromCol": 4,
+      "toCol": 4,
+      "variant": "dashed"
+    }
+  ],
+  "mainPath": [
+    "pvc",
+    "wffc",
+    "provision",
+    "bind",
+    "running"
+  ],
+  "nodes": [
+    {
+      "id": "pvc",
+      "lane": "main",
+      "col": 0,
+      "type": "frontend",
+      "label": "创建 PVC",
+      "sublabel": "500Mi · sc=fast-local",
+      "width": 120
+    },
+    {
+      "id": "wffc",
+      "lane": "main",
+      "col": 1,
+      "type": "backend",
+      "label": "WaitForFirstConsumer",
+      "sublabel": "Pending=正常 · 等 Pod 调度",
+      "tag": "拓扑正确",
+      "width": 152
+    },
+    {
+      "id": "provision",
+      "lane": "main",
+      "col": 2,
+      "type": "backend",
+      "label": "自动建卷+生成 PV",
+      "sublabel": "按 500Mi 精确创建",
+      "width": 145
+    },
+    {
+      "id": "bind",
+      "lane": "main",
+      "col": 3,
+      "type": "backend",
+      "label": "Bound",
+      "sublabel": "kubelet 挂载",
+      "width": 115
+    },
+    {
+      "id": "running",
+      "lane": "main",
+      "col": 4,
+      "type": "frontend",
+      "label": "Pod Running",
+      "sublabel": "写入动态卷",
+      "width": 105
+    },
+    {
+      "id": "delete",
+      "lane": "reclaim",
+      "col": 3,
+      "type": "security",
+      "label": "删 PVC → PV 一并删除",
+      "sublabel": "reclaimPolicy: Delete",
+      "tag": "Retain 可改",
+      "width": 165
+    }
+  ],
+  "edges": [
+    {
+      "from": "pvc",
+      "to": "wffc",
+      "label": "无可绑 PV，SC 接管"
+    },
+    {
+      "from": "wffc",
+      "to": "provision",
+      "label": "Pod 调度完成"
+    },
+    {
+      "from": "provision",
+      "to": "bind"
+    },
+    {
+      "from": "bind",
+      "to": "running"
+    },
+    {
+      "from": "bind",
+      "to": "delete",
+      "label": "删 PVC",
+      "variant": "security",
+      "role": "error"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "SC 四个关键字段",
+      "items": [
+        "provisioner：谁来真正建卷/删卷（CSI 驱动或 local-path）",
+        "parameters：透传给供给器（EBS gp3/IOPS 等）",
+        "reclaimPolicy + volumeBindingMode：怎么回收、什么时候建"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Immediate vs WFFC",
+      "items": [
+        "Immediate：PVC 一创建就建卷，云上可能跨可用区挂不上",
+        "WFFC：Pod 调度后才建卷，卷跟 Pod 同节点/同区",
+        "WFFC 下 PVC Pending 是正常状态，不是故障"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "默认 SC 与坑",
+      "items": [
+        "is-default-class 注解：PVC 留空 storageClassName 时接管",
+        "storageClassName: \"\" 是明确不要动态供给，与省略不同",
+        "在线扩容需 allowVolumeExpansion: true 且驱动支持"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,183 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "kubectl debug 三种姿势：不重启、不改镜像、不影响线上",
+    "locale": "zh-CN",
+    "output": "labs/26_ephemeral_debug/images/debug_modes.html",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    {
+      "id": "kubectl",
+      "type": "external",
+      "label": "kubectl debug",
+      "sublabel": "排障三姿势的选择",
+      "pos": [
+        60,
+        190
+      ],
+      "size": [
+        200,
+        80
+      ]
+    },
+    {
+      "id": "m1",
+      "type": "backend",
+      "label": "姿势 1 · 临时容器注入",
+      "sublabel": "kubectl debug --target=app -it",
+      "pos": [
+        360,
+        60
+      ],
+      "size": [
+        250,
+        90
+      ],
+      "tag": "活着/崩溃都行"
+    },
+    {
+      "id": "m2",
+      "type": "backend",
+      "label": "姿势 2 · 克隆 Pod",
+      "sublabel": "--copy-to + --sleep-forever",
+      "pos": [
+        360,
+        200
+      ],
+      "size": [
+        250,
+        90
+      ],
+      "tag": "原 Pod 不动"
+    },
+    {
+      "id": "m3",
+      "type": "backend",
+      "label": "姿势 3 · 节点调试",
+      "sublabel": "debug node/<node> → chroot /host",
+      "pos": [
+        360,
+        340
+      ],
+      "size": [
+        250,
+        90
+      ],
+      "tag": "怀疑 CNI/kubelet 时"
+    },
+    {
+      "id": "appc",
+      "type": "backend",
+      "label": "app 容器",
+      "sublabel": "distroless · CrashLoopBackOff",
+      "pos": [
+        700,
+        290
+      ],
+      "size": [
+        220,
+        88
+      ],
+      "tag": "PID 1 已崩溃"
+    },
+    {
+      "id": "dbg",
+      "type": "security",
+      "label": "debugger 临时容器",
+      "sublabel": "netshoot / busybox 工具箱",
+      "pos": [
+        700,
+        150
+      ],
+      "size": [
+        220,
+        88
+      ],
+      "tag": "ephemeralContainers"
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "broken-app Pod（黑盒现场）",
+      "wraps": [
+        "appc",
+        "dbg"
+      ],
+      "pad": 24
+    }
+  ],
+  "connections": [
+    {
+      "from": "kubectl",
+      "to": "m1",
+      "variant": "emphasis"
+    },
+    {
+      "from": "kubectl",
+      "to": "m2"
+    },
+    {
+      "from": "kubectl",
+      "to": "m3"
+    },
+    {
+      "from": "m1",
+      "to": "dbg",
+      "variant": "emphasis",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "from": "m2",
+      "to": "appc",
+      "label": "克隆自原 Pod",
+      "variant": "dashed",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "from": "dbg",
+      "to": "appc",
+      "label": "共享 PID ns（--target=app）",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        825,
+        264
+      ]
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "临时容器的三条限制",
+      "items": [
+        "不能声明 ports / probes / lifecycle / resources（env 允许）",
+        "不能重启——诊断手段，不是修复手段",
+        "看完病随 Pod 一起消失，不留痕迹"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "--target 是关键",
+      "items": [
+        "默认 PID 隔离：不加 target 只是在空壳里装忙",
+        "共享 PID ns 后：ps 看进程、读 /proc/<pid>/root、gdb attach",
+        "坑：containerd 对已退出容器 --target 会 CreateContainerError"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "工具箱与安全",
+      "items": [
+        "netshoot：tcpdump/dig/mtr 网络瑞士军刀；busybox 胜在轻量",
+        "ubuntu 适合 chroot 宿主机场景（systemctl/journalctl/ipvsadm）",
+        "调试镜像只进 ephemeralContainers；写权限单独 RBAC 收敛"
+      ]
+    }
+  ]
+}

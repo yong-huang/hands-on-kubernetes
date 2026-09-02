@@ -1,26 +1,26 @@
 # 镜像安全与漏洞扫描
 
-## 文件结构
+## 1. 文件结构
 
 ```
 21_image_security/
-├── README.md     # 本文档
-├── image_security.sh # 全流程演示脚本（步骤见脚本头部注释）
+├── README.md                # 本文档
+├── image_security.sh        # 全流程演示脚本（步骤见脚本头部注释）
 ├── manifests/
 │   └── image_security.yaml  # 演示用的 K8s 清单
-├── scripts/
-│   └── gen_arch.py   # 架构图生成脚本 (python3 scripts/gen_arch.py)
 └── images/
-    └── image_security_arch.png   # 架构图（gen_arch.py 生成）
+    ├── supply_chain.architecture.json  # 图源（Archify Typed JSON IR）
+    ├── supply_chain.html               # 交互版架构图
+    └── supply_chain.svg                # 双主题矢量版（本文档 §5 内嵌）
 ```
 
-## 项目概述
+## 2. 项目概述
 
 容器逃逸、供应链投毒是 K8s 生产环境最常见的攻击面。本项目（`image_security.yaml` + `image_security.sh`）搭建三层防线：**Trivy Operator 持续扫描**在跑镜像并生成 `VulnerabilityReport` CRD；**Cosign** 给镜像签名保证来源可信；**Kyverno 准入策略**在 Pod 创建时验签 + 拦截含 Critical 漏洞的镜像——目标是让"带高危漏洞的镜像无法部署"成为集群的默认行为而非事后补救。
 
 ---
 
-## 核心机制解析
+## 3. 核心机制解析
 
 ### 1. Trivy Operator：把扫描结果变成 K8s 资源
 
@@ -76,17 +76,17 @@ exclude:
 
 ---
 
-## 可视化分析
+## 4. 可视化
 
-![image security](images/image_security_arch.png)
+![镜像安全供应链](images/supply_chain.svg)
 
-上图两面板：
-- **左图 供应链流水线**：构建 → Trivy 扫描 → Cosign 签名 → 私有 Registry 四个卡点，进入 K8s 准入层双重校验（验签 + 高危拦截）后才允许 Pod 运行；底部是 Trivy Operator 的持续重扫闭环
-- **右图 Kyverno 决策流**：Pod 请求 → 匹配规则 → cosign verify 三种结局（有效放行 / 无效拒绝 / 无签名拒绝），附灰度上线建议
+图中两条线：**供应链卡点**（上行）构建 → Trivy 扫描 → Cosign 签名 → 私有 Registry，签名镜像的 Pod 创建请求进入 Kyverno 准入做双重校验（verifyImages 验签 + deny 拦 Critical）后才放行；**持续重扫闭环**（下行）Trivy Operator watch 运行中镜像生成 VulnerabilityReport，报告字段再回流给策略引用——"部署后"的安全状态也持续可观测。
+
+> 🌐 **交互版**：[在线打开（GitHub Pages）](https://yong-huang.github.io/hands-on-kubernetes/labs/21_image_security/images/supply_chain.html)（或本地打开 [`images/supply_chain.html`](images/supply_chain.html)）。
 
 ---
 
-## 工程延伸
+## 5. 工程延伸
 
 - **SBOM 附件**: cosign attest 把 SBOM 签进镜像，审计时可证明"部署的就是扫过的那份"
 - **keyless 签名**: 用 OIDC 短期证书替代长期密钥，避免私钥管理负担

@@ -1,0 +1,258 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Karmada：一份声明，按 4:2 权重分发到两个集群",
+    "locale": "zh-CN",
+    "output": "labs/30_multicluster_federation/images/karmada_flow.html",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    {
+      "id": "user",
+      "type": "external",
+      "label": "kubectl / 原有 YAML",
+      "sublabel": "一个 API 管所有集群",
+      "pos": [
+        40,
+        150
+      ],
+      "size": [
+        150,
+        70
+      ]
+    },
+    {
+      "id": "apiserver",
+      "type": "backend",
+      "label": "karmada-apiserver",
+      "sublabel": "统一入口 · 原生 API 兼容",
+      "pos": [
+        260,
+        150
+      ],
+      "size": [
+        195,
+        84
+      ]
+    },
+    {
+      "id": "binding",
+      "type": "backend",
+      "label": "ResourceBinding",
+      "sublabel": "6 副本待分发",
+      "pos": [
+        535,
+        150
+      ],
+      "size": [
+        190,
+        80
+      ]
+    },
+    {
+      "id": "sched",
+      "type": "backend",
+      "label": "karmada-scheduler",
+      "sublabel": "按 staticWeight 4:2 拆分",
+      "pos": [
+        800,
+        150
+      ],
+      "size": [
+        195,
+        84
+      ]
+    },
+    {
+      "id": "exec",
+      "type": "backend",
+      "label": "execution-controller",
+      "sublabel": "push 下发成员集群",
+      "pos": [
+        1065,
+        150
+      ],
+      "size": [
+        190,
+        84
+      ],
+      "tag": "成员零侵入"
+    },
+    {
+      "id": "op",
+      "type": "security",
+      "label": "OverridePolicy",
+      "sublabel": "imageOverrider：Tag 按地域覆盖",
+      "pos": [
+        260,
+        340
+      ],
+      "size": [
+        230,
+        84
+      ]
+    },
+    {
+      "id": "pp",
+      "type": "security",
+      "label": "PropagationPolicy",
+      "sublabel": "Divided · staticWeight 4:2",
+      "pos": [
+        535,
+        340
+      ],
+      "size": [
+        230,
+        84
+      ]
+    },
+    {
+      "id": "mus",
+      "type": "backend",
+      "label": "member-us",
+      "sublabel": "Deployment 4 副本 · Tag 1.27",
+      "pos": [
+        800,
+        340
+      ],
+      "size": [
+        235,
+        90
+      ]
+    },
+    {
+      "id": "map",
+      "type": "backend",
+      "label": "member-ap",
+      "sublabel": "Deployment 2 副本 · Tag 1.26",
+      "pos": [
+        1090,
+        340
+      ],
+      "size": [
+        240,
+        90
+      ],
+      "tag": "失联 60s → 份额迁回 us"
+    }
+  ],
+  "connections": [
+    {
+      "from": "user",
+      "to": "apiserver",
+      "label": "提交 Deployment",
+      "variant": "emphasis",
+      "labelAt": [
+        205,
+        134
+      ]
+    },
+    {
+      "from": "apiserver",
+      "to": "binding",
+      "label": "生成"
+    },
+    {
+      "from": "binding",
+      "to": "sched",
+      "label": "待调度"
+    },
+    {
+      "from": "sched",
+      "to": "exec",
+      "label": "分发计划",
+      "labelAt": [
+        1010,
+        134
+      ]
+    },
+    {
+      "from": "exec",
+      "to": "mus",
+      "label": "4 副本",
+      "variant": "emphasis",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        975,
+        285
+      ]
+    },
+    {
+      "from": "exec",
+      "to": "map",
+      "label": "2 副本",
+      "variant": "emphasis",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        1210,
+        300
+      ]
+    },
+    {
+      "from": "pp",
+      "to": "sched",
+      "label": "权重策略",
+      "variant": "dashed",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "labelAt": [
+        720,
+        280
+      ]
+    },
+    {
+      "from": "op",
+      "to": "map",
+      "label": "Tag 覆写 1.26",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "bottom",
+      "via": [
+        [
+          375,
+          470
+        ],
+        [
+          1210,
+          470
+        ]
+      ],
+      "labelAt": [
+        650,
+        463
+      ]
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "控制面四级流水线",
+      "items": [
+        "apiserver 聚合 API：kubectl 直接可用，YAML 原样提交",
+        "controller 生成 ResourceBinding → scheduler 按权重拆分",
+        "execution push 下发；成员集群不装任何组件"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "两类策略",
+      "items": [
+        "PropagationPolicy：Duplicated 全量复制 / Divided 按权重拆分",
+        "OverridePolicy：镜像 Tag、副本数、规格的地域差异以补丁声明",
+        "改总副本数按同权重自动再平衡，无需逐集群操作"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "故障转移的权衡",
+      "items": [
+        "clusterTolerations：心跳超时 60s 份额迁往健康集群",
+        "网络抖动误判 = 脑裂双跑，阈值不能无脑缩短",
+        "应用层幂等 / 数据一致性设计是前提"
+      ]
+    }
+  ]
+}

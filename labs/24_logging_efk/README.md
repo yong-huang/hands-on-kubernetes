@@ -1,26 +1,26 @@
 # 日志收集（EFK Stack）
 
-## 文件结构
+## 1. 文件结构
 
 ```
 24_logging_efk/
-├── README.md     # 本文档
-├── logging_efk.sh   # 全流程演示脚本（步骤见脚本头部注释）
+├── README.md              # 本文档
+├── logging_efk.sh         # 全流程演示脚本（步骤见脚本头部注释）
 ├── manifests/
-│   └── logging_efk.yaml  # 演示用的 K8s 清单
-├── scripts/
-│   └── gen_arch.py   # 架构图生成脚本 (python3 scripts/gen_arch.py)
+│   └── logging_efk.yaml   # 演示用的 K8s 清单
 └── images/
-    └── logging_efk_arch.png   # 架构图（gen_arch.py 生成）
+    ├── log_pipeline.architecture.json  # 图源（Archify Typed JSON IR）
+    ├── log_pipeline.html               # 交互版架构图
+    └── log_pipeline.svg                # 双主题矢量版（本文档 §5 内嵌）
 ```
 
-## 项目概述
+## 2. 项目概述
 
 `kubectl logs` 只能看单个 Pod，跨节点排障时日志散落在几十台机器上。本项目（`logging_efk.yaml` + `logging_efk.sh`）搭建经典 EFK 栈：**Fluent Bit DaemonSet** 在每个节点尾读容器日志文件，补全 Kubernetes 元数据后转发给 **Elasticsearch** 建立倒排索引，**Kibana** 提供检索界面——目标是让所有 Pod 日志在一处可查、可过滤、可聚合。
 
 ---
 
-## 核心机制解析
+## 3. 核心机制解析
 
 ### 1. 为什么采集的是文件而不是容器接口
 
@@ -63,17 +63,17 @@ tolerations: [{operator: Exists}]
 
 ---
 
-## 可视化分析
+## 4. 可视化
 
-![logging efk](images/logging_efk_arch.png)
+![EFK 日志链路](images/log_pipeline.svg)
 
-上图两面板：
-- **左图 一条日志的旅程**：从应用 stdout 到 containerd 落盘、tail 采集、元数据增强、JSON 解析、写入 ES、Kibana 检索的完整八步链路，附内存缓冲与超长行处理的取舍说明
-- **右图 部署拓扑**：节点内 app → 文件 → fluent-bit 的 tail 关系，以及集中层 ES/Kibana；右侧回答"为什么 tail 文件"三个理由，底部标注最小 RBAC 权限集
+一条日志的旅程：应用只往 stdout 打印 → containerd 落盘成文件 → Fluent Bit（DaemonSet，每节点一个）tail 采集 → kubernetes filter 反查 API Server 补元数据、Merge_Log 展开结构化字段 → 写入 Elasticsearch 按天分索引 → Kibana 检索。节点边界框强调"采集发生在节点本地"，工程师的查询不再受单机限制。
+
+> 🌐 **交互版**：[在线打开（GitHub Pages）](https://yong-huang.github.io/hands-on-kubernetes/labs/24_logging_efk/images/log_pipeline.html)（或本地打开 [`images/log_pipeline.html`](images/log_pipeline.html)）。
 
 ---
 
-## 工程延伸
+## 5. 工程延伸
 
 - **资源隔离**: ES 是内存大户，单独的节点池 + local-path/NVMe 存储；Fluent Bit 限 `Mem_Buf_Limit` 防止打爆节点
 - **Loki 替代**: 若只索引 label 不索引全文（LogCLI 按 selector 过滤），存储成本降一个数量级——Grafana 生态下常替代 EFK

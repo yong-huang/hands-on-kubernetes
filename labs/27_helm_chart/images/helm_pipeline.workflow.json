@@ -1,0 +1,40 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "Helm 渲染流水线：三层 values 合并 → 模板 → Release",
+    "locale": "zh-CN",
+    "output": "labs/27_helm_chart/images/helm_pipeline.html",
+    "quality_profile": "showcase"
+  },
+  "lanes": [
+    { "id": "main", "label": "install / upgrade 闭环" },
+    { "id": "rollback", "label": "回滚路径", "variant": "exception" }
+  ],
+  "phases": [
+    { "id": "p1", "label": "合并 values", "fromCol": 0, "toCol": 0, "variant": "emphasis" },
+    { "id": "p2", "label": "渲染与提交", "fromCol": 1, "toCol": 2 },
+    { "id": "p3", "label": "Release 版本链", "fromCol": 3, "toCol": 4, "variant": "dashed" }
+  ],
+  "mainPath": ["vals", "render", "apply", "release", "run"],
+  "nodes": [
+    { "id": "vals", "lane": "main", "col": 0, "type": "frontend", "label": "三层 values 合并", "sublabel": "chart < -f file < --set", "tag": "低 → 高", "width": 155 },
+    { "id": "render", "lane": "main", "col": 1, "type": "backend", "label": "Go template 渲染", "sublabel": "templates + .Values → 清单", "width": 155 },
+    { "id": "apply", "lane": "main", "col": 2, "type": "backend", "label": "校验 · 提交 API", "sublabel": "install / upgrade", "width": 135 },
+    { "id": "release", "lane": "main", "col": 3, "type": "backend", "label": "Release vN 快照", "sublabel": "存集群 Secret · 版本递增", "tag": "回滚底气", "width": 150 },
+    { "id": "run", "lane": "main", "col": 4, "type": "frontend", "label": "工作负载运行", "sublabel": "deploy/svc/ingress/cm 四件套", "width": 155 },
+    { "id": "rollback", "lane": "rollback", "col": 3, "type": "security", "label": "helm rollback demo 1", "sublabel": "回滚的是渲染产物", "tag": "事实源仍是 Git", "width": 165 }
+  ],
+  "edges": [
+    { "from": "vals", "to": "render" },
+    { "from": "render", "to": "apply" },
+    { "from": "apply", "to": "release" },
+    { "from": "release", "to": "run" },
+    { "from": "release", "to": "rollback", "label": "版本回退", "variant": "security", "role": "error" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "Chart 结构与解耦", "items": ["模板只写\"形状\"，值全部来自 .Values", "image.tag | default .Chart.AppVersion：chart 升级与发版解耦", "_helpers.tpl 的 fullname = Release 名-Chart 名，多租户的根基"] },
+    { "dot": "rose", "title": "values 合并的坑", "items": ["Helm 3 upgrade 默认复用上次 release 的用户值", "想回纯 chart 默认值必须显式 --reset-values", "不校验当前生效值直接 upgrade，是生产事故的经典来源"] },
+    { "dot": "emerald", "title": "多租户命名约定", "items": ["资源名带 release 前缀，label 带 app.kubernetes.io/instance", "同一 chart 以不同 release 名同 ns 部署多份互不干扰", "漏掉这层：两个 release 会互相接管对方的 Pod"] }
+  ]
+}

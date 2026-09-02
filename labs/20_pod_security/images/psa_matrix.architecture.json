@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "PSA 准入：同一个特权 Pod，三个命名空间三种命运",
+    "locale": "zh-CN",
+    "output": "labs/20_pod_security/images/psa_matrix.html",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    { "id": "podreq", "type": "backend", "label": "特权测试 Pod", "sublabel": "privileged: true + hostPath /", "pos": [60, 240], "size": [220, 90], "tag": "同一个 Pod" },
+    { "id": "o1", "type": "security", "label": "创建被拒", "sublabel": "403 Forbidden", "pos": [390, 60], "size": [240, 90], "tag": "enforce" },
+    { "id": "o2", "type": "backend", "label": "创建成功 + Warning", "sublabel": "warnings 字段提示违规项", "pos": [390, 240], "size": [240, 90], "tag": "warn" },
+    { "id": "o3", "type": "backend", "label": "创建成功 + 审计事件", "sublabel": "审计日志记 PodSecurityAudit", "pos": [390, 420], "size": [240, 90], "tag": "audit" },
+    { "id": "c1", "type": "backend", "label": "runAsNonRoot: true", "sublabel": "禁 uid=0，root 镜像要重打", "pos": [760, 60], "size": [260, 62] },
+    { "id": "c2", "type": "backend", "label": "capabilities.drop: ALL", "sublabel": "确需能力再单独 add 回来", "pos": [760, 140], "size": [260, 62] },
+    { "id": "c3", "type": "backend", "label": "allowPrivilegeEscalation: false", "sublabel": "禁 sudo/suid 提权", "pos": [760, 220], "size": [260, 62] },
+    { "id": "c4", "type": "backend", "label": "seccompProfile: RuntimeDefault", "sublabel": "限制系统调用集", "pos": [760, 300], "size": [260, 62] }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "ns-a · pod-security.kubernetes.io/enforce=restricted", "wraps": ["o1"], "pad": 22 },
+    { "kind": "region", "label": "ns-b · warn=restricted", "wraps": ["o2"], "pad": 22 },
+    { "kind": "region", "label": "ns-c · audit=restricted", "wraps": ["o3"], "pad": 22 },
+    { "kind": "security-group", "label": "restricted 合规四件套（securityContext）", "wraps": ["c1", "c2", "c3", "c4"], "pad": 22 }
+  ],
+  "connections": [
+    { "from": "podreq", "to": "o1", "variant": "security" },
+    { "from": "podreq", "to": "o2" },
+    { "from": "podreq", "to": "o3", "variant": "dashed" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "PSS 三等级（包含关系）", "items": ["privileged：全放开，只给 CNI/CSI 等系统组件", "baseline：禁特权容器、hostPath、宿主命名空间、新增 capabilities", "restricted：再加 runAsNonRoot、drop ALL、seccomp、禁提权"] },
+    { "dot": "rose", "title": "三种模式（软硬之分）", "items": ["enforce：违规直接拒绝，API 返回 Forbidden", "audit：照常创建，审计日志留痕评估违规面", "warn：照常创建，warnings 字段提示调用方；灰度路径 warn → audit → enforce"] },
+    { "dot": "emerald", "title": "层次与旧 PSP", "items": ["RBAC 管 API 访问、PSA 管 Pod 越权配置、NetworkPolicy 管网络可达", "PSP v1.25 已移除：PSA 零 API 对象、按 namespace 天然隔离", "六种标签 {enforce,audit,warn}[-version]，version 建议显式固定"] }
+  ]
+}

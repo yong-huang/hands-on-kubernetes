@@ -1,0 +1,211 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "监控双线：指标数据流（Pull）+ Operator 声明式配置",
+    "locale": "zh-CN",
+    "output": "labs/23_prometheus_grafana/images/monitoring_flow.html",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    {
+      "id": "app",
+      "type": "backend",
+      "label": "demo 应用 Pod",
+      "sublabel": "暴露 /metrics（文本协议）",
+      "pos": [
+        60,
+        60
+      ],
+      "size": [
+        200,
+        80
+      ]
+    },
+    {
+      "id": "prom",
+      "type": "database",
+      "label": "Prometheus",
+      "sublabel": "Pull 每 15s · TSDB 存储",
+      "pos": [
+        400,
+        60
+      ],
+      "size": [
+        230,
+        90
+      ],
+      "tag": "up==0 表达宕机"
+    },
+    {
+      "id": "grafana",
+      "type": "backend",
+      "label": "Grafana",
+      "sublabel": "PromQL 查询 · 渲染面板",
+      "pos": [
+        760,
+        40
+      ],
+      "size": [
+        200,
+        80
+      ]
+    },
+    {
+      "id": "alertm",
+      "type": "messagebus",
+      "label": "Alertmanager",
+      "sublabel": "分组 · 去重 · 升级链",
+      "pos": [
+        760,
+        200
+      ],
+      "size": [
+        200,
+        84
+      ]
+    },
+    {
+      "id": "oncall",
+      "type": "external",
+      "label": "值班通知",
+      "sublabel": "出门的只有它",
+      "pos": [
+        760,
+        350
+      ],
+      "size": [
+        200,
+        64
+      ]
+    },
+    {
+      "id": "sm",
+      "type": "backend",
+      "label": "ServiceMonitor CR",
+      "sublabel": "selector + endpoints",
+      "pos": [
+        60,
+        360
+      ],
+      "size": [
+        200,
+        80
+      ]
+    },
+    {
+      "id": "rule",
+      "type": "backend",
+      "label": "PrometheusRule CR",
+      "sublabel": "alert（for 防抖）+ record 预聚合",
+      "pos": [
+        300,
+        440
+      ],
+      "size": [
+        230,
+        80
+      ]
+    },
+    {
+      "id": "oper",
+      "type": "cloud",
+      "label": "Prometheus Operator",
+      "sublabel": "watch CR → 渲染 Secret",
+      "pos": [
+        560,
+        360
+      ],
+      "size": [
+        185,
+        84
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "from": "app",
+      "to": "prom",
+      "label": "Pull /metrics",
+      "variant": "emphasis"
+    },
+    {
+      "from": "prom",
+      "to": "grafana",
+      "label": "PromQL 查询"
+    },
+    {
+      "from": "prom",
+      "to": "alertm",
+      "label": "规则触发"
+    },
+    {
+      "from": "alertm",
+      "to": "oncall",
+      "label": "通知",
+      "labelAt": [
+        868,
+        320
+      ]
+    },
+    {
+      "from": "sm",
+      "to": "oper",
+      "label": "watch",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "from": "rule",
+      "to": "oper",
+      "label": "watch",
+      "fromSide": "right",
+      "toSide": "bottom",
+      "labelAt": [
+        560,
+        494
+      ]
+    },
+    {
+      "from": "oper",
+      "to": "prom",
+      "label": "渲染 Secret · 热加载",
+      "variant": "dashed",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "labelAt": [
+        590,
+        190
+      ]
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Pull 模型",
+      "items": [
+        "每 15s 拉取 /metrics，原始数据不出集群",
+        "应用崩溃留最后样本，宕机用 up==0 表达——采集与告警解耦",
+        "出门的只有 Alertmanager 发出的通知"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Operator 模式",
+      "items": [
+        "ServiceMonitor 被 Operator watch，渲染 Secret 后 Prometheus 热加载",
+        "最大的坑：SM 必须带 release 标签，否则静默不生效",
+        "PrometheusRule：for 防抖 + record 预聚合加速大面板"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "成本与演进",
+      "items": [
+        "指标基数（cardinality）是最大成本项：topk 审计高基数 label",
+        "多副本 / 长期保留上 Thanos 远端存储",
+        "Blackbox Exporter 补黑盒外部视角"
+      ]
+    }
+  ]
+}

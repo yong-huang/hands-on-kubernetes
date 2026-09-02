@@ -1,0 +1,169 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "Operator 最小闭环：CRD + Reconcile 循环",
+    "locale": "zh-CN",
+    "output": "labs/29_crd_controller/images/reconcile_loop.html",
+    "quality_profile": "showcase"
+  },
+  "lanes": [
+    {
+      "id": "main",
+      "label": "Reconcile 循环（controller.py）"
+    },
+    {
+      "id": "drift",
+      "label": "漂移自愈演示",
+      "variant": "exception"
+    }
+  ],
+  "phases": [
+    {
+      "id": "p1",
+      "label": "声明入库",
+      "fromCol": 0,
+      "toCol": 1,
+      "variant": "emphasis"
+    },
+    {
+      "id": "p2",
+      "label": "调谐：对比期望与实际",
+      "fromCol": 2,
+      "toCol": 3
+    },
+    {
+      "id": "p3",
+      "label": "回写 status",
+      "fromCol": 4,
+      "toCol": 4,
+      "variant": "dashed"
+    }
+  ],
+  "mainPath": [
+    "cr",
+    "api",
+    "compare",
+    "act",
+    "write"
+  ],
+  "nodes": [
+    {
+      "id": "cr",
+      "lane": "main",
+      "col": 0,
+      "type": "frontend",
+      "label": "提交 Database CR",
+      "sublabel": "postgres · 10Gi · 3 副本",
+      "width": 150
+    },
+    {
+      "id": "api",
+      "lane": "main",
+      "col": 1,
+      "type": "backend",
+      "label": "API Server 校验存储",
+      "sublabel": "openAPIV3Schema · /status 子资源",
+      "width": 165
+    },
+    {
+      "id": "compare",
+      "lane": "main",
+      "col": 2,
+      "type": "backend",
+      "label": "读期望 vs 查实际",
+      "sublabel": "CR spec vs StatefulSet",
+      "tag": "水平触发",
+      "width": 145
+    },
+    {
+      "id": "act",
+      "lane": "main",
+      "col": 3,
+      "type": "backend",
+      "label": "缺则建 · 漂移则 patch",
+      "sublabel": "幂等：重复执行无副作用",
+      "width": 160
+    },
+    {
+      "id": "write",
+      "lane": "main",
+      "col": 4,
+      "type": "backend",
+      "label": "回写 status",
+      "sublabel": "只归 controller 写",
+      "width": 120
+    },
+    {
+      "id": "drift",
+      "lane": "drift",
+      "col": 3,
+      "type": "security",
+      "label": "手改 STS 副本 = 2",
+      "sublabel": "下一轮对比自动拉回 3",
+      "tag": "自愈演示",
+      "width": 150
+    }
+  ],
+  "edges": [
+    {
+      "from": "cr",
+      "to": "api"
+    },
+    {
+      "from": "api",
+      "to": "compare"
+    },
+    {
+      "from": "compare",
+      "to": "act"
+    },
+    {
+      "from": "act",
+      "to": "write"
+    },
+    {
+      "from": "write",
+      "to": "compare",
+      "label": "周期重入队（10s）",
+      "variant": "dashed",
+      "role": "return"
+    },
+    {
+      "from": "drift",
+      "to": "compare",
+      "label": "被对比发现",
+      "variant": "security",
+      "role": "error"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "CRD 四要素",
+      "items": [
+        "API Server 长出 /apis/demo.example.com 端点，kubectl 免改",
+        "openAPIV3Schema：非法 CR 在准入时就被拒",
+        "spec 用户写 / status 只归 controller 写——否则事件风暴"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "水平触发，不是边沿触发",
+      "items": [
+        "不关心\"发生了什么事件\"，只对比期望 vs 实际",
+        "幂等是灵魂：重复执行、漏事件、重启都无错误动作",
+        "漂移实验：手动改 STS 副本，下一轮自动拉回——自愈原理"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "教学版 vs 生产",
+      "items": [
+        "本例：while True + list 每 10s 轮询",
+        "生产：Informer + 工作队列（去重、限速重试）",
+        "同模式实例：ServiceMonitor、ArgoCD Application 都是 CR + Controller"
+      ]
+    }
+  ]
+}
