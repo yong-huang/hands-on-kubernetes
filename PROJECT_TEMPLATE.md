@@ -73,15 +73,19 @@ hands-on-{{DOMAIN}}/
 
 ```
 labs/NN_xxx/
-├── README.md          # 教程文档（原 blog），GitHub 直接渲染
+├── README.md          # 教程文档（GitHub 直接渲染，内嵌双主题 SVG 架构图）
 ├── xxx.sh             # 主演示脚本 —— 学习重点，放在实验根目录
 ├── manifests/         # 声明式配置（K8s YAML / 配置文件 / chart 等）
 │   └── ...
-├── scripts/
-│   └── gen_arch.py    # matplotlib 架构图生成脚本（工程辅助，与主脚本区分）
-└── images/
-    └── xxx_arch.png   # 由 gen_arch.py 生成，README 引用
+└── images/            # 架构图三件套（Archify 生成），每张图 1~2 组：
+    ├── xxx.architecture.json  # 图源：Typed JSON IR（人工/AI 编写、可 diff）
+    ├── xxx.html               # 交付的交互版：自包含单文件，缩放/聚焦/路径追踪
+    └── xxx.svg                # 双主题矢量版：README 内嵌，跟随系统深浅色
 ```
+
+图源类型按内容选择五种之一：`architecture`（组件/边界）、`workflow`
+（流程/泳道）、`sequence`（调用时序）、`dataflow`（数据管线）、`lifecycle`
+（状态机）。每个实验 1~2 张，一节一图，不凑数。
 
 例外情况：
 
@@ -96,37 +100,46 @@ labs/NN_xxx/
 
 #### README.md（教程文档）
 
-统一的章节结构（可微调标题名，顺序不变）：
+统一的章节结构（编号到二级标题；标题措辞可调，顺序不变）：
 
 ```markdown
 # NN · 主题名：一句话副标题
 
-## 引言 / 为什么需要它
-   （从上一个实验的"痛点"切入，2~4 段，讲清楚这个概念解决什么问题）
+> 引言 blockquote：从上一实验的痛点切入，3~4 行说清本篇解决什么
 
-## 文件结构
-   （代码块画出本实验目录树，每个文件带一句中文注释）
+## 1. 为什么需要它
+   （2~4 段，讲清楚概念解决什么问题）
 
-## 核心概念
-   （3~6 个小节，每节一个机制；多用 ASCII 图、表格、对比；
-    术语第一次出现给英文原文；写"易错点/常见误解"小节）
+## 2. 总览：核心机制一图看懂
+   ![总览图](images/xxx.svg)
+   （内嵌双主题 SVG + 一段"怎么看这张图"+ 心智模型一句话 +
+    🌐 交互版链接：GitHub Pages 在线 / 本地打开 images/xxx.html）
 
-## 实操演示
-   （按脚本步骤给出关键命令和**真实输出示例**；
-    网络相关步骤标注国内环境替代方案）
+## 3. 快速开始
+   （./xxx.sh 的分步用法，每步一行注释说明在看什么）
 
-## 预期结果与陷阱
-   （诚实写出本环境下会看到什么、不会看到什么、为什么）
+## 4. 核心概念
+   （2~5 个小节，每节一个机制，关键的配专属图；多用表格与对比；
+    术语首次出现给英文原文；"易错点"单独成段）
 
-## 小结
+## 5. YAML 关键字段
+   （带"为什么"注释的代码块 + 易踩的坑清单）
+
+## 6. 文件结构
+   （目录树：README / 脚本 / manifests/ / images/ 三件套，逐文件注释）
+
+## 7. 面试要点
+   （4~5 个问答式考点）
+
+## 8. 总结
    （3~5 句话收束主线 + 一句"下一篇"引导）
-
-（配一张架构图：![xxx](images/xxx_arch.png)）
 ```
 
 写作风格约定：
 
 - 中文正文，命令/字段/术语保留英文；
+- **一节一图**：图内嵌在讲它的那一节，不集中堆在文末；每张图配
+  "怎么看"的两三句话；
 - 每个结论都给出验证方法（"你可以用 `xxx` 命令亲眼看到"）；
 - 敢写"这不是故障，是预期行为"——诚实预期是这个系列的特色；
 - 长度 80~150 行，超过就拆成两个实验。
@@ -192,26 +205,39 @@ main "$@"
 - 演示密码用 `changeme` / `demo-password` 等明显的占位值，并注释
   "生产应使用 Secret/外部密钥管理"。
 
-#### scripts/gen_arch.py + images/
+#### images/（Archify 架构图三件套）
 
-- matplotlib 脚本，生成 1~2 张架构/流程图，输出到 `images/xxx_arch.png`；
-- 固定头部（从脚本位置定位实验根，保证在任何 cwd 运行都输出正确）：
+每张图 = 图源 JSON + 交互 HTML + 双主题 SVG，三者同源、可复现。
 
-```python
-import os
-import matplotlib
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
+**作者写 JSON（Typed IR），工具负责校验与渲染**——不要手写坐标/样式。
+以 [Archify](https://github.com/tt-a1i/archify) 为例的完整管线：
 
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-os.chdir(os.path.join(SCRIPT_DIR, ".."))
-# ... 画图 ...
-plt.savefig("images/xxx_arch.png", dpi=150, bbox_inches="tight")
+```bash
+cd archify/   # archify 仓库根
+# 1. 选类型（architecture/workflow/sequence/dataflow/lifecycle），读对应
+#    schemas/*.schema.json + 一个 examples/ 示例，然后编写图源 JSON：
+#    meta.quality_profile="showcase"、meta.locale="zh-CN"、节点 ≤ 12、
+#    一条主路径、自动路由优先（不要预先手调 via/labelAt）；
+node bin/archify.mjs validate <type> <图源>.json --quality showcase --json
+# 2. 按 diagnostics 修：只改被诊断的对象，一次一个；9 项检查全过即冻结；
+node bin/archify.mjs deliver <type> <图源>.json <输出>.html --quality showcase --json
+# 3. deliver 会原子提交自包含 HTML 并出具 SHA-256 回执；
+node bin/archify.mjs visual-check <输出>.html --json
+# 4. 浏览器证据（1440/1600/1920/2048 视口零溢出）通过后再人工视觉复核。
 ```
 
-- 图内容必须与 README 描述的组件/流程一致；中文标注（macOS 用
-  Hiragino Sans GB，注意个别 emoji/特殊符号缺字形）；
-- 图片入库（~100-300KB/张，总量 10MB 内不需要 LFS）。
+布局经验（实测沉淀）：
+
+- 画布要"宽扁"（宽高比 ≥ 1.6），竖向长条会在 1440×900 视口垂直溢出；
+- 多节点扇出时优先**删低价值边**（语义已被端点 sublabel/tag 隐含的），
+  再考虑路由控制；标签放不进窄间隙就把它挪进节点的 sublabel/tag；
+- workflow 用 schema v2（逻辑列 + 自动布局），泳道 ≤ 3，节点加宽用
+  `width` 字段解决长副标签；不能通行的 route 预设直接删掉交给自动路由；
+- 交互页 Export 菜单可导出**双主题 SVG**（跟随系统深浅色）与 4400 级
+  全图 PNG；README 内嵌 SVG、仓库同时保留 HTML 供交互；
+- 仓库开启 GitHub Pages（master / root）后，每个实验的
+  `labs/NN_xxx/images/xxx.html` 自动获得在线地址，README 里放链接即可
+  （Jekyll 还会把 README.md 渲染成目录首页）。
 
 ---
 
@@ -269,7 +295,9 @@ plt.savefig("images/xxx_arch.png", dpi=150, bbox_inches="tight")
 2. **写 manifests**（声明先行）；
 3. **写脚本**，在真实环境里逐步跑通、边跑边修；
 4. **写 README**，把跑通过程中的真实输出粘进"实操演示"；
-5. **写 gen_arch.py 生成架构图**，README 引用；
+5. **编写 Archify 图源并走完渲染管线**（validate → deliver →
+   visual-check → 导出双主题 SVG，见第三节 images/ 规范），README 内嵌
+   SVG 并链接交互版；
 6. **自检清单**：
    - [ ] `bash -n` 通过；脚本从任意 cwd 调用都正确
    - [ ] `./xxx.sh clean` 后无残留资源
@@ -303,9 +331,10 @@ PROJECT_TEMPLATE.md 中的结构与规范。请按以下步骤工作：
 1. 先给出实验列表规划（25~35 个，编号+主题+一句话目标，分 4~6 个学习阶段），
    00 是工具安装、01 是环境初始化，供我确认；
 2. 我确认后，逐个实验生成五件套：README.md（按模版章节结构，中文，
-   诚实预期）、主演示脚本（分步 case 分发骨架 + set -euo pipefail +
-   完整 clean）、manifests/（带教学注释）、scripts/gen_arch.py、
-   以及运行它生成的 images/xxx_arch.png；
+   编号章节、内嵌双主题 SVG、诚实预期）、主演示脚本（分步 case 分发骨架 +
+   set -euo pipefail + 完整 clean）、manifests/（带教学注释）、以及
+   images/ 下的 Archify 图三件套（图源 JSON 通过 showcase 校验后
+   deliver 出交互 HTML，再导出双主题 SVG 内嵌进 README）；
 3. 所有命令必须是你确信在 {{TOOLCHAIN}} 当前稳定版上可执行的；
    不确定的 API/flag 要先验证再写；
 4. 每生成 5 个实验停下，输出自检清单结果（bash -n / 语法检查 /
@@ -325,6 +354,7 @@ PROJECT_TEMPLATE.md 中的结构与规范。请按以下步骤工作：
 | kind 集群 | 领域的本地沙箱（fintech：本地账本/区块链测试链；LLM：本地推理运行时） |
 | kubectl | 领域核心 CLI |
 | manifests/*.yaml | 领域的声明式配置（合约、流水线定义、拓扑文件） |
+| images/ Archify 图三件套 | 保留：JSON 图源 + 交互 HTML + 双主题 SVG 的组合与工具无关（任何 diagram-as-code 工具皆可套用此三件套与校验管线） |
 | 演示脚本串联"创建→观察→破坏→验证→清理" | 保留这个生命周期骨架，换领域动词（如 fintech：开户→记账→对账→冲正→清退） |
 | load_images.sh 解决镜像拉取 | 解决该领域最普遍的环境阻塞（包源、测试数据、模拟服务） |
 | "诚实预期"章节 | 保留：任何本地环境演示不了的生产行为都明说 |
