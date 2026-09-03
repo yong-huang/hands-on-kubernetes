@@ -1,8 +1,8 @@
 # hands-on-kubernetes
 
-Kubernetes 动手学习系列：通过 **31 个可真实跑通的小项目**，从环境搭建一路学到多集群与 Operator 开发。每个实验都自带原理讲解（README）、K8s 清单（manifests/）、一键演示脚本（scripts/）和架构图（images/）。
+Kubernetes 动手学习系列：通过 **31 个可真实跑通的小项目**，从环境搭建一路学到多集群与 Operator 开发。每个实验都自带原理讲解（README）、K8s 清单（manifests/）、一键演示脚本（xxx.sh）和架构图（images/）。
 
-> 🖼️ **交互式架构图**：部分实验配有可交互 HTML 图（缩放 / 节点聚焦 / 连线追踪 / 深浅主题），由 [Archify](https://github.com/tt-a1i/archify) 生成并通过 showcase 级校验。仓库开启 GitHub Pages 后可[在线查看](https://yong-huang.github.io/hands-on-kubernetes/)；克隆到本地后直接用浏览器打开对应实验的 `images/*.html` 也可以。
+> 🖼️ **交互式架构图**：每个实验（00 除外）都配有由 [Archify](https://github.com/tt-a1i/archify) 生成、通过 showcase 级校验的架构图，共 38 张三件套：图源 JSON（Typed JSON IR）+ 可交互 HTML（缩放 / 节点聚焦 / 连线追踪 / 深浅主题）+ 双主题矢量 SVG（README 内嵌）。开启 GitHub Pages 后可[在线查看](https://yong-huang.github.io/hands-on-kubernetes/)；克隆到本地后用浏览器打开对应实验的 `images/*.html` 也可以。
 
 ## 环境要求
 
@@ -20,17 +20,20 @@ scripts/load_images.sh [image1 image2 ...]   # 无参数时加载默认列表
 
 ```
 hands-on-kubernetes/
-├── README.md          # 本文档：系列总目录
+├── README.md             # 本文档：系列总目录
+├── LICENSE               # MIT
+├── PROJECT_TEMPLATE.md   # 复刻模版：把本系列泛化到其它领域（含 AI 提示词）
 ├── scripts/
-│   └── load_images.sh # 公共脚本：拉取镜像并导入所有 kind 节点（集群名 k8s-learn）
+│   └── load_images.sh    # 公共脚本：拉取镜像并导入所有 kind 节点（集群名 k8s-learn）
 └── labs/
-    └── NN_xxx/            # 每个实验统一结构：
-        ├── README.md      #   教程文档（原理 + 实操步骤）
-        ├── xxx.sh         #   主演示脚本：本实验的学习重点（./xxx.sh [step]）
-        ├── manifests/     #   K8s YAML 清单
-        ├── scripts/
-        │   └── gen_arch.py #  架构图生成脚本（python3 scripts/gen_arch.py）
-        └── images/        #   架构图
+    └── NN_xxx/           # 每个实验统一结构：
+        ├── README.md     #   教程文档（原理 + 实操步骤，内嵌双主题矢量架构图）
+        ├── xxx.sh        #   主演示脚本：本实验的学习重点（./xxx.sh [step]）
+        ├── manifests/    #   K8s YAML 清单
+        └── images/       #   架构图三件套（Archify 生成）：
+            ├── xxx.architecture.json  #   图源（Typed JSON IR）
+            ├── xxx.html               #   交互版（浏览器打开，可缩放/聚焦/追踪）
+            └── xxx.svg                #   双主题矢量版（README 内嵌）
 ```
 
 ## 实验列表
