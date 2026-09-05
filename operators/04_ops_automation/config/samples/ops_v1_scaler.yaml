@@ -1,0 +1,11 @@
+apiVersion: ops.example.com/v1
+kind: Scaler
+metadata:
+  name: business-hours
+spec:
+  targetName: ops-target-nginx
+  schedules:
+    - cron: "*/3 * * * *"       # 演示：每 3 分钟 → 5 副本
+      replicas: 5
+    - cron: "1-59/3 * * * *"    # 偏移 1 分钟 → 2 副本（下一分钟）
+      replicas: 2

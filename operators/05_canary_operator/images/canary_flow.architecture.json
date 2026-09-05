@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Canary Operator：渐进式发布状态机",
+    "locale": "zh-CN",
+    "output": "operators/05_canary_operator/images/canary_flow.html",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    { "id": "cr", "type": "database", "label": "Canary CR", "sublabel": "steps: 25% → 50% → 100%", "pos": [50, 200], "size": [200, 78] },
+    { "id": "ctrl", "type": "backend", "label": "Canary Controller", "sublabel": "状态机：对比 step 计数", "pos": [330, 200], "size": [220, 84] },
+    { "id": "stable", "type": "backend", "label": "stable Deployment", "sublabel": "旧镜像 · 逐步缩到 0", "pos": [640, 100], "size": [220, 84] },
+    { "id": "canarydep", "type": "backend", "label": "canary Deployment", "sublabel": "新镜像 · 逐步扩到 total", "pos": [640, 280], "size": [220, 84] },
+    { "id": "svc", "type": "backend", "label": "共享 Service", "sublabel": "selector 不含 version", "pos": [940, 200], "size": [210, 70] }
+  ],
+  "connections": [
+    { "from": "cr", "to": "ctrl", "variant": "dashed" },
+    { "from": "ctrl", "to": "stable", "label": "缩容", "variant": "dashed" },
+    { "from": "ctrl", "to": "canarydep", "label": "扩容", "variant": "emphasis" },
+    { "from": "stable", "to": "svc", "variant": "dashed" },
+    { "from": "canarydep", "to": "svc", "variant": "dashed" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "状态机", "items": ["step 从 0 递增到 len(steps)", "每步计算 canary/stable 副本数并 CreateOrPatch", "全部 Ready 后推进下一步；全部完成后 phase=Completed"] },
+    { "dot": "rose", "title": "失败回滚", "items": ["新 Pod 不 Ready → 不推进（卡在当前步）", "人工把 step 归零 → 全量回滚到 stable", "生产建议：结合 Prometheus 告警自动回滚"] },
+    { "dot": "emerald", "title": "与 Deployment 原生对比", "items": ["原生 maxSurge 只能在同一 Deployment 换镜像", "金丝雀 Operator 用两个独立 Deployment 分别管新旧版本", "共享 Service selector 不含 version → 按副本数比例分配流量"] }
+  ]
+}

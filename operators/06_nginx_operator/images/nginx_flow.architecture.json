@@ -1,0 +1,130 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Nginx Operator：CR → 渲染配置 → ConfigMap → Nginx",
+    "locale": "zh-CN",
+    "output": "operators/06_nginx_operator/images/nginx_flow.html",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    {
+      "id": "cr",
+      "type": "database",
+      "label": "NginxProxy CR",
+      "sublabel": "upstreams + locations",
+      "pos": [
+        40,
+        170
+      ],
+      "size": [
+        220,
+        78
+      ]
+    },
+    {
+      "id": "ctrl",
+      "type": "backend",
+      "label": "Controller",
+      "sublabel": "渲染 nginx.conf",
+      "pos": [
+        340,
+        170
+      ],
+      "size": [
+        200,
+        74
+      ]
+    },
+    {
+      "id": "cm",
+      "type": "database",
+      "label": "ConfigMap",
+      "sublabel": "nginx.conf",
+      "pos": [
+        640,
+        170
+      ],
+      "size": [
+        200,
+        70
+      ]
+    },
+    {
+      "id": "dep",
+      "type": "backend",
+      "label": "nginx Deployment",
+      "sublabel": "挂载 ConfigMap · :80",
+      "pos": [
+        40,
+        370
+      ],
+      "size": [
+        200,
+        78
+      ]
+    },
+    {
+      "id": "svc",
+      "type": "backend",
+      "label": "Service :80",
+      "sublabel": "ClusterIP",
+      "pos": [
+        340,
+        370
+      ],
+      "size": [
+        200,
+        62
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "from": "cr",
+      "to": "ctrl",
+      "variant": "dashed"
+    },
+    {
+      "from": "ctrl",
+      "to": "cm",
+      "label": "渲染写入"
+    },
+    {
+      "from": "ctrl",
+      "to": "dep",
+      "variant": "dashed"
+    },
+    {
+      "from": "dep",
+      "to": "svc"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "配置渲染",
+      "items": [
+        "CR 里的 upstreams/locations 渲染成 nginx.conf",
+        "ConfigMap 变更 → Pod 内文件自动更新（kubelet 同步）",
+        "生产需要 reloader sidecar 或 nginx -s reload 信号"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "subPath 的坑",
+      "items": [
+        "挂单文件用 subPath 不会热更新（kubelet 不追踪）",
+        "改挂目录而非文件即可绕过"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "级联删除",
+      "items": [
+        "CR 删除 → ConfigMap + Deployment + Service 级联清理",
+        "OwnerReference 是级联删除的关键"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,113 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "GPU 训练任务 Operator：扩展资源调度",
+    "locale": "zh-CN",
+    "output": "operators/08_gpu_job_operator/images/gpu_job.html",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    {
+      "id": "cr",
+      "type": "database",
+      "label": "TrainingJob CR",
+      "sublabel": "image / command / gpuCount",
+      "pos": [
+        40,
+        160
+      ],
+      "size": [
+        220,
+        78
+      ]
+    },
+    {
+      "id": "ctrl",
+      "type": "backend",
+      "label": "Controller",
+      "sublabel": "创建 Job · 追踪 phase",
+      "pos": [
+        340,
+        160
+      ],
+      "size": [
+        210,
+        78
+      ]
+    },
+    {
+      "id": "job",
+      "type": "backend",
+      "label": "K8s Job",
+      "sublabel": "resources: nvidia.com/gpu",
+      "pos": [
+        640,
+        160
+      ],
+      "size": [
+        220,
+        78
+      ]
+    },
+    {
+      "id": "node",
+      "type": "cloud",
+      "label": "GPU 节点",
+      "sublabel": "allocatable: nvidia.com/gpu",
+      "pos": [
+        640,
+        360
+      ],
+      "size": [
+        230,
+        70
+      ],
+      "tag": "真卡或 fake"
+    }
+  ],
+  "connections": [
+    {
+      "from": "cr",
+      "to": "ctrl",
+      "variant": "dashed",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "from": "ctrl",
+      "to": "job",
+      "label": "创建 Job",
+      "variant": "emphasis",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "from": "job",
+      "to": "node",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "variant": "dashed"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "扩展资源",
+      "items": [
+        "requests/limits: nvidia.com/gpu = N（必须相等）",
+        "调度器比较 allocatable 与 requests 做算术",
+        "不验证物理存在——fake GPU 也能跑"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "生命周期",
+      "items": [
+        "Created → Running → Succeeded/Failed",
+        "TTL 到期自动清理 Job（ttlSecondsAfterFinished）",
+        "status.phase 由 Job 状态驱动"
+      ]
+    }
+  ]
+}

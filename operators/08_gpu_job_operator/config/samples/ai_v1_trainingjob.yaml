@@ -1,0 +1,9 @@
+apiVersion: ai.example.com/v1
+kind: TrainingJob
+metadata:
+  name: demo-training
+spec:
+  image: busybox:1.36
+  command: ["sh", "-c", "echo training-done && sleep 5"]
+  gpuCount: 1
+  ttlSecondsAfterFinished: 60

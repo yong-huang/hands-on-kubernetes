@@ -1,0 +1,29 @@
+# This rule is not used by the project kafka-topic-operator itself.
+# It is provided to allow the cluster admin to help manage permissions for users.
+#
+# Grants read-only access to kafka.example.com resources.
+# This role is intended for users who need visibility into these resources
+# without permissions to modify them. It is ideal for monitoring purposes and limited-access viewing.
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: kafka-topic-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: kafkatopic-viewer-role
+rules:
+- apiGroups:
+  - kafka.example.com
+  resources:
+  - kafkatopics
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - kafka.example.com
+  resources:
+  - kafkatopics/status
+  verbs:
+  - get

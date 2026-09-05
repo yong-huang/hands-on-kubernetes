@@ -1,0 +1,154 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "MicroService Operator：一个 CR 编排全栈资源",
+    "locale": "zh-CN",
+    "output": "operators/10_microservice_operator/images/ms_stack.html",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    {
+      "id": "cr",
+      "type": "database",
+      "label": "MicroService CR",
+      "sublabel": "image / replicas / env / ingress",
+      "pos": [
+        50,
+        170
+      ],
+      "size": [
+        230,
+        78
+      ],
+      "tag": "一个 CR = 全栈"
+    },
+    {
+      "id": "ctrl",
+      "type": "backend",
+      "label": "Controller",
+      "sublabel": "编排全部子资源",
+      "pos": [
+        50,
+        350
+      ],
+      "size": [
+        220,
+        74
+      ]
+    },
+    {
+      "id": "cm",
+      "type": "database",
+      "label": "ConfigMap",
+      "sublabel": "configData",
+      "pos": [
+        360,
+        60
+      ],
+      "size": [
+        180,
+        62
+      ]
+    },
+    {
+      "id": "dep",
+      "type": "backend",
+      "label": "Deployment",
+      "sublabel": "image + replicas",
+      "pos": [
+        360,
+        180
+      ],
+      "size": [
+        180,
+        62
+      ]
+    },
+    {
+      "id": "svc",
+      "type": "backend",
+      "label": "Service",
+      "sublabel": "port 80",
+      "pos": [
+        580,
+        180
+      ],
+      "size": [
+        180,
+        62
+      ]
+    },
+    {
+      "id": "ing",
+      "type": "backend",
+      "label": "Ingress",
+      "sublabel": "ingressHost 路由",
+      "pos": [
+        580,
+        300
+      ],
+      "size": [
+        180,
+        62
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "from": "cr",
+      "to": "ctrl",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "from": "ctrl",
+      "to": "cm",
+      "variant": "dashed",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "from": "ctrl",
+      "to": "dep",
+      "variant": "emphasis",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "from": "ctrl",
+      "to": "svc",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "left"
+    },
+    {
+      "from": "ctrl",
+      "to": "ing",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "left"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "全栈编排",
+      "items": [
+        "一个 CR 创建 ConfigMap + Deployment + Service + Ingress",
+        "全部挂 OwnerReference → 删 CR 级联清理",
+        "status 上报 readyReplicas 和 resourcesCreated"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "扩展点",
+      "items": [
+        "HPA（autoscaling/v2）按 CPU 自动伸缩",
+        "PDB 保证滚动更新时最少可用副本",
+        "网络策略 NetworkPolicy 限制 Pod 间流量"
+      ]
+    }
+  ]
+}

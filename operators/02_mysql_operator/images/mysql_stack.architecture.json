@@ -1,0 +1,172 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "MySQL Operator：CR → 全栈资源 + Finalizer 清理",
+    "locale": "zh-CN",
+    "output": "operators/02_mysql_operator/images/mysql_stack.html",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    {
+      "id": "cr",
+      "type": "database",
+      "label": "MySQL CR",
+      "sublabel": "storageSize / passwordSecret / backupSchedule",
+      "pos": [
+        60,
+        60
+      ],
+      "size": [
+        220,
+        84
+      ],
+      "tag": "期望状态"
+    },
+    {
+      "id": "ctrl",
+      "type": "backend",
+      "label": "MySQL Controller",
+      "sublabel": "Reconcile + Finalizer",
+      "pos": [
+        60,
+        240
+      ],
+      "size": [
+        220,
+        80
+      ],
+      "tag": "删 CR 先清 PVC"
+    },
+    {
+      "id": "hsvc",
+      "type": "backend",
+      "label": "Headless Service",
+      "sublabel": "mysql-h · 稳定 DNS",
+      "pos": [
+        380,
+        60
+      ],
+      "size": [
+        210,
+        70
+      ]
+    },
+    {
+      "id": "svc",
+      "type": "backend",
+      "label": "ClusterIP Service",
+      "sublabel": "3306 · 应用连接入口",
+      "pos": [
+        380,
+        180
+      ],
+      "size": [
+        210,
+        70
+      ]
+    },
+    {
+      "id": "sts",
+      "type": "backend",
+      "label": "StatefulSet mysql:8.0",
+      "sublabel": "volumeClaimTemplates → data PVC",
+      "pos": [
+        380,
+        300
+      ],
+      "size": [
+        220,
+        88
+      ],
+      "tag": "Pod 重建数据不丢"
+    },
+    {
+      "id": "bpvc",
+      "type": "database",
+      "label": "备份 PVC",
+      "sublabel": "独立 RWO · 只给备份挂",
+      "pos": [
+        700,
+        300
+      ],
+      "size": [
+        200,
+        70
+      ]
+    },
+    {
+      "id": "cron",
+      "type": "messagebus",
+      "label": "备份 CronJob",
+      "sublabel": "mysqldump | gzip → /backup",
+      "pos": [
+        700,
+        420
+      ],
+      "size": [
+        220,
+        74
+      ],
+      "tag": "ForbidConcurrent"
+    }
+  ],
+  "connections": [
+    {
+      "from": "cr",
+      "to": "ctrl",
+      "label": "Reconcile",
+      "variant": "emphasis",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        180,
+        175
+      ]
+    },
+    {
+      "from": "ctrl",
+      "to": "hsvc",
+      "variant": "dashed"
+    },
+    {
+      "from": "ctrl",
+      "to": "svc",
+      "variant": "dashed"
+    },
+    {
+      "from": "ctrl",
+      "to": "sts",
+      "variant": "emphasis"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "两个 Service 的分工",
+      "items": [
+        "Headless（clusterIP: None）：稳定 DNS，主从寻址",
+        "ClusterIP：应用连接入口，随机转发到 Ready Pod",
+        "密码用 Secret 引用，CR 里没有明文"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "数据卷 vs 备份卷",
+      "items": [
+        "数据 PVC 由 volumeClaimTemplates 供给，跟随 STS",
+        "备份 PVC 必须由 controller 显式创建——CronJob 的卷引用不会触发动态供给",
+        "实测踩坑：漏建备份 PVC，Job 永远 Pending（pvc not found）"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Finalizer 清理",
+      "items": [
+        "删 CR → Terminating：先按标签清理全部 PVC",
+        "宁可 Terminating 慢，不可留孤儿数据卷",
+        "清完移除 finalizer，API Server 才真正删除"
+      ]
+    }
+  ]
+}

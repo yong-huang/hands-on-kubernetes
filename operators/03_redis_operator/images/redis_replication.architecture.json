@@ -1,0 +1,153 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Redis 主从 Operator：主写从读，Owns 级联",
+    "locale": "zh-CN",
+    "output": "operators/03_redis_operator/images/redis_replication.html",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    {
+      "id": "cr",
+      "type": "database",
+      "label": "RedisCluster CR",
+      "sublabel": "replicas: 从库数量",
+      "pos": [
+        60,
+        210
+      ],
+      "size": [
+        200,
+        78
+      ],
+      "tag": "期望状态"
+    },
+    {
+      "id": "ctrl",
+      "type": "backend",
+      "label": "RedisCluster Controller",
+      "sublabel": "编排主从拓扑",
+      "pos": [
+        60,
+        420
+      ],
+      "size": [
+        230,
+        78
+      ]
+    },
+    {
+      "id": "master",
+      "type": "backend",
+      "label": "master Deployment",
+      "sublabel": "redis-server（可写）",
+      "pos": [
+        420,
+        90
+      ],
+      "size": [
+        220,
+        84
+      ],
+      "tag": "role=master"
+    },
+    {
+      "id": "msvc",
+      "type": "backend",
+      "label": "master Service",
+      "sublabel": "复制源 · 稳定连接入口",
+      "pos": [
+        700,
+        90
+      ],
+      "size": [
+        220,
+        70
+      ]
+    },
+    {
+      "id": "repsts",
+      "type": "backend",
+      "label": "replicas StatefulSet",
+      "sublabel": "1 主 N 从 · 启动即 replicaof 主库",
+      "pos": [
+        420,
+        260
+      ],
+      "size": [
+        230,
+        88
+      ],
+      "tag": "role=replica"
+    }
+  ],
+  "connections": [
+    {
+      "from": "cr",
+      "to": "ctrl",
+      "label": "Reconcile",
+      "variant": "emphasis",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "from": "ctrl",
+      "to": "master",
+      "variant": "emphasis",
+      "labelAt": [
+        520,
+        160
+      ]
+    },
+    {
+      "from": "ctrl",
+      "to": "repsts",
+      "variant": "emphasis",
+      "labelAt": [
+        520,
+        330
+      ]
+    },
+    {
+      "from": "repsts",
+      "to": "msvc",
+      "label": "replicaof 主库",
+      "variant": "dashed"
+    },
+    {
+      "from": "msvc",
+      "to": "master",
+      "variant": "dashed"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "主从复制",
+      "items": [
+        "从库启动命令自带 --replicaof 主库 DNS",
+        "INFO replication 可见 role:slave / master_link_status:up",
+        "主写从读：写入 master，replica 秒级同步"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "扩缩容",
+      "items": [
+        "改 CR 的 replicas 字段即扩缩从库（主库不动）",
+        "新从库启动自动全量同步，再进入增量",
+        "从库无状态（未开持久化），缩容安全"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Owns 级联",
+      "items": [
+        "master Deployment / Service / replicas STS 全挂 ownerRef",
+        "删 CR 级联清理，零残留",
+        "漏挂 ownerRef = 资源残留（实测踩坑）"
+      ]
+    }
+  ]
+}

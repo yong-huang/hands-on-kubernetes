@@ -1,0 +1,7 @@
+apiVersion: cache.example.com/v1
+kind: RedisCluster
+metadata:
+  name: redis-demo
+spec:
+  replicas: 1        # 从库数量；写主读从验证后可 patch 到 2
+  image: redis:7-alpine

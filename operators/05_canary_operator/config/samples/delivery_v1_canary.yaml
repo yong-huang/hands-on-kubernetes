@@ -1,0 +1,13 @@
+apiVersion: delivery.example.com/v1
+kind: Canary
+metadata:
+  name: demo-canary
+spec:
+  targetRef: demo-app
+  stableImage: "nginx:1.25"
+  canaryImage: "nginx:1.27"
+  totalReplicas: 4
+  steps:
+    - weight: 25
+    - weight: 50
+    - weight: 100

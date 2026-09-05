@@ -1,0 +1,132 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "ops-automation：Cron 定时扩缩容 + 注解触发滚动重启",
+    "locale": "zh-CN",
+    "output": "operators/04_ops_automation/images/ops_flow.html",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    {
+      "id": "scaler",
+      "type": "database",
+      "label": "Scaler CR",
+      "sublabel": "schedules[]：cron + replicas",
+      "pos": [
+        40,
+        100
+      ],
+      "size": [
+        220,
+        84
+      ],
+      "tag": "声明式"
+    },
+    {
+      "id": "ctrl",
+      "type": "backend",
+      "label": "Scaler Controller",
+      "sublabel": "30s 检查 cron 匹配 → 改 replicas",
+      "pos": [
+        400,
+        100
+      ],
+      "size": [
+        220,
+        84
+      ],
+      "tag": "时间驱动"
+    },
+    {
+      "id": "dep",
+      "type": "backend",
+      "label": "目标 Deployment",
+      "sublabel": "副本数被 Cron 规则控制",
+      "pos": [
+        780,
+        100
+      ],
+      "size": [
+        220,
+        80
+      ],
+      "tag": "自动伸缩"
+    },
+    {
+      "id": "restart",
+      "type": "security",
+      "label": "Rolling Restart",
+      "sublabel": "注解触发 · 逐 Pod 替换",
+      "pos": [
+        780,
+        320
+      ],
+      "size": [
+        220,
+        80
+      ],
+      "tag": "ops.example.com/rolling-restart"
+    },
+    {
+      "id": "cronchip",
+      "type": "external",
+      "label": "cron 表达式",
+      "sublabel": "0 9 * * 1-5 → 10 副本\n0 18 * * 1-5 → 2 副本",
+      "pos": [
+        40,
+        300
+      ],
+      "size": [
+        220,
+        80
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "from": "scaler",
+      "to": "ctrl",
+      "variant": "dashed"
+    },
+    {
+      "from": "ctrl",
+      "to": "dep",
+      "variant": "emphasis"
+    },
+    {
+      "from": "dep",
+      "to": "restart",
+      "variant": "security"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "时间驱动 Reconcile",
+      "items": [
+        "每 30s 检查当前时间是否命中 cron 规则",
+        "命中则把 Deployment 调到对应副本数",
+        "没命中就等待——持续值守，不依赖事件"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "滚动重启",
+      "items": [
+        "kubectl annotate deployment X ops.example.com/rolling-restart=true",
+        "Controller patch pod template → 逐 Pod 替换",
+        "等价于 kubectl rollout restart 的 Operator 版"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "典型场景",
+      "items": [
+        "工作日白天扩容、夜间缩容（成本优化）",
+        "定时全量滚动重启（内存泄漏预防）",
+        "促销时段扩容，结束后自动回落"
+      ]
+    }
+  ]
+}

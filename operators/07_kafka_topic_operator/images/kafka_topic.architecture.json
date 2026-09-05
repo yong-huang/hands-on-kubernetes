@@ -1,0 +1,115 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Kafka Topic Operator：管理集群外资源",
+    "locale": "zh-CN",
+    "output": "operators/07_kafka_topic_operator/images/kafka_topic.html",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    {
+      "id": "cr",
+      "type": "database",
+      "label": "KafkaTopic CR",
+      "sublabel": "partitions / RF / bootstrapServers",
+      "pos": [
+        50,
+        180
+      ],
+      "size": [
+        230,
+        84
+      ],
+      "tag": "期望状态"
+    },
+    {
+      "id": "ctrl",
+      "type": "backend",
+      "label": "Controller",
+      "sublabel": "调 Kafka AdminClient API",
+      "pos": [
+        370,
+        180
+      ],
+      "size": [
+        220,
+        78
+      ],
+      "tag": "集群外资源管理"
+    },
+    {
+      "id": "kafka",
+      "type": "cloud",
+      "label": "Kafka 集群",
+      "sublabel": "bootstrapServers",
+      "pos": [
+        660,
+        180
+      ],
+      "size": [
+        230,
+        84
+      ]
+    },
+    {
+      "id": "topic",
+      "type": "messagebus",
+      "label": "Kafka Topic",
+      "sublabel": "partitions / RF / configs",
+      "pos": [
+        660,
+        380
+      ],
+      "size": [
+        230,
+        78
+      ],
+      "tag": "集群外资源"
+    }
+  ],
+  "connections": [
+    {
+      "from": "cr",
+      "to": "ctrl",
+      "label": "watch",
+      "variant": "dashed",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "from": "ctrl",
+      "to": "kafka",
+      "variant": "emphasis",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "from": "kafka",
+      "to": "topic",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "外部资源管理模式",
+      "items": [
+        "CR 里的字段 = 外部资源的期望配置",
+        "Controller 调外部 API 把实际状态收敛到期望",
+        "与 Deployment/STS 不同：目标在集群外，不在 etcd"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "注意事项",
+      "items": [
+        "Kafka 不可达时 status 标 False 并周期重试",
+        "幂等：Topic 已存在不算错误",
+        "生产建议：结合 Strimzi 等 Kafka Operator 一起使用"
+      ]
+    }
+  ]
+}

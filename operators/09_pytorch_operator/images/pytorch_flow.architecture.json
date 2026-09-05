@@ -1,0 +1,121 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "PyTorch 分布式训练：Headless Service 成员发现",
+    "locale": "zh-CN",
+    "output": "operators/09_pytorch_operator/images/pytorch_flow.html",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    {
+      "id": "cr",
+      "type": "database",
+      "label": "PyTorchJob CR",
+      "sublabel": "image / command / workers",
+      "pos": [
+        40,
+        100
+      ],
+      "size": [
+        210,
+        78
+      ]
+    },
+    {
+      "id": "ctrl",
+      "type": "backend",
+      "label": "Controller",
+      "sublabel": "编排分布式训练",
+      "pos": [
+        40,
+        280
+      ],
+      "size": [
+        210,
+        84
+      ]
+    },
+    {
+      "id": "hsvc",
+      "type": "backend",
+      "label": "Headless Service",
+      "sublabel": "clusterIP: None · 成员发现",
+      "pos": [
+        380,
+        100
+      ],
+      "size": [
+        200,
+        70
+      ]
+    },
+    {
+      "id": "pods",
+      "type": "backend",
+      "label": "Master + Worker Pods",
+      "sublabel": "torchrun · MASTER_ADDR 互联",
+      "pos": [
+        380,
+        280
+      ],
+      "size": [
+        220,
+        84
+      ],
+      "tag": "rank 0..N"
+    }
+  ],
+  "connections": [
+    {
+      "from": "cr",
+      "to": "ctrl",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "from": "ctrl",
+      "to": "hsvc",
+      "variant": "emphasis",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "from": "hsvc",
+      "to": "pods",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "环境变量注入",
+      "items": [
+        "MASTER_ADDR = master Pod 的 Headless DNS",
+        "MASTER_PORT = 29500（torchrun 通信端口）",
+        "WORLD_SIZE = 总进程数 · RANK = 每个 Pod 的序号"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "有序启动",
+      "items": [
+        "Master 先启动并监听 29500 端口",
+        "Worker 依次通过 Headless DNS 找到 Master",
+        "全部就绪后 torchrun 开始分布式训练"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "与项目 8 的关系",
+      "items": [
+        "项目 8：单 Pod 单卡（resources.requests 声明 gpuCount）",
+        "本项目：多 Pod 协同，通过 Headless DNS 互联",
+        "生产可用 Volcano gang scheduler 替代手写编排"
+      ]
+    }
+  ]
+}

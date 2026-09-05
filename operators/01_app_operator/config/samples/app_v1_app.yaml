@@ -1,0 +1,13 @@
+apiVersion: app.example.com/v1
+kind: App
+metadata:
+  name: app-sample
+spec:
+  image: nginx:alpine          # 建议用 labs/01 已预载的镜像
+  replicas: 2
+  env:
+    TZ: Asia/Shanghai
+  configData:
+    APP_MODE: "production"
+    LOG_LEVEL: "info"
+    greeting: "hello from app-operator"

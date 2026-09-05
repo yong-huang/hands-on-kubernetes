@@ -1,0 +1,154 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "App Operator：Reconcile 编排三件套 + Owns 漂移自愈",
+    "locale": "zh-CN",
+    "output": "operators/01_app_operator/images/app_reconcile.html",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    {
+      "id": "user",
+      "type": "external",
+      "label": "用户 / CI",
+      "sublabel": "kubectl apply",
+      "pos": [
+        60,
+        230
+      ],
+      "size": [
+        180,
+        70
+      ]
+    },
+    {
+      "id": "appcr",
+      "type": "database",
+      "label": "App CR",
+      "sublabel": "spec: image/replicas/env/configData",
+      "pos": [
+        320,
+        230
+      ],
+      "size": [
+        210,
+        84
+      ],
+      "tag": "期望状态"
+    },
+    {
+      "id": "ctrl",
+      "type": "backend",
+      "label": "App Controller",
+      "sublabel": "Reconcile：对比期望与实际",
+      "pos": [
+        620,
+        225
+      ],
+      "size": [
+        220,
+        88
+      ],
+      "tag": "每轮幂等"
+    },
+    {
+      "id": "cm",
+      "type": "backend",
+      "label": "ConfigMap",
+      "sublabel": "configData → /etc/app",
+      "pos": [
+        940,
+        60
+      ],
+      "size": [
+        190,
+        74
+      ]
+    },
+    {
+      "id": "dep",
+      "type": "backend",
+      "label": "Deployment",
+      "sublabel": "image / replicas / env",
+      "pos": [
+        940,
+        230
+      ],
+      "size": [
+        190,
+        74
+      ]
+    },
+    {
+      "id": "svc",
+      "type": "backend",
+      "label": "Service",
+      "sublabel": ":80 → :80 · selector 认领",
+      "pos": [
+        940,
+        400
+      ],
+      "size": [
+        190,
+        74
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "from": "user",
+      "to": "appcr",
+      "label": "apply",
+      "variant": "emphasis"
+    },
+    {
+      "from": "appcr",
+      "to": "ctrl",
+      "label": "watch",
+      "variant": "dashed"
+    },
+    {
+      "from": "ctrl",
+      "to": "cm"
+    },
+    {
+      "from": "ctrl",
+      "to": "dep",
+      "variant": "emphasis"
+    },
+    {
+      "from": "ctrl",
+      "to": "svc"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "CreateOrPatch 三态",
+      "items": [
+        "created / patched / unchanged 会打进日志",
+        "mutate 函数保证\"声明什么就是什么\"",
+        "幂等：同一轮跑多少遍结果一致"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "OwnerReference 级联",
+      "items": [
+        "三个子资源都挂 App 为 owner",
+        "删 CR = 三件套级联消失，零残留",
+        "selector 精确到 instance，多租户互不干扰"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Owns 漂移自愈",
+      "items": [
+        "子资源被手改 → Owns 事件触发 Reconcile",
+        "下一轮 CreateOrPatch 把漂移拉回期望",
+        "status 只归 controller 写（/status 子资源）"
+      ]
+    }
+  ]
+}

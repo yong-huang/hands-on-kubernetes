@@ -1,0 +1,11 @@
+apiVersion: web.example.com/v1
+kind: NginxProxy
+metadata:
+  name: reverse-proxy
+spec:
+  upstreams:
+    - name: backend
+      servers: ["nginx:80"]
+  locations:
+    - path: /
+      upstream: backend

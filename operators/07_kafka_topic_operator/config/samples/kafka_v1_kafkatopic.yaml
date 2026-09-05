@@ -1,0 +1,11 @@
+apiVersion: kafka.example.com/v1
+kind: KafkaTopic
+metadata:
+  name: demo-topic
+spec:
+  topicName: demo-topic
+  partitions: 3
+  replicationFactor: 1
+  bootstrapServers: "kafka:9092"
+  configs:
+    retention.ms: "604800000"
