@@ -5,7 +5,11 @@
     "title": "PyTorch 分布式训练：Headless Service 成员发现",
     "locale": "zh-CN",
     "output": "operators/09_pytorch_operator/images/pytorch_flow.html",
-    "quality_profile": "showcase"
+    "quality_profile": "showcase",
+    "viewBox": [
+      1100,
+      520
+    ]
   },
   "components": [
     {
@@ -15,7 +19,7 @@
       "sublabel": "image / command / workers",
       "pos": [
         40,
-        100
+        170
       ],
       "size": [
         210,
@@ -28,8 +32,8 @@
       "label": "Controller",
       "sublabel": "编排分布式训练",
       "pos": [
-        40,
-        280
+        330,
+        170
       ],
       "size": [
         210,
@@ -42,8 +46,8 @@
       "label": "Headless Service",
       "sublabel": "clusterIP: None · 成员发现",
       "pos": [
-        380,
-        100
+        630,
+        170
       ],
       "size": [
         200,
@@ -56,11 +60,11 @@
       "label": "Master + Worker Pods",
       "sublabel": "torchrun · MASTER_ADDR 互联",
       "pos": [
-        380,
-        280
+        890,
+        170
       ],
       "size": [
-        220,
+        210,
         84
       ],
       "tag": "rank 0..N"
@@ -70,23 +74,17 @@
     {
       "from": "cr",
       "to": "ctrl",
-      "variant": "dashed",
-      "fromSide": "bottom",
-      "toSide": "top"
+      "variant": "dashed"
     },
     {
       "from": "ctrl",
       "to": "hsvc",
-      "variant": "emphasis",
-      "fromSide": "right",
-      "toSide": "left"
+      "variant": "emphasis"
     },
     {
       "from": "hsvc",
       "to": "pods",
-      "variant": "dashed",
-      "fromSide": "bottom",
-      "toSide": "top"
+      "variant": "dashed"
     }
   ],
   "cards": [
