@@ -49,7 +49,7 @@ nginx-headless       ClusterIP      None         80/TCP         ← 没有 VIP�
 
 Service 本身不直接"记住"Pod，链路是：
 
-1. Service 的 `selector`（如 `app: nginx`）匹配 Pod 的 label；
+1. Service 的 `selector`（本实验用 `app: nginx-svc`）匹配 Pod 的 label；
 2. **Endpoints Controller**（控制面组件）持续 watch Pod，把所有 **Ready** 的 Pod IP:targetPort 写入同名 Endpoints 对象；
 3. Pod 挂掉 / 新建 → Endpoints 自动增删；
 4. 每个节点的 **kube-proxy** watch Service + Endpoints，把最新后端同步成本地转发规则。
@@ -57,6 +57,8 @@ Service 本身不直接"记住"Pod，链路是：
 两种转发模式：**iptables**（默认）为每个 Service 生成 DNAT 规则，请求路径上没有 proxy 进程、性能好，但规则线性匹配，数千条 Service 时更新和匹配都变慢；**ipvs** 用内核哈希表 O(1) 查找，支持多种均衡算法，大规模集群首选。
 
 所以 `kubectl get endpoints <svc>` 是排查"Service 不通"的第一站：**Endpoints 为空 = selector 不匹配或没有 Ready 的 Pod**。
+
+> 注：v1.33 起 v1 Endpoints API 已标记废弃（概念不变，对象被拆成 EndpointSlice 分片），现行查看命令是 `kubectl get endpointslices -l kubernetes.io/service-name=<svc>`，演示脚本里两种都跑给你看。
 
 ### 4.2 ClusterDNS：Service 名怎么变成 IP
 

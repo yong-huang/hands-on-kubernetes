@@ -113,7 +113,7 @@ kubectl rollout status deployment/nginx-rolling        # 盯着看发布进度
 kubectl set image deployment/nginx-rolling nginx=nginx:1.26
 kubectl rollout history deployment/nginx-rolling      # 查看修订版
 kubectl rollout undo  deployment/nginx-rolling        # 回滚上一版
-kubectl rollout undo  deployment/nginx-rolling --to-revision=2
+kubectl rollout undo  deployment/nginx-rolling --to-revision=2  # N 必须仍存在, 超过保留数的旧修订已被回收
 kubectl rollout pause deployment/nginx-rolling        # 暂停（可累积多处改动）
 kubectl rollout resume deployment/nginx-rolling       # 恢复后一次性发布
 ```
@@ -139,7 +139,7 @@ kubectl rollout resume deployment/nginx-rolling       # 恢复后一次性发布
 
 1. **滚动更新原理**：Deployment 不直接动 Pod；改模板 → 新建 RS → 控制循环按 maxSurge/maxUnavailable 约束同步地"扩新 RS、缩旧 RS"→ 旧 RS 保留在 0 副本供回滚。
 2. **maxSurge / maxUnavailable 的作用**：控制更新速度与可用容量的折中。maxSurge 允许临时超额（多占资源），maxUnavailable 允许临时欠额（容量下降）；两者共同决定任意时刻新旧 Pod 总数的上下限 `[replicas - maxUnavailable, replicas + maxSurge]`。
-3. **如何回滚**：`kubectl rollout undo`（或 `--to-revision=N`）。原理是把旧 RS 里的 Pod 模板拷回 Deployment，再正向执行一次滚动更新；能回滚的前提是旧 RS 未被删除（受 `revisionHistoryLimit` 控制）。
+3. **如何回滚**：`kubectl rollout undo`（或 `--to-revision=N`）。原理是把旧 RS 里的 Pod 模板拷回 Deployment，再正向执行一次滚动更新；能回滚的前提是旧 RS 未被删除（受 `revisionHistoryLimit` 控制）。两个易错点：修订版号**只增不减**——undo 并不是把指针拨回去，而是产生一个携带旧模板的**新**修订；超出保留数的旧修订会被回收——所以脚本/CI 里别写死 `--to-revision=2`，应动态查询现存修订。另外 `--record` 已废弃，CHANGE-CAUSE 应在更新前用 `kubectl annotate deployment/x kubernetes.io/change-cause="..."` 声明（新 RS 创建时拷贝该注解）。
 4. **Deployment 不能管理哪类工作负载**：有状态应用。Deployment 的 Pod 是无身份的（名字随机、可互相替换、无稳定存储和网络标识），有状态应用应该用 **StatefulSet**（稳定 hostname、有序启停、每副本独立 PV）；此外守护进程类用 DaemonSet、单次任务用 Job。
 
 ## 7. 总结

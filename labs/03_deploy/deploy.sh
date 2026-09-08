@@ -52,6 +52,10 @@ do_update() {
     kubectl get rs -l "${LABEL}" -n "${NAMESPACE}"
 
     step "update" "触发滚动更新: nginx:1.25 -> ${NEW_IMAGE}"
+    # --record 已废弃; 先写 change-cause 注解再更新, 新 ReplicaSet 创建时才会带上它
+    kubectl annotate "deployment/${DEPLOY}" \
+        "kubernetes.io/change-cause=升级镜像 1.25 -> ${NEW_IMAGE}" \
+        --overwrite -n "${NAMESPACE}"
     kubectl set image "deployment/${DEPLOY}" "nginx=${NEW_IMAGE}" \
         -n "${NAMESPACE}"
     kubectl rollout status "deployment/${DEPLOY}" -n "${NAMESPACE}"
@@ -73,11 +77,17 @@ do_rollback() {
     kubectl get deploy "${DEPLOY}" -n "${NAMESPACE}" \
         -o jsonpath='{.spec.template.spec.containers[0].image}'; echo
 
-    step "rollback" "指定修订版回滚: --to-revision=2"
+    # 注意: 修订版号随每次更新/回滚递增, 且只保留最近 revisionHistoryLimit=10 个,
+    # 所以不能写死 --to-revision=2 (重复运行后旧修订早已被回收) —— 动态取现存最老的修订版
+    step "rollback" "指定修订版回滚: --to-revision=<现存最老修订版>"
     kubectl rollout history "deployment/${DEPLOY}" -n "${NAMESPACE}"
+    OLDEST_REV=$(kubectl rollout history "deployment/${DEPLOY}" -n "${NAMESPACE}" \
+        | awk '/^[0-9]+/{print $1}' | sort -n | head -1)
+    echo "(跳转到现存最老修订版: ${OLDEST_REV})"
     kubectl rollout undo "deployment/${DEPLOY}" \
-        --to-revision=2 -n "${NAMESPACE}"
+        --to-revision="${OLDEST_REV}" -n "${NAMESPACE}"
     kubectl rollout status "deployment/${DEPLOY}" -n "${NAMESPACE}"
+    kubectl rollout history "deployment/${DEPLOY}" -n "${NAMESPACE}"
 }
 
 # ----------------------------- 5. 暂停 / 恢复发布 -----------------------------

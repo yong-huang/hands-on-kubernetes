@@ -12,22 +12,24 @@
 # 0. 后端 Deployment：3 个 nginx Pod，作为所有 Service 的后端
 #    注意 metadata.labels 必须与 Service 的 selector 匹配，
 #    Service 才能通过 label 把流量转发到这些 Pod。
+#    ★ 标签故意用 nginx-svc 而不是通用的 nginx：selector 匹配是 namespace 内全局的，
+#      太通用的标签会把集群里其它 app=nginx 的 Pod 也拉进后端（经典生产事故）。
 # =====================================================================
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: nginx-deploy            # Deployment 名字
   labels:
-    app: nginx                  # Deployment 自身的 label（可选）
+    app: nginx-svc                  # Deployment 自身的 label（可选）
 spec:
   replicas: 3                   # 3 个副本，用于观察负载均衡
   selector:
     matchLabels:
-      app: nginx                # Deployment 用它管理 Pod（必须匹配 template.labels）
+      app: nginx-svc                # Deployment 用它管理 Pod（必须匹配 template.labels）
   template:                     # Pod 模板
     metadata:
       labels:
-        app: nginx              # ★ Pod 的 label —— Service 的 selector 找的就是它
+        app: nginx-svc              # ★ Pod 的 label —— Service 的 selector 找的就是它
     spec:
       containers:
         - name: nginx
@@ -51,7 +53,7 @@ metadata:
 spec:
   type: ClusterIP               # 默认类型，可省略
   selector:
-    app: nginx                  # ★ selector 匹配 Pod label → 自动生成 Endpoints
+    app: nginx-svc                  # ★ selector 匹配 Pod label → 自动生成 Endpoints
   ports:
     - name: http
       port: 80                  # Service 对外的端口（访问入口）
@@ -74,7 +76,7 @@ metadata:
 spec:
   type: NodePort                # 关键区别
   selector:
-    app: nginx
+    app: nginx-svc
   ports:
     - name: http
       port: 80                  # 集群内访问: nginx-nodeport:80
@@ -95,7 +97,7 @@ metadata:
 spec:
   type: LoadBalancer            # 依赖云厂商的 LB controller
   selector:
-    app: nginx
+    app: nginx-svc
   ports:
     - name: http
       port: 80                  # LB 监听的端口
@@ -117,7 +119,7 @@ metadata:
 spec:
   clusterIP: None               # ★ Headless 的标志
   selector:
-    app: nginx
+    app: nginx-svc
   ports:
     - name: http
       port: 80
