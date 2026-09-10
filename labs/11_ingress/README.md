@@ -14,7 +14,7 @@ Service 的 NodePort 模式有三个痛点：端口随机难记、每个服务�
 ├── manifests/
 │   └── ingress.yaml          # 两个后端 + 域名路由 Ingress + 路径路由 Ingress
 └── images/
-    ├── ingress_routing.architecture.json  # 图源（Archify Typed JSON IR）
+    ├── ingress_routing.architecture.json  # 图源（Typed JSON IR）
     ├── ingress_routing.html               # 交互版架构图
     └── ingress_routing.svg                # 双主题矢量版（本文档 §6 内嵌）
 ```

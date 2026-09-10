@@ -15,7 +15,7 @@ Service 提供的是"找到并负载均衡"，但默认情况下 Kubernetes 集�
 ├── manifests/
 │   └── network_policy.yaml   # Namespace + 工作负载 + 网络策略（tier 标签分组）
 └── images/
-    ├── netpol_isolation.architecture.json  # 图源（Archify Typed JSON IR）
+    ├── netpol_isolation.architecture.json  # 图源（Typed JSON IR）
     ├── netpol_isolation.html               # 交互版架构图
     └── netpol_isolation.svg                # 双主题矢量版（本文档 §可视化 内嵌）
 ```

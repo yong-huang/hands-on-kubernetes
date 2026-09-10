@@ -95,13 +95,13 @@ ports:
 ├── manifests/
 │   └── service.yaml        # Deployment + 4 种 Service（ClusterIP/NodePort/LB/Headless）
 └── images/
-    ├── service_types.workflow.json          # 图源（Archify Typed JSON IR）
+    ├── service_types.workflow.json          # 图源（Typed JSON IR）
     ├── service_types.html        # 交互版（浏览器打开）
     └── service_types.svg          # 双主题矢量版      
-    ├── service_mechanism.workflow.json          # 图源（Archify Typed JSON IR）
+    ├── service_mechanism.workflow.json          # 图源（Typed JSON IR）
     ├── service_mechanism.html        # 交互版（浏览器打开）
     └── service_mechanism.svg          # 双主题矢量版  
-    ├── service_dns.workflow.json          # 图源（Archify Typed JSON IR）
+    ├── service_dns.workflow.json          # 图源（Typed JSON IR）
     ├── service_dns.html        # 交互版（浏览器打开）
     └── service_dns.svg          # 双主题矢量版        
 ```

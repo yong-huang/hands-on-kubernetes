@@ -15,7 +15,7 @@
 ├── manifests/
 │   └── csi_snapshot.yaml   # PVC+Pod / VolumeSnapshotClass / VolumeSnapshot / 还原 PVC
 └── images/
-    ├── snapshot_chain.architecture.json  # 图源（Archify Typed JSON IR）
+    ├── snapshot_chain.architecture.json  # 图源（Typed JSON IR）
     ├── snapshot_chain.html               # 交互版架构图
     └── snapshot_chain.svg                # 双主题矢量版（本文档 §6 内嵌）
 ```

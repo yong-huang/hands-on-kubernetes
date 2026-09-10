@@ -10,7 +10,7 @@
 ├── manifests/
 │   └── database_crd.yaml  # 演示用的 K8s 清单
 └── images/
-    ├── reconcile_loop.workflow.json  # 图源（Archify Typed JSON IR）
+    ├── reconcile_loop.workflow.json  # 图源（Typed JSON IR）
     ├── reconcile_loop.html           # 交互版流程图
     └── reconcile_loop.svg            # 双主题矢量版（本文档 §5 内嵌）
 ```

@@ -9,7 +9,7 @@
 ├── manifests/
 │   └── broken_pod.yaml   # 演示用的 K8s 清单
 └── images/
-    ├── debug_modes.architecture.json  # 图源（Archify Typed JSON IR）
+    ├── debug_modes.architecture.json  # 图源（Typed JSON IR）
     ├── debug_modes.html               # 交互版架构图
     └── debug_modes.svg                # 双主题矢量版（本文档 §5 内嵌）
 ```

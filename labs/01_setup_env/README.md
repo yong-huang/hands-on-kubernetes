@@ -135,10 +135,10 @@ kind delete cluster --name k8s-learn   # 等价 ./setup.sh down
 ├── manifests/
 │   └── kind-config.yaml      # 集群拓扑: 1 control-plane + 2 worker（脚本每次会重新生成）
 └── images/
-    ├── kind_arch.architecture.json          # 图源（Archify Typed JSON IR）
+    ├── kind_arch.architecture.json          # 图源（Typed JSON IR）
     ├── kind_arch.html        # 交互版（浏览器打开）
     └── kind_arch.svg          # 双主题矢量版         
-    ├── setup_flow.workflow.json          # 图源（Archify Typed JSON IR）
+    ├── setup_flow.workflow.json          # 图源（Typed JSON IR）
     ├── setup_flow.html        # 交互版（浏览器打开）
     └── setup_flow.svg          # 双主题矢量版        
 ```

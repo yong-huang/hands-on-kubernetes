@@ -79,7 +79,7 @@ op, err := controllerutil.CreateOrPatch(ctx, r.Client, cm, func() error {
 ├── internal/controller/             # Reconcile 核心（app_controller.go）
 ├── config/                          # CRD / RBAC / manager 部署清单
 └── images/
-    ├── app_reconcile.architecture.json  # 图源（Archify Typed JSON IR）
+    ├── app_reconcile.architecture.json  # 图源（Typed JSON IR）
     ├── app_reconcile.html               # 交互版架构图
     └── app_reconcile.svg                # 双主题矢量版（本文档 §2 内嵌）
 ```

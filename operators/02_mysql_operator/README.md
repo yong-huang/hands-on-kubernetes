@@ -100,7 +100,7 @@ sts.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{{
 ├── internal/controller/             # Reconcile 核心（mysql_controller.go）
 ├── config/                          # CRD / RBAC / manager 部署清单
 └── images/
-    ├── mysql_stack.architecture.json  # 图源（Archify Typed JSON IR）
+    ├── mysql_stack.architecture.json  # 图源（Typed JSON IR）
     ├── mysql_stack.html               # 交互版架构图
     └── mysql_stack.svg                # 双主题矢量版（本文档 §2 内嵌）
 ```

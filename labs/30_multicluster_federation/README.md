@@ -9,7 +9,7 @@
 ├── manifests/
 │   └── karmada.yaml    # 演示用的 K8s 清单
 └── images/
-    ├── karmada_flow.architecture.json  # 图源（Archify Typed JSON IR）
+    ├── karmada_flow.architecture.json  # 图源（Typed JSON IR）
     ├── karmada_flow.html               # 交互版架构图
     └── karmada_flow.svg                # 双主题矢量版（本文档 §5 内嵌）
 ```

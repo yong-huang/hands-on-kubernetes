@@ -15,7 +15,7 @@
 ├── manifests/
 │   └── storageclass.yaml    # StorageClass(fast-local) + PVC + 挂载 Pod
 └── images/
-    ├── sc_provisioning.workflow.json  # 图源（Archify Typed JSON IR）
+    ├── sc_provisioning.workflow.json  # 图源（Typed JSON IR）
     ├── sc_provisioning.html           # 交互版流程图
     └── sc_provisioning.svg            # 双主题矢量版（本文档 §可视化 内嵌）
 ```

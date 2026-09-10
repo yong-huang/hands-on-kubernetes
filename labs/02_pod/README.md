@@ -126,10 +126,10 @@ spec:
 ├── manifests/
 │   └── pod.yaml       # 4 个 Pod 示例：单容器 / sidecar / initContainer / 探针
 └── images/
-    ├── pod_anatomy.workflow.json          # 图源（Archify Typed JSON IR）
+    ├── pod_anatomy.workflow.json          # 图源（Typed JSON IR）
     ├── pod_anatomy.html        # 交互版（浏览器打开）
     └── pod_anatomy.svg          # 双主题矢量版      
-    ├── pod_lifecycle.workflow.json          # 图源（Archify Typed JSON IR）
+    ├── pod_lifecycle.workflow.json          # 图源（Typed JSON IR）
     ├── pod_lifecycle.html        # 交互版（浏览器打开）
     └── pod_lifecycle.svg          # 双主题矢量版    
 ```

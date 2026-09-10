@@ -123,10 +123,10 @@ volumes:
 ├── manifests/
 │   └── cm_secret.yaml      # 2 个 ConfigMap + 1 个 Secret + 1 个消费 Pod
 └── images/
-    ├── cm_secret_inject.workflow.json          # 图源（Archify Typed JSON IR）
+    ├── cm_secret_inject.workflow.json          # 图源（Typed JSON IR）
     ├── cm_secret_inject.html        # 交互版（浏览器打开）
     └── cm_secret_inject.svg          # 双主题矢量版   
-    ├── secret_base64.workflow.json          # 图源（Archify Typed JSON IR）
+    ├── secret_base64.workflow.json          # 图源（Typed JSON IR）
     ├── secret_base64.html        # 交互版（浏览器打开）
     └── secret_base64.svg          # 双主题矢量版      
 ```

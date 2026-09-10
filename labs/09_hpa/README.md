@@ -94,12 +94,12 @@ spec:
 │   ├── hpa.yaml                       # Deployment + HPA（autoscaling/v2）
 │   └── metrics-server.yaml            # metrics-server 安装清单（本地缓存）
 └── images/
-    ├── hpa_control_loop.architecture.json  # 图源（Archify Typed JSON IR）
+    ├── hpa_control_loop.architecture.json  # 图源（Typed JSON IR）
     ├── hpa_control_loop.html               # 交互版架构图（浏览器打开，可缩放/聚焦/追踪连线）
     └── hpa_control_loop.svg                # 双主题矢量版（本文档 §3 内嵌，跟随系统深浅色）
 ```
 
-> 三类产物同源：`hpa_control_loop.architecture.json` 是图源（Archify Typed JSON IR，`node bin/archify.mjs deliver architecture <json> <html>` 可复现），`.html` 是交付的交互成品，`.svg` 是从交互版 Export 菜单导出的双主题矢量图（跟随系统深浅色，任意缩放不糊）。
+> 三类产物同源：`hpa_control_loop.architecture.json` 是图源（Typed JSON IR），`.html` 是交付的交互成品，`.svg` 是从交互版 Export 菜单导出的双主题矢量图（跟随系统深浅色，任意缩放不糊）。
 
 ## 7. 面试要点
 

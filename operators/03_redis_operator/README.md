@@ -88,7 +88,7 @@ Command: []string{
 ├── internal/controller/               # Reconcile 核心
 ├── config/                            # CRD / RBAC / manager 部署清单
 └── images/
-    ├── redis_replication.architecture.json  # 图源（Archify Typed JSON IR）
+    ├── redis_replication.architecture.json  # 图源（Typed JSON IR）
     ├── redis_replication.html               # 交互版架构图
     └── redis_replication.svg                # 双主题矢量版（本文档 §2 内嵌）
 ```

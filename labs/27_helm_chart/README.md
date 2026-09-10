@@ -11,7 +11,7 @@
 │       ├── Chart.yaml / values.yaml
 │       └── templates/     # deployment/service/ingress/configmap + _helpers.tpl + NOTES.txt
 └── images/
-    ├── helm_pipeline.workflow.json  # 图源（Archify Typed JSON IR）
+    ├── helm_pipeline.workflow.json  # 图源（Typed JSON IR）
     ├── helm_pipeline.html           # 交互版流程图
     └── helm_pipeline.svg            # 双主题矢量版（本文档 §5 内嵌）
 ```

@@ -17,7 +17,7 @@
 ├── manifests/
 │   └── dns_discovery.yaml   # Headless + StatefulSet + ClusterIP Service + 自定义 DNS Pod
 └── images/
-    ├── dns_resolution.workflow.json  # 图源（Archify Typed JSON IR）
+    ├── dns_resolution.workflow.json  # 图源（Typed JSON IR）
     ├── dns_resolution.html           # 交互版解析流程图
     └── dns_resolution.svg            # 双主题矢量版（本文档 §可视化 内嵌）
 ```

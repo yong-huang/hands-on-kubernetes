@@ -9,7 +9,7 @@
 ├── manifests/
 │   └── jaeger_tracing.yaml  # 演示用的 K8s 清单
 └── images/
-    ├── trace_waterfall.architecture.json  # 图源（Archify Typed JSON IR）
+    ├── trace_waterfall.architecture.json  # 图源（Typed JSON IR）
     ├── trace_waterfall.html               # 交互版架构图
     └── trace_waterfall.svg                # 双主题矢量版（本文档 §5 内嵌）
 ```

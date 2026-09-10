@@ -22,7 +22,7 @@ ArgoCD 就是这样一个运行在集群内的控制器，也是 CNCF 毕业项�
 │   ├── app-of-apps.yaml     # Application CRD 示例: guestbook 应用 + app-of-apps 根应用(注释)
 │   ├── argocd-install.yaml  # ArgoCD 官方安装清单(已 vendor 进仓库, 约 24500 行, 离线可用)
 └── images/
-    ├── gitops_loop.architecture.json  # 图源（Archify Typed JSON IR）
+    ├── gitops_loop.architecture.json  # 图源（Typed JSON IR）
     ├── gitops_loop.html               # 交互版架构图
     └── gitops_loop.svg                # 双主题矢量版（本文档 §6 内嵌）
 ```

@@ -15,7 +15,7 @@ RBAC 的优雅之处在于把"身份"和"权限"解耦：权限定义在 Role �
 ├── manifests/
 │   └── rbac.yaml      # Namespace + 两个 SA/Role/RoleBinding 身份组合 + demo Deployment
 └── images/
-    ├── rbac_model.architecture.json  # 图源（Archify Typed JSON IR）
+    ├── rbac_model.architecture.json  # 图源（Typed JSON IR）
     ├── rbac_model.html               # 交互版架构图
     └── rbac_model.svg                # 双主题矢量版（本文档 §6 内嵌）
 ```

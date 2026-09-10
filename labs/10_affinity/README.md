@@ -158,15 +158,15 @@ nodeAffinity:
 ├── manifests/
 │   └── affinity.yaml                    # 硬性/软性 antiAffinity、nodeAffinity、topologySpread
 └── images/
-    ├── scheduler_pipeline.workflow.json   # 图源（Archify Typed JSON IR）
+    ├── scheduler_pipeline.workflow.json   # 图源（Typed JSON IR）
     ├── scheduler_pipeline.html            # 交互版：调度决策流水线
     ├── scheduler_pipeline.svg             # 双主题矢量版（本文档 §3 内嵌，跟随系统深浅色）
-    ├── maxskew_spread.architecture.json   # 图源（Archify Typed JSON IR）
+    ├── maxskew_spread.architecture.json   # 图源（Typed JSON IR）
     ├── maxskew_spread.html                # 交互版：maxSkew 打散
     └── maxskew_spread.svg                 # 双主题矢量版（本文档 §5 内嵌，跟随系统深浅色）
 ```
 
-> 三类产物同源：`*.workflow.json` / `*.architecture.json` 是图源（Archify Typed JSON IR，`node bin/archify.mjs deliver <type> <json> <html>` 可复现），`.html` 是交付的交互成品，`.svg` 是从交互版 Export 菜单导出的双主题矢量图（跟随系统深浅色，任意缩放不糊）。
+> 三类产物同源：`*.workflow.json` / `*.architecture.json` 是图源（Typed JSON IR），`.html` 是交付的交互成品，`.svg` 是从交互版 Export 菜单导出的双主题矢量图（跟随系统深浅色，任意缩放不糊）。
 
 ## 8. 面试要点
 

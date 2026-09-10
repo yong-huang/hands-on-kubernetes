@@ -98,10 +98,10 @@ PVC 名 = <模板名>-<Pod名>   =>   data-web-0 / data-web-1 / data-web-2
 ├── manifests/
 │   └── statefulset.yaml   # Headless Service + StatefulSet（volumeClaimTemplates / initContainer）
 └── images/
-    ├── sts_identity.workflow.json          # 图源（Archify Typed JSON IR）
+    ├── sts_identity.workflow.json          # 图源（Typed JSON IR）
     ├── sts_identity.html        # 交互版（浏览器打开）
     └── sts_identity.svg          # 双主题矢量版   
-    ├── sts_ordering.workflow.json          # 图源（Archify Typed JSON IR）
+    ├── sts_ordering.workflow.json          # 图源（Typed JSON IR）
     ├── sts_ordering.html        # 交互版（浏览器打开）
     └── sts_ordering.svg          # 双主题矢量版   
 ```

@@ -108,10 +108,10 @@ spec:
 ├── manifests/
 │   └── job_cronjob.yaml       # 三个示例：一次性 Job / 并行 Job / CronJob 定时备份
 └── images/
-    ├── job_completions.workflow.json          # 图源（Archify Typed JSON IR）
+    ├── job_completions.workflow.json          # 图源（Typed JSON IR）
     ├── job_completions.html        # 交互版（浏览器打开）
     └── job_completions.svg          # 双主题矢量版    
-    ├── cronjob_policy.workflow.json          # 图源（Archify Typed JSON IR）
+    ├── cronjob_policy.workflow.json          # 图源（Typed JSON IR）
     ├── cronjob_policy.html        # 交互版（浏览器打开）
     └── cronjob_policy.svg          # 双主题矢量版     
 ```

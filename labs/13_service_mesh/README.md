@@ -20,7 +20,7 @@
 ├── manifests/
 │   └── service_mesh.yaml   # Namespace(注入) + v1/v2 Deployment + Service + DestinationRule + VirtualService
 └── images/
-    ├── istio_canary.architecture.json  # 图源（Archify Typed JSON IR）
+    ├── istio_canary.architecture.json  # 图源（Typed JSON IR）
     ├── istio_canary.html               # 交互版架构图
     └── istio_canary.svg                # 双主题矢量版（本文档 §可视化 内嵌）
 ```

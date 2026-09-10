@@ -15,7 +15,7 @@ Velero（原 Heptio Ark，现归 VMware Tanzu）就是干这个的：**把一个
 ├── manifests/
 │   └── velero_demo.yaml   # Namespace + headless Service + StatefulSet(volumeClaimTemplates)
 └── images/
-    ├── velero_planes.architecture.json  # 图源（Archify Typed JSON IR）
+    ├── velero_planes.architecture.json  # 图源（Typed JSON IR）
     ├── velero_planes.html               # 交互版架构图
     └── velero_planes.svg                # 双主题矢量版（本文档 §6 内嵌）
 ```

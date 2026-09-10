@@ -127,10 +127,10 @@ kubectl rollout resume deployment/nginx-rolling       # 恢复后一次性发布
 ├── manifests/
 │   └── deploy.yaml      # 两个 Deployment 示例：RollingUpdate vs Recreate
 └── images/
-    ├── deploy_ownership.workflow.json          # 图源（Archify Typed JSON IR）
+    ├── deploy_ownership.workflow.json          # 图源（Typed JSON IR）
     ├── deploy_ownership.html        # 交互版（浏览器打开）
     └── deploy_ownership.svg          # 双主题矢量版   
-    ├── deploy_rolling.workflow.json          # 图源（Archify Typed JSON IR）
+    ├── deploy_rolling.workflow.json          # 图源（Typed JSON IR）
     ├── deploy_rolling.html        # 交互版（浏览器打开）
     └── deploy_rolling.svg          # 双主题矢量版     
 ```

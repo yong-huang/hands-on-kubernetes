@@ -9,7 +9,7 @@
 ├── manifests/
 │   └── fake_gpu.yaml    # 演示用的 K8s 清单
 └── images/
-    ├── fake_gpu_gates.architecture.json  # 图源（Archify Typed JSON IR）
+    ├── fake_gpu_gates.architecture.json  # 图源（Typed JSON IR）
     ├── fake_gpu_gates.html               # 交互版架构图
     └── fake_gpu_gates.svg                # 双主题矢量版（本文档 §5 内嵌）
 ```

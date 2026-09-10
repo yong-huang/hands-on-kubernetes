@@ -15,7 +15,7 @@ Kubernetes 的解法是 **PV/PVC 两层抽象**：管理员用 PersistentVolume 
 ├── manifests/
 │   └── pv_pvc.yaml      # PV(hostPath) + PVC + 挂载 Pod + 带节点亲和性的第二个 PV
 └── images/
-    ├── pvc_binding.architecture.json  # 图源（Archify Typed JSON IR）
+    ├── pvc_binding.architecture.json  # 图源（Typed JSON IR）
     ├── pvc_binding.html               # 交互版架构图
     └── pvc_binding.svg                # 双主题矢量版（本文档 §可视化 内嵌）
 ```

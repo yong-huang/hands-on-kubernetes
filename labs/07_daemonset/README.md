@@ -106,10 +106,10 @@ volumes:
 ├── manifests/
 │   └── daemonset.yaml           # 日志采集（全节点+tolerations）+ nodeAffinity 版
 └── images/
-    ├── daemonset_scheduling.workflow.json          # 图源（Archify Typed JSON IR）
+    ├── daemonset_scheduling.workflow.json          # 图源（Typed JSON IR）
     ├── daemonset_scheduling.html        # 交互版（浏览器打开）
     └── daemonset_scheduling.svg          # 双主题矢量版 
-    ├── daemonset_hostpath.workflow.json          # 图源（Archify Typed JSON IR）
+    ├── daemonset_hostpath.workflow.json          # 图源（Typed JSON IR）
     ├── daemonset_hostpath.html        # 交互版（浏览器打开）
     └── daemonset_hostpath.svg          # 双主题矢量版   
 ```

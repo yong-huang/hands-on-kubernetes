@@ -15,7 +15,7 @@ Kubernetes 的现代答案是 **PSS + PSA 两层设计**：Pod Security Standard
 ├── manifests/
 │   └── pod_security.yaml   # 3 个不同等级标签的 ns + 4 个测试 Pod (特权/hostPath/合规/root)
 └── images/
-    ├── psa_matrix.architecture.json  # 图源（Archify Typed JSON IR）
+    ├── psa_matrix.architecture.json  # 图源（Typed JSON IR）
     ├── psa_matrix.html               # 交互版架构图
     └── psa_matrix.svg                # 双主题矢量版（本文档 §6 内嵌）
 ```
