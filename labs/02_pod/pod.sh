@@ -44,6 +44,12 @@ for i in 1 2 3 4 5 6; do
     sleep 3
 done
 
+# 显式等待全部 Pod Ready：新集群上镜像拉取可能要几分钟，
+# 后面的 logs/exec 依赖容器真正 Running，固定睡 15s 在全新集群会翻车
+step "等待所有 Pod Ready（最长 5 分钟）"
+kubectl wait pod --all -n "$NS" --for=condition=Ready --timeout=300s
+kubectl get pods -n "$NS" -o wide
+
 # ---------- 2. describe：排查 Pod 问题第一站 ----------
 header "2. kubectl describe —— 事件与探针状态"
 step "查看 nginx Pod 详情（关注 Events 段）"
