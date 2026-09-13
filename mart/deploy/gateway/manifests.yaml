@@ -1,0 +1,125 @@
+# mini-mart · API 网关层（项目 8）：product v2 灰度副本 + 网关规则
+# 网关能力由 ingress-nginx 注解实现：
+#   认证   auth-url -> auth 服务（外部授权模式）
+#   限流   limit-rps + limit-req-status-code
+#   灰度   canary-by-header（X-Canary: true 100% 进 v2）
+---
+# 灰度副本：与 product 同镜像，仅版本号不同，/version 可肉眼区分
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: product-v2
+  namespace: mart
+  labels:
+    app: product-v2
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: product-v2
+  template:
+    metadata:
+      labels:
+        app: product-v2
+    spec:
+      containers:
+        - name: product
+          image: mart/product:0.3.0
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: APP_VERSION
+              value: "0.4.0-canary"
+          ports:
+            - name: http
+              containerPort: 8000
+          volumeMounts:
+            - name: config
+              mountPath: /etc/mart
+              readOnly: true
+            - name: secrets
+              mountPath: /etc/mart/secrets
+              readOnly: true
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            periodSeconds: 2
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 10
+          resources:
+            requests: {cpu: 30m, memory: 64Mi}
+            limits: {cpu: 500m, memory: 512Mi}
+      volumes:
+        - name: config
+          configMap:
+            name: product-config
+        - name: secrets
+          secret:
+            secretName: db-credentials
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: product-v2
+  namespace: mart
+spec:
+  selector:
+    app: product-v2
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000
+---
+# 基线入口：JWT 认证 + 限流 5 r/s（超限 429）
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: product-baseline
+  namespace: mart
+  annotations:
+    nginx.ingress.kubernetes.io/auth-url: "http://10.96.111.84:8000/auth"  # ClusterIP 直连：控制器 DNS 受损环境下的 workaround
+    nginx.ingress.kubernetes.io/limit-rps: "5"
+    nginx.ingress.kubernetes.io/limit-req-status-code: "429"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: mart.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: product
+                port:
+                  number: 8000
+---
+# 金丝雀入口：X-Canary: true 的请求 100% 进 v2，其余不进这条规则
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: product-canary
+  namespace: mart
+  annotations:
+    nginx.ingress.kubernetes.io/canary: "true"
+    nginx.ingress.kubernetes.io/canary-by-header: "X-Canary"
+    nginx.ingress.kubernetes.io/canary-by-header-value: "true"
+    # canary ingress 会与基线合并生成 location，基线的限流注解会被它吃掉，两边都得写
+    nginx.ingress.kubernetes.io/limit-rps: "5"
+    nginx.ingress.kubernetes.io/limit-req-status-code: "429"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: mart.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: product-v2
+                port:
+                  number: 8000

@@ -1,0 +1,54 @@
+# mini-mart · 认证服务（项目 8）：ingress auth-url 的外部授权后端
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: auth
+  namespace: mart
+  labels:
+    app: auth
+spec:
+  # 固定 ClusterIP：ingress 控制器 DNS 受损时 auth-url 用 IP 直连（本项目踩坑记录）
+  clusterIP: 10.96.111.84
+  selector:
+    app: auth
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth
+  namespace: mart
+  labels:
+    app: auth
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: auth
+  template:
+    metadata:
+      labels:
+        app: auth
+    spec:
+      containers:
+        - name: auth
+          image: mart/auth:0.1.0
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: JWT_SECRET
+              value: mart-demo-secret   # 演示用；生产走 Secret/外部 KMS
+          ports:
+            - name: http
+              containerPort: 8000
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 3
+          resources:
+            requests: {cpu: 10m, memory: 48Mi}
+            limits: {cpu: 200m, memory: 128Mi}

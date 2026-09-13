@@ -1,0 +1,70 @@
+# mini-mart · 库存服务（项目 6）：Saga 参与方，独立数据库 invdb
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: inventory
+  namespace: mart
+  labels:
+    app: inventory
+spec:
+  type: NodePort
+  selector:
+    app: inventory
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000
+      nodePort: 30884
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: inventory
+  namespace: mart
+  labels:
+    app: inventory
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: inventory
+  template:
+    metadata:
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+      labels:
+        app: inventory
+    spec:
+      terminationGracePeriodSeconds: 20
+      containers:
+        - name: inventory
+          image: mart/inventory:0.1.0
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: INV_DB_DSN
+              value: postgresql://inv_user:invpw@postgres.mart.svc:5432/invdb
+          ports:
+            - name: http
+              containerPort: 8000
+          # db 就绪前应用自己会重试 60s，探针只管进程活性
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            periodSeconds: 5
+            failureThreshold: 40
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 30m
+              memory: 64Mi
+            limits:
+              cpu: "1"
+              memory: 256Mi

@@ -19,3 +19,10 @@ velero-backup/
 
 # 工具会话文件
 .zcode/
+
+# 测试基建（本地产物，不入库）
+mart/kubeconfig-kind
+/bin/
+mart/images/*.visual-check.*
+mart/gitops/
+mart/gitops-remote.git/

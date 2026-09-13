@@ -1,0 +1,250 @@
+# mini-mart · 观测底座（项目 7）：Jaeger + Prometheus + Grafana
+# 设计取舍：plain deployment 而非 kube-prometheus-stack——学习清单要的是
+# "应用怎么接"，装栈本身 labs/23/25 已演示过；这里保持最小可运行
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: observability
+---
+# ---- Jaeger all-in-one：直接收 OTLP，省掉独立 Collector ----
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jaeger
+  namespace: observability
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: jaeger}
+  template:
+    metadata:
+      labels: {app: jaeger}
+    spec:
+      containers:
+        - name: jaeger
+          image: mart/jaeger-all-in-one:1.62.0
+          env:
+            - name: COLLECTOR_OTLP_ENABLED
+              value: "true"          # 服务直发 OTLP:4317，不再单独装 Collector
+          ports:
+            - {containerPort: 16686, name: ui}
+            - {containerPort: 4317, name: otlp-grpc}
+            - {containerPort: 4318, name: otlp-http}
+          resources:
+            requests: {cpu: 100m, memory: 128Mi}
+            limits: {cpu: 500m, memory: 384Mi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jaeger
+  namespace: observability
+spec:
+  type: NodePort
+  selector: {app: jaeger}
+  ports:
+    - {name: ui, port: 16686, targetPort: 16686, nodePort: 30886}
+    - {name: otlp-grpc, port: 4317, targetPort: 4317}
+    - {name: otlp-http, port: 4318, targetPort: 4318}
+---
+# ---- Prometheus：kubernetes_sd 按注解抓取应用 /metrics ----
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: observability
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 5s
+    scrape_configs:
+      - job_name: kubernetes-pods
+        kubernetes_sd_configs:
+          - role: pod
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            action: keep
+            regex: "true"
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+            action: replace
+            target_label: __metrics_path__
+            regex: (.+)
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_port, __meta_kubernetes_pod_ip]
+            action: replace
+            regex: (.+);(.+)
+            replacement: $2:$1
+            target_label: __address__
+          - source_labels: [__meta_kubernetes_namespace]
+            target_label: namespace
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            target_label: service
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: prometheus
+  namespace: observability
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: prometheus-pod-discovery
+rules:
+  - apiGroups: [""]
+    resources: [pods, services, endpoints]
+    verbs: [get, list, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: prometheus-pod-discovery
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: prometheus-pod-discovery
+subjects:
+  - kind: ServiceAccount
+    name: prometheus
+    namespace: observability
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus
+  namespace: observability
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: prometheus}
+  template:
+    metadata:
+      labels: {app: prometheus}
+    spec:
+      serviceAccountName: prometheus
+      containers:
+        - name: prometheus
+          image: mart/prometheus:v2.53.0
+          args: ["--config.file=/etc/prometheus/prometheus.yml", "--storage.tsdb.retention.time=2d"]
+          ports:
+            - {containerPort: 9090}
+          resources:
+            requests: {cpu: 100m, memory: 128Mi}
+            limits: {cpu: 500m, memory: 512Mi}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/prometheus
+      volumes:
+        - name: config
+          configMap:
+            name: prometheus-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus
+  namespace: observability
+spec:
+  selector: {app: prometheus}
+  ports:
+    - {name: http, port: 9090, targetPort: 9090}
+---
+# ---- Grafana：自动装好 Prometheus 数据源和 RED 看板 ----
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-provision
+  namespace: observability
+data:
+  datasources.yaml: |
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        access: proxy
+        url: http://prometheus.observability.svc:9090
+        isDefault: true
+  dashboards.yaml: |
+    apiVersion: 1
+    providers:
+      - name: default
+        folder: mini-mart
+        type: file
+        options:
+          path: /var/lib/grafana/dashboards
+  mini-mart-red.json: |
+    {
+      "title": "mini-mart RED",
+      "uid": "mini-mart-red",
+      "refresh": "10s",
+      "time": {"from": "now-30m", "to": "now"},
+      "panels": [
+        {
+          "id": 1, "type": "timeseries", "title": "QPS by service (http.server requests)",
+          "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8},
+          "targets": [{"expr": "sum by (service) (rate({__name__=~\"http_server_duration_milliseconds_count|http_server_request_duration_seconds_count\"}[1m]))", "legendFormat": "{{service}}"}]
+        },
+        {
+          "id": 2, "type": "timeseries", "title": "P99 latency by service",
+          "gridPos": {"x": 12, "y": 0, "w": 12, "h": 8},
+          "targets": [{"expr": "histogram_quantile(0.99, sum by (le, service) (rate({__name__=~\"http_server_duration_milliseconds_bucket|http_server_request_duration_seconds_bucket\"}[5m])))", "legendFormat": "{{service}}"}]
+        },
+        {
+          "id": 3, "type": "timeseries", "title": "Error rate (5xx) by service",
+          "gridPos": {"x": 0, "y": 8, "w": 24, "h": 8},
+          "targets": [{"expr": "sum by (service) (rate({__name__=~\"http_server_duration_milliseconds_count|http_server_request_duration_seconds_count\", http_status_code=~\"5..\"}[5m])) / clamp_min(sum by (service) (rate({__name__=~\"http_server_duration_milliseconds_count|http_server_request_duration_seconds_count\"}[5m])), 0.001)", "legendFormat": "{{service}}"}]
+        }
+      ],
+      "schemaVersion": 39
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  namespace: observability
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: grafana}
+  template:
+    metadata:
+      labels: {app: grafana}
+    spec:
+      containers:
+        - name: grafana
+          image: mart/grafana:11.1.0
+          env:
+            - {name: GF_AUTH_ANONYMOUS_ENABLED, value: "true"}
+            - {name: GF_AUTH_ANONYMOUS_ORG_ROLE, value: Admin}
+          ports:
+            - {containerPort: 3000}
+          resources:
+            requests: {cpu: 50m, memory: 96Mi}
+            limits: {cpu: 500m, memory: 256Mi}
+          volumeMounts:
+            - {name: provision, mountPath: /etc/grafana/provisioning}
+            - {name: dashboards, mountPath: /var/lib/grafana/dashboards}
+      volumes:
+        - name: provision
+          configMap:
+            name: grafana-provision
+            items:
+              - {key: datasources.yaml, path: datasources/datasources.yaml}
+              - {key: dashboards.yaml, path: dashboards/dashboards.yaml}
+        - name: dashboards
+          configMap:
+            name: grafana-provision
+            items:
+              - {key: mini-mart-red.json, path: mini-mart-red.json}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana
+  namespace: observability
+spec:
+  type: NodePort
+  selector: {app: grafana}
+  ports:
+    - {name: http, port: 3000, targetPort: 3000, nodePort: 30885}

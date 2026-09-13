@@ -1,0 +1,74 @@
+# mini-mart · 压测 Job（项目 10）：k6 在集群内跑，脚本经 ConfigMap 注入
+# 每次创建 Job 前先删旧的（Job 不可更新）
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: k6-script
+  namespace: mart
+data:
+  checkout_flow.js: |
+    import http from 'k6/http';
+    import { check, sleep } from 'k6';
+
+    const ORDER = __ENV.ORDER_BASE || 'http://order.mart.svc:8000';
+    const PRODUCT = __ENV.PRODUCT_BASE || 'http://product.mart.svc:8000';
+    const RATE = Number(__ENV.RATE || 200);
+    const DURATION = __ENV.DURATION || '5m';
+
+    export const options = {
+      scenarios: {
+        checkout: {
+          executor: 'constant-arrival-rate',
+          rate: RATE,
+          timeUnit: '1s',
+          duration: DURATION,
+          preAllocatedVUs: 150,
+          maxVUs: 400,
+        },
+      },
+      thresholds: {
+        http_req_duration: ['p(99)<300'],
+        http_req_failed: ['rate<0.001'],
+      },
+    };
+
+    export default function () {
+      const p = http.get(`${PRODUCT}/products/p1`, { tags: { name: 'get_product' } });
+      check(p, { 'product ok': (r) => r.status === 200 });
+      const res = http.post(`${ORDER}/orders`,
+        JSON.stringify({ product_id: 'p1', quantity: 1 }),
+        { headers: { 'Content-Type': 'application/json' }, tags: { name: 'create_order' } });
+      check(res, { 'order accepted': (r) => r.status === 201 });
+      sleep(0.05);
+    }
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: k6-load
+  namespace: mart
+spec:
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        app: k6
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: k6
+          image: mart/k6:0.51.0
+          env:
+            - name: RATE
+              value: "200"
+            - name: DURATION
+              value: "5m"
+          args: ["run", "/script/checkout_flow.js"]
+          volumeMounts:
+            - name: script
+              mountPath: /script
+      volumes:
+        - name: script
+          configMap:
+            name: k6-script

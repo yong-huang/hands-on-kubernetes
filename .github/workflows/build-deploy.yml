@@ -1,0 +1,54 @@
+# mini-mart CI（推送到 GitHub 后生效；本机离线路线由 scripts/09_cicd.sh 扮演同等角色）
+# 只构建有改动的服务：paths 过滤 + matrix 并行
+name: build-deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      product: ${{ steps.f.outputs.product }}
+      order: ${{ steps.f.outputs.order }}
+      inventory: ${{ steps.f.outputs.inventory }}
+      notification: ${{ steps.f.outputs.notification }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: f
+        run: |
+          for svc in product order inventory notification; do
+            if git diff --name-only "${
+              github.event.before || 'HEAD~1'
+            }" HEAD | grep -q "^mart/services/$svc/"; then
+              echo "$svc=true" >> "$GITHUB_OUTPUT"
+            fi
+          done
+
+  build:
+    needs: changes
+    if: ${{ needs.changes.outputs.product == 'true' || needs.changes.outputs.order == 'true' || needs.changes.outputs.inventory == 'true' || needs.changes.outputs.notification == 'true' }}
+    strategy:
+      matrix:
+        include:
+          - svc: product
+            dockerfile: services/product/Dockerfile
+            ctx: services/product
+          - svc: order
+            dockerfile: services/order/Dockerfile
+            ctx: mart
+          - svc: inventory
+            dockerfile: services/inventory/Dockerfile
+            ctx: services/inventory
+          - svc: notification
+            dockerfile: services/notification/Dockerfile
+            ctx: mart
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: build & push
+        if: ${{ needs.changes.outputs[format('{0}', matrix.svc)] == 'true' }}
+        run: |
+          echo "building ${{ matrix.svc }} ..."
+          # docker build -f ${{ matrix.dockerfile }} ${{ matrix.ctx }} && push ghcr + 改写 gitops tag

@@ -1,0 +1,87 @@
+# mini-mart · 共享 Postgres 实例，双库双用户（项目 6）
+# 生产环境应是两个独立实例；本机为省资源共用一个 Pod，但库/账号/权限完全隔离，
+# 两个服务无法读对方的库——database-per-service 的边界仍然是硬的
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init
+  namespace: mart
+data:
+  init.sql: |
+    CREATE USER order_user PASSWORD 'orderpw';
+    CREATE DATABASE orderdb OWNER order_user;
+    CREATE USER inv_user PASSWORD 'invpw';
+    CREATE DATABASE invdb OWNER inv_user;
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: mart
+  labels:
+    app: postgres
+spec:
+  selector:
+    app: postgres
+  ports:
+    - name: pg
+      port: 5432
+      targetPort: 5432
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: mart
+  labels:
+    app: postgres
+spec:
+  serviceName: postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: mart/postgres:16-alpine
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: POSTGRES_PASSWORD
+              value: superpgpw
+          ports:
+            - containerPort: 5432
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgres"]
+            periodSeconds: 5
+            failureThreshold: 12
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+            - name: init
+              mountPath: /docker-entrypoint-initdb.d
+      volumes:
+        - name: init
+          configMap:
+            name: postgres-init
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 2Gi

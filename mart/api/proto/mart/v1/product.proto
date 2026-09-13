@@ -1,0 +1,24 @@
+syntax = "proto3";
+// mini-mart 商品服务契约：Go 订单服务经 gRPC 实时查价（项目 2）
+package mart.v1;
+
+option go_package = "mart/api/gen/go/mart/v1;martv1";
+
+message Product {
+  string product_id = 1;
+  string name = 2;
+  int64 price_cents = 3;
+}
+
+message GetProductRequest {
+  string product_id = 1;
+}
+
+message GetProductResponse {
+  Product product = 1;
+}
+
+service ProductService {
+  // 查询单个商品；调用方（订单服务）带 500ms 超时预算
+  rpc GetProduct(GetProductRequest) returns (GetProductResponse);
+}

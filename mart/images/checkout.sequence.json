@@ -1,0 +1,208 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "mini-mart 下单链路（同步 Saga + 异步事件）",
+    "output": "mart/images/checkout.sequence.html",
+    "viewBox": [
+      1400,
+      580
+    ],
+    "quality_profile": "showcase",
+    "locale": "zh-CN"
+  },
+  "participants": [
+    {
+      "id": "user",
+      "type": "external",
+      "label": "用户"
+    },
+    {
+      "id": "gateway",
+      "type": "security",
+      "label": "API 网关"
+    },
+    {
+      "id": "order",
+      "type": "backend",
+      "label": "order·Go"
+    },
+    {
+      "id": "product",
+      "type": "backend",
+      "label": "product·Py"
+    },
+    {
+      "id": "inventory",
+      "type": "backend",
+      "label": "inventory·Py"
+    },
+    {
+      "id": "kafka",
+      "type": "messagebus",
+      "label": "Kafka"
+    },
+    {
+      "id": "notification",
+      "type": "backend",
+      "label": "notify·Go"
+    }
+  ],
+  "segments": [
+    {
+      "from": 140,
+      "to": 285,
+      "label": "同步下单（500ms 预算）"
+    },
+    {
+      "from": 320,
+      "to": 525,
+      "label": "Saga、异步事件与消费"
+    }
+  ],
+  "messages": [
+    {
+      "from": "user",
+      "to": "gateway",
+      "y": 165,
+      "label": "POST /orders + JWT",
+      "variant": "emphasis"
+    },
+    {
+      "from": "gateway",
+      "to": "order",
+      "y": 195,
+      "label": "转发（已认证）"
+    },
+    {
+      "from": "order",
+      "to": "product",
+      "y": 225,
+      "label": "gRPC GetProduct（500ms 预算）",
+      "variant": "emphasis"
+    },
+    {
+      "from": "product",
+      "to": "order",
+      "y": 255,
+      "label": "价格",
+      "variant": "return"
+    },
+    {
+      "from": "order",
+      "to": "inventory",
+      "y": 315,
+      "label": "reserve（按 order_id 幂等）",
+      "variant": "emphasis"
+    },
+    {
+      "from": "inventory",
+      "to": "order",
+      "y": 345,
+      "label": "已预留",
+      "variant": "return"
+    },
+    {
+      "from": "order",
+      "to": "kafka",
+      "y": 375,
+      "label": "发布 order.created",
+      "variant": "dashed"
+    },
+    {
+      "from": "order",
+      "to": "gateway",
+      "y": 405,
+      "label": "201 Created",
+      "variant": "return"
+    },
+    {
+      "from": "gateway",
+      "to": "user",
+      "y": 435,
+      "label": "201 Created",
+      "variant": "return"
+    },
+    {
+      "from": "kafka",
+      "to": "notification",
+      "y": 465,
+      "label": "投递 order.created",
+      "variant": "emphasis"
+    },
+    {
+      "from": "notification",
+      "to": "kafka",
+      "y": 495,
+      "label": "失败重试 3 次 → DLQ；成功提交 offset",
+      "variant": "dashed"
+    }
+  ],
+  "activations": [
+    {
+      "participant": "gateway",
+      "from": 179,
+      "to": 445,
+      "type": "security"
+    },
+    {
+      "participant": "order",
+      "from": 209,
+      "to": 419,
+      "type": "backend"
+    },
+    {
+      "participant": "product",
+      "from": 239,
+      "to": 269,
+      "type": "backend"
+    },
+    {
+      "participant": "inventory",
+      "from": 309,
+      "to": 359,
+      "type": "backend"
+    },
+    {
+      "participant": "kafka",
+      "from": 369,
+      "to": 505,
+      "type": "messagebus"
+    },
+    {
+      "participant": "notification",
+      "from": 459,
+      "to": 505,
+      "type": "backend"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "同步预算与快速失败",
+      "items": [
+        "查价总预算 500ms（含 1 次重试）",
+        "熔断 Open 后毫秒级 503，不拖垮请求线程",
+        "库存不足 → 409 + 订单自动取消"
+      ]
+    },
+    {
+      "dot": "orange",
+      "title": "Saga 一致性",
+      "items": [
+        "reserve 按 order_id 幂等，重试不会重复扣减",
+        "失败逆序补偿（release），无中间态残留",
+        "Saga 中途杀 Pod，重试预算覆盖重建窗口"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "异步解耦",
+      "items": [
+        "事件发布异步化，Kafka 停顿不影响下单延迟",
+        "消费失败重试 3 次后进 orders.dlq",
+        "同一 order_id 重复投递被幂等去重"
+      ]
+    }
+  ]
+}

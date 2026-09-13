@@ -1,0 +1,300 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "mini-mart 微服务架构（K8s）",
+    "output": "mart/images/mart.architecture.html",
+    "quality_profile": "showcase",
+    "locale": "zh-CN",
+    "viewBox": [
+      1240,
+      680
+    ]
+  },
+  "components": [
+    {
+      "id": "user",
+      "type": "external",
+      "label": "用户",
+      "sublabel": "curl / k6 压测",
+      "pos": [
+        60,
+        330
+      ],
+      "size": [
+        120,
+        60
+      ]
+    },
+    {
+      "id": "gateway",
+      "type": "security",
+      "label": "API 网关",
+      "sublabel": "ingress-nginx + JWT",
+      "pos": [
+        240,
+        330
+      ],
+      "size": [
+        140,
+        60
+      ],
+      "tag": "项目8"
+    },
+    {
+      "id": "auth",
+      "type": "security",
+      "label": "认证服务",
+      "sublabel": "auth-url 外部授权",
+      "pos": [
+        240,
+        150
+      ],
+      "size": [
+        140,
+        60
+      ],
+      "tag": "项目8"
+    },
+    {
+      "id": "order",
+      "type": "backend",
+      "label": "订单 order",
+      "sublabel": "Go · Saga 编排",
+      "pos": [
+        450,
+        330
+      ],
+      "size": [
+        140,
+        62
+      ],
+      "tag": "项目2/4/6"
+    },
+    {
+      "id": "product",
+      "type": "backend",
+      "label": "商品 product",
+      "sublabel": "Python · FastAPI + gRPC",
+      "pos": [
+        450,
+        150
+      ],
+      "size": [
+        150,
+        62
+      ],
+      "tag": "项目1/3/7"
+    },
+    {
+      "id": "inventory",
+      "type": "backend",
+      "label": "库存 inventory",
+      "sublabel": "Python · 幂等预留",
+      "pos": [
+        700,
+        520
+      ],
+      "size": [
+        150,
+        62
+      ],
+      "tag": "项目6"
+    },
+    {
+      "id": "pg",
+      "type": "database",
+      "label": "PostgreSQL",
+      "sublabel": "双库双用户隔离",
+      "pos": [
+        450,
+        520
+      ],
+      "size": [
+        140,
+        62
+      ],
+      "tag": "项目6"
+    },
+    {
+      "id": "kafka",
+      "type": "messagebus",
+      "label": "Kafka",
+      "sublabel": "orders / orders.dlq",
+      "pos": [
+        700,
+        330
+      ],
+      "size": [
+        130,
+        60
+      ],
+      "tag": "项目5"
+    },
+    {
+      "id": "notification",
+      "type": "backend",
+      "label": "通知 notification",
+      "sublabel": "Go · 重试+DLQ+幂等",
+      "pos": [
+        930,
+        330
+      ],
+      "size": [
+        150,
+        62
+      ],
+      "tag": "项目5"
+    },
+    {
+      "id": "otel",
+      "type": "cloud",
+      "label": "可观测栈",
+      "sublabel": "Jaeger + Prometheus + Grafana",
+      "pos": [
+        930,
+        150
+      ],
+      "size": [
+        180,
+        62
+      ],
+      "tag": "项目7"
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "kind 集群 · mart 命名空间",
+      "wraps": [
+        "gateway",
+        "auth",
+        "order",
+        "product",
+        "inventory",
+        "pg",
+        "kafka",
+        "notification"
+      ],
+      "pad": 22
+    },
+    {
+      "kind": "region",
+      "label": "observability 命名空间",
+      "wraps": [
+        "otel"
+      ],
+      "pad": 16
+    }
+  ],
+  "connections": [
+    {
+      "from": "user",
+      "to": "gateway",
+      "label": "HTTPS + JWT",
+      "variant": "emphasis"
+    },
+    {
+      "from": "gateway",
+      "to": "auth",
+      "label": "auth-url 校验",
+      "variant": "dashed",
+      "fromSide": "top",
+      "toSide": "bottom"
+    },
+    {
+      "from": "gateway",
+      "to": "order",
+      "label": "POST /orders",
+      "variant": "emphasis"
+    },
+    {
+      "from": "order",
+      "to": "product",
+      "label": "gRPC 查价（500ms 预算）",
+      "fromSide": "top",
+      "toSide": "bottom"
+    },
+    {
+      "from": "order",
+      "to": "inventory",
+      "label": "锁库存（Saga）",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "route": "orthogonal-v"
+    },
+    {
+      "from": "order",
+      "to": "pg",
+      "label": "orderdb",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelDy": 55,
+      "labelDx": -60
+    },
+    {
+      "from": "inventory",
+      "to": "pg",
+      "label": "invdb",
+      "fromSide": "left",
+      "toSide": "right"
+    },
+    {
+      "from": "order",
+      "to": "kafka",
+      "label": "发布 order.created",
+      "variant": "dashed"
+    },
+    {
+      "from": "kafka",
+      "to": "notification",
+      "label": "消费（失败→DLQ）",
+      "variant": "emphasis"
+    },
+    {
+      "from": "notification",
+      "to": "otel",
+      "label": "OTLP",
+      "variant": "dashed",
+      "fromSide": "top",
+      "toSide": "bottom"
+    },
+    {
+      "from": "product",
+      "to": "otel",
+      "label": "OTLP",
+      "variant": "dashed",
+      "fromSide": "right",
+      "toSide": "left"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "服务与技术模式",
+      "items": [
+        "order：Saga 编排 + gobreaker 熔断 + gRPC 客户端",
+        "product：探针/优雅关闭 + 配置热加载 + 灰度副本",
+        "inventory：独立数据库 + 按 order_id 幂等预留"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "流量与数据边界",
+      "items": [
+        "南北流量经 ingress-nginx（JWT + 限流 + 灰度）",
+        "东西流量走 Service DNS（REST / gRPC / Kafka）",
+        "database-per-service：orderdb 与 invdb 物理隔离"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "异步与可观测",
+      "items": [
+        "order.created 事件驱动通知，失败 3 次进 DLQ",
+        "OTel 全链路 trace 串联四个服务",
+        "k6 压测 + 混沌实验验证 SLO"
+      ]
+    }
+  ]
+}

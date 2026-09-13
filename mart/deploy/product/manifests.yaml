@@ -1,0 +1,149 @@
+# mini-mart · 商品服务部署清单（项目 1）
+# 应用方式：kubectl apply -f manifests.yaml（单文件多文档，按 tier 分阶段）
+# tier=base   命名空间与服务
+# tier=app    Deployment
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mart
+  labels:
+    app.kubernetes.io/part-of: mini-mart
+---
+# NodePort 是为了从宿主机（OrbStack 节点 IP 直达）跑验收压测；
+# 集群内部服务间调用走 ClusterIP DNS 名 product.mart.svc（项目 2 开始）
+apiVersion: v1
+kind: Service
+metadata:
+  name: product
+  namespace: mart
+  labels:
+    app: product
+spec:
+  type: NodePort
+  selector:
+    app: product
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000
+      nodePort: 30880
+    # gRPC 也经 NodePort 暴露，grpcurl 从宿主机直连做验收
+    - name: grpc
+      port: 50051
+      targetPort: 50051
+      nodePort: 30881
+---
+# 项目 3：热加载配置。key 是文件名，value 是文件内容；改动后 kubelet 会同步进容器
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: product-config
+  namespace: mart
+data:
+  config.json: |
+    {"log_level": "INFO", "max_qps": 100}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: db-credentials
+  namespace: mart
+type: Opaque
+stringData:
+  db_password: super-secret-v1
+---
+# tier=app
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: product
+  namespace: mart
+  labels:
+    app: product
+spec:
+  replicas: 3
+  # 进度Deadline：卡住 60s 就判死（默认 600s 太久，验收要能快速看到"自动中止"）
+  progressDeadlineSeconds: 60
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1        # 先起新的，保证容量不减
+      maxUnavailable: 0  # 旧的必须等新 Pod ready 后才退 —— 零中断的前提
+  selector:
+    matchLabels:
+      app: product
+  template:
+    metadata:
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+      labels:
+        app: product
+    spec:
+      # 优雅关闭总预算：preStop sleep 5 + 排空在途请求，30s 足够
+      terminationGracePeriodSeconds: 30
+      # 项目 3：volume 方式挂载（不是 env！）才支持热加载——env 注入的配置改了要重启
+      volumes:
+        - name: config
+          configMap:
+            name: product-config
+        - name: secrets
+          secret:
+            secretName: db-credentials
+      containers:
+        - name: product
+          # 本机构建后 kind load 进集群，不走 registry
+          image: mart/product:0.3.0
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: APP_VERSION
+              value: "0.3.0"
+          ports:
+            - name: http
+              containerPort: 8000
+            - name: grpc
+              containerPort: 50051
+          volumeMounts:
+            - name: config
+              mountPath: /etc/mart
+              readOnly: true
+            # 嵌套挂载：/etc/mart/secrets 单独挂 Secret，配置与密钥权限分开
+            - name: secrets
+              mountPath: /etc/mart/secrets
+              readOnly: true
+          # startupProbe：给 Python 应用留冷启动时间，期间不打扰 readiness
+          startupProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            periodSeconds: 1
+            failureThreshold: 30
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            periodSeconds: 2
+            timeoutSeconds: 1
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 1
+          # 三个探针端口统一用命名端口 http，改应用端口只动一处
+          # —— 项目 1 验收②故意把它改成错的，观察 rollout 卡住
+          lifecycle:
+            preStop:
+              # 经典竞态：SIGTERM 与 Endpoints 摘除是并发的，先睡 5s
+              # 确保 kube-proxy 把本 Pod 从 Service 后端摘掉后再开始退
+              exec:
+                command: ["sleep", "5"]
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi

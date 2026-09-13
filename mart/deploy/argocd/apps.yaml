@@ -1,0 +1,85 @@
+# mini-mart · ArgoCD Applications（项目 9）：app-of-apps 之外的扁平 4 应用
+# 离线 GitOps：git 仓库由主机 git daemon 提供（git://host.internal:9418/gitops-remote.git）
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: product
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: git://host.internal:9418/gitops-remote.git
+    targetRevision: main
+    path: product
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mart
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - ApplyOutOfSyncOnly=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: order
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: git://host.internal:9418/gitops-remote.git
+    targetRevision: main
+    path: order
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mart
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - ApplyOutOfSyncOnly=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: inventory
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: git://host.internal:9418/gitops-remote.git
+    targetRevision: main
+    path: inventory
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mart
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - ApplyOutOfSyncOnly=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: notification
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: git://host.internal:9418/gitops-remote.git
+    targetRevision: main
+    path: notification
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mart
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - ApplyOutOfSyncOnly=true

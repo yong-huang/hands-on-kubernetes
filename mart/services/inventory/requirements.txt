@@ -1,0 +1,9 @@
+fastapi>=0.115,<1.0
+uvicorn>=0.32,<1.0
+psycopg[binary]>=3.1,<4.0
+pydantic>=2.7,<3.0
+opentelemetry-sdk>=1.26,<2.0
+opentelemetry-exporter-otlp-proto-grpc>=1.26,<2.0
+opentelemetry-exporter-prometheus>=0.47b0,<1.0
+opentelemetry-instrumentation-fastapi>=0.47b0,<1.0
+prometheus-client>=0.20,<1.0
