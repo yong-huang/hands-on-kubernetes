@@ -54,7 +54,13 @@ var _ = Describe("MySQL Controller", func() {
 						Name:      resourceName,
 						Namespace: resourceNamespace,
 					},
-					// TODO(user): Specify other spec details if needed.
+					Spec: mysqlv1.MySQLSpec{
+						StorageSize: "10Gi",
+						RootPasswordSecret: mysqlv1.SecretRef{
+							Name: "test-secret",
+							Key:  "password",
+						},
+					},
 				}
 				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
 			}

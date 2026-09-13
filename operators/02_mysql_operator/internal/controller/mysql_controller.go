@@ -96,9 +96,9 @@ func (r *MySQLReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	hsvc := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: db.Name + "-h", Namespace: db.Namespace, Labels: mysqlLabels(db.Name)},
 		Spec: corev1.ServiceSpec{
-			ClusterIP: "None",
-			Selector:  mysqlLabels(db.Name),
-			Ports:     []corev1.ServicePort{{Name: "mysql", Port: 3306}},
+			ClusterIP:                "None",
+			Selector:                 mysqlLabels(db.Name),
+			Ports:                    []corev1.ServicePort{{Name: "mysql", Port: 3306}},
 			PublishNotReadyAddresses: true,
 		},
 	}
@@ -231,9 +231,9 @@ func (r *MySQLReconciler) mysqlPodTemplate(db *mysqlv1.MySQL) corev1.PodTemplate
 		ObjectMeta: metav1.ObjectMeta{Labels: mysqlLabels(db.Name)},
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{{
-				Name:    "mysql",
-				Image:   "mysql:8.0",
-				Ports:   []corev1.ContainerPort{{Name: "mysql", ContainerPort: 3306}},
+				Name:  "mysql",
+				Image: "mysql:8.0",
+				Ports: []corev1.ContainerPort{{Name: "mysql", ContainerPort: 3306}},
 				Env: []corev1.EnvVar{
 					{Name: "MYSQL_ROOT_PASSWORD", ValueFrom: &corev1.EnvVarSource{
 						SecretKeyRef: &corev1.SecretKeySelector{
@@ -253,10 +253,10 @@ func (r *MySQLReconciler) desiredBackupCronJob(db *mysqlv1.MySQL) *batchv1.CronJ
 	return &batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{Name: db.Name + "-backup", Namespace: db.Namespace, Labels: mysqlLabels(db.Name)},
 		Spec: batchv1.CronJobSpec{
-			Schedule:          db.Spec.BackupSchedule,
-			ConcurrencyPolicy:           batchv1.ForbidConcurrent, // 备份绝不允许重叠
-			SuccessfulJobsHistoryLimit:  &[]int32{3}[0],
-			FailedJobsHistoryLimit:      &[]int32{1}[0],
+			Schedule:                   db.Spec.BackupSchedule,
+			ConcurrencyPolicy:          batchv1.ForbidConcurrent, // 备份绝不允许重叠
+			SuccessfulJobsHistoryLimit: &[]int32{3}[0],
+			FailedJobsHistoryLimit:     &[]int32{1}[0],
 			JobTemplate: batchv1.JobTemplateSpec{
 				Spec: batchv1.JobSpec{
 					BackoffLimit: &[]int32{1}[0],
@@ -264,8 +264,8 @@ func (r *MySQLReconciler) desiredBackupCronJob(db *mysqlv1.MySQL) *batchv1.CronJ
 						Spec: corev1.PodSpec{
 							RestartPolicy: corev1.RestartPolicyNever,
 							Containers: []corev1.Container{{
-								Name:  "backup",
-								Image: "mysql:8.0",
+								Name:    "backup",
+								Image:   "mysql:8.0",
 								Command: []string{"/bin/sh", "-c"},
 								Args: []string{
 									"mysqldump -h " + db.Name + " -uroot -p\"$MYSQL_ROOT_PASSWORD\" --all-databases | gzip > /backup/dump-$(date +%Y%m%d-%H%M).sql.gz && echo backup-ok",
@@ -317,7 +317,7 @@ func mysqlLabels(name string) map[string]string {
 	}
 }
 
-func dbReplicas() *int32 { r := int32(1); return &r }
+func dbReplicas() *int32         { r := int32(1); return &r }
 func dbStorageClassPtr() *string { return nil } // 用集群默认 SC（kind 的 standard）
 
 // SetupWithManager sets up the controller with the Manager.

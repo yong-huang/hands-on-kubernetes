@@ -79,7 +79,11 @@ func (r *MicroServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		if err := controllerutil.SetControllerReference(&ms, cm, r.Scheme); err != nil {
 			return ctrl.Result{}, err
 		}
-		if err := r.Create(ctx, cm); err == nil { created++ } else if !apierrors.IsAlreadyExists(err) { return ctrl.Result{}, err }
+		if err := r.Create(ctx, cm); err == nil {
+			created++
+		} else if !apierrors.IsAlreadyExists(err) {
+			return ctrl.Result{}, err
+		}
 	}
 
 	// 2. Deployment
@@ -104,7 +108,11 @@ func (r *MicroServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	if err := controllerutil.SetControllerReference(&ms, dep, r.Scheme); err != nil {
 		return ctrl.Result{}, err
 	}
-	if err := r.Create(ctx, dep); err == nil { created++ } else if !apierrors.IsAlreadyExists(err) { return ctrl.Result{}, err }
+	if err := r.Create(ctx, dep); err == nil {
+		created++
+	} else if !apierrors.IsAlreadyExists(err) {
+		return ctrl.Result{}, err
+	}
 
 	// 3. Service
 	svc := &corev1.Service{
@@ -117,7 +125,11 @@ func (r *MicroServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	if err := controllerutil.SetControllerReference(&ms, svc, r.Scheme); err != nil {
 		return ctrl.Result{}, err
 	}
-	if err := r.Create(ctx, svc); err == nil { created++ } else if !apierrors.IsAlreadyExists(err) { return ctrl.Result{}, err }
+	if err := r.Create(ctx, svc); err == nil {
+		created++
+	} else if !apierrors.IsAlreadyExists(err) {
+		return ctrl.Result{}, err
+	}
 
 	// 4. Ingress（可选）
 	if ms.Spec.IngressHost != "" {
@@ -142,7 +154,9 @@ func (r *MicroServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		if err := controllerutil.SetControllerReference(&ms, ing, r.Scheme); err != nil {
 			return ctrl.Result{}, err
 		}
-		if err := r.Create(ctx, ing); err == nil { created++ }
+		if err := r.Create(ctx, ing); err == nil {
+			created++
+		}
 	}
 
 	// status 回写
@@ -150,7 +164,7 @@ func (r *MicroServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	_ = r.Get(ctx, client.ObjectKeyFromObject(dep), &live)
 	cond := metav1.Condition{
 		Type: "Ready", Status: metav1.ConditionTrue, Reason: "StackDeployed",
-		Message: fmt.Sprintf("%d resources created", created),
+		Message:            fmt.Sprintf("%d resources created", created),
 		ObservedGeneration: ms.Generation, LastTransitionTime: metav1.Now(),
 	}
 	meta.SetStatusCondition(&ms.Status.Conditions, cond)

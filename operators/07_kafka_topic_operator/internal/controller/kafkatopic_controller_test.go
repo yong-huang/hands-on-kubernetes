@@ -54,7 +54,11 @@ var _ = Describe("KafkaTopic Controller", func() {
 						Name:      resourceName,
 						Namespace: resourceNamespace,
 					},
-					// TODO(user): Specify other spec details if needed.
+					Spec: kafkav1.KafkaTopicSpec{
+						Partitions:        1,
+						ReplicationFactor: 1,
+						BootstrapServers:  "kafka.mart.svc:9092",
+					},
 				}
 				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
 			}

@@ -54,7 +54,12 @@ var _ = Describe("Canary Controller", func() {
 						Name:      resourceName,
 						Namespace: resourceNamespace,
 					},
-					// TODO(user): Specify other spec details if needed.
+					Spec: deliveryv1.CanarySpec{
+						TargetRef:   "test-target",
+						StableImage: "nginx:1.27",
+						CanaryImage: "nginx:1.28",
+						Steps:       []deliveryv1.CanaryStep{{Weight: 20}},
+					},
 				}
 				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
 			}

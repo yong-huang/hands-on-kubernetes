@@ -109,7 +109,7 @@ func (r *NginxProxyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	changed := np.Status.ConfigHash != confHash || np.Status.ObservedGeneration != np.Generation
 	cond := metav1.Condition{
 		Type: "Ready", Status: metav1.ConditionTrue, Reason: "Deployed",
-		Message: fmt.Sprintf("config %s deployed", confHash),
+		Message:            fmt.Sprintf("config %s deployed", confHash),
 		ObservedGeneration: np.Generation, LastTransitionTime: metav1.Now(),
 	}
 	meta.SetStatusCondition(&np.Status.Conditions, cond)

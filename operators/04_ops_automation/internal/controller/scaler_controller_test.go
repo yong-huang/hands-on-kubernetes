@@ -54,7 +54,12 @@ var _ = Describe("Scaler Controller", func() {
 						Name:      resourceName,
 						Namespace: resourceNamespace,
 					},
-					// TODO(user): Specify other spec details if needed.
+					Spec: opsv1.ScalerSpec{
+						TargetName: "test-target",
+						Schedules: []opsv1.ScaleSchedule{
+							{Cron: "* * * * *", Replicas: 1},
+						},
+					},
 				}
 				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
 			}

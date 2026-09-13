@@ -60,9 +60,9 @@ func (r *PyTorchJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	hsvc := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: pj.Name + "-h", Namespace: pj.Namespace, Labels: ptLabels(pj.Name)},
 		Spec: corev1.ServiceSpec{
-			ClusterIP: "None",
-			Selector:  ptLabels(pj.Name),
-			Ports:     []corev1.ServicePort{{Name: "torch", Port: 29500}},
+			ClusterIP:                "None",
+			Selector:                 ptLabels(pj.Name),
+			Ports:                    []corev1.ServicePort{{Name: "torch", Port: 29500}},
 			PublishNotReadyAddresses: true,
 		},
 	}
@@ -115,7 +115,7 @@ func (r *PyTorchJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	// status 回写
 	cond := metav1.Condition{
 		Type: "Ready", Status: metav1.ConditionTrue, Reason: "DistributedTraining",
-		Message: fmt.Sprintf("master + %d workers 编排完成", workerCount),
+		Message:            fmt.Sprintf("master + %d workers 编排完成", workerCount),
 		ObservedGeneration: pj.Generation, LastTransitionTime: metav1.Now(),
 	}
 	meta.SetStatusCondition(&pj.Status.Conditions, cond)
@@ -145,8 +145,8 @@ func ptWorkerSpec(name, image string, cmd []string, count int32) appsv1.Deployme
 			ObjectMeta: metav1.ObjectMeta{Labels: ptLabels(name + "-worker")},
 			Spec: corev1.PodSpec{
 				Containers: []corev1.Container{{
-					Name:  "torch",
-					Image: image,
+					Name:    "torch",
+					Image:   image,
 					Command: append([]string{"torchrun", "--nproc_per_node=1"}, cmd...),
 					Env: []corev1.EnvVar{
 						{Name: "MASTER_ADDR", Value: name + "-master"},

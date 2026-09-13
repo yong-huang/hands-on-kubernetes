@@ -54,7 +54,10 @@ var _ = Describe("NginxProxy Controller", func() {
 						Name:      resourceName,
 						Namespace: resourceNamespace,
 					},
-					// TODO(user): Specify other spec details if needed.
+					Spec: webv1.NginxProxySpec{
+						Upstreams: []webv1.Upstream{{Name: "up1", Servers: []string{"127.0.0.1:8080"}}},
+						Locations: []webv1.Location{{Path: "/", Upstream: "up1"}},
+					},
 				}
 				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
 			}

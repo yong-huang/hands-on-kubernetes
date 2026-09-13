@@ -81,17 +81,17 @@ type MicroServiceStatus struct {
 
 // MicroService is the Schema for the microservices API
 type MicroService struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
-	Spec MicroServiceSpec `json:"spec"`
-	Status MicroServiceStatus `json:"status,omitempty"`
+	Spec              MicroServiceSpec   `json:"spec"`
+	Status            MicroServiceStatus `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 type MicroServiceList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitzero"`
-	Items []MicroService `json:"items"`
+	Items           []MicroService `json:"items"`
 }
 
 // DeploySpec 引用 appsv1.DeploymentSpec 的模板（保持与 appsv1 的一致性）

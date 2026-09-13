@@ -49,12 +49,16 @@ var _ = Describe("MicroService Controller", func() {
 			By("creating the custom resource for the Kind MicroService")
 			err := k8sClient.Get(ctx, typeNamespacedName, microservice)
 			if err != nil && errors.IsNotFound(err) {
+				replicas := int32(1)
 				resource := &platformv1.MicroService{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      resourceName,
 						Namespace: resourceNamespace,
 					},
-					// TODO(user): Specify other spec details if needed.
+					Spec: platformv1.MicroServiceSpec{
+						Image:    "nginx:1.27",
+						Replicas: &replicas,
+					},
 				}
 				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
 			}

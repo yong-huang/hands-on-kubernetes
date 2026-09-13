@@ -64,17 +64,17 @@ type PyTorchJobStatus struct {
 
 // PyTorchJob is the Schema for the pytorchjobs API
 type PyTorchJob struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
-	Spec PyTorchJobSpec `json:"spec"`
-	Status PyTorchJobStatus `json:"status,omitempty"`
+	Spec              PyTorchJobSpec   `json:"spec"`
+	Status            PyTorchJobStatus `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 type PyTorchJobList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitzero"`
-	Items []PyTorchJob `json:"items"`
+	Items           []PyTorchJob `json:"items"`
 }
 
 func init() {

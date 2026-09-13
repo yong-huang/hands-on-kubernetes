@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"time"
 
+	cronlib "github.com/robfig/cron/v3"
 	appsv1 "k8s.io/api/apps/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -30,7 +31,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	cronlib "github.com/robfig/cron/v3"
 
 	opsv1 "example.com/ops-automation/api/v1"
 )

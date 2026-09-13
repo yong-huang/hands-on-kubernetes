@@ -70,17 +70,17 @@ type NginxProxyStatus struct {
 
 // NginxProxy is the Schema for the nginxproxies API
 type NginxProxy struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitzero"`
-	Spec NginxProxySpec `json:"spec"`
-	Status NginxProxyStatus `json:"status,omitempty"`
+	Spec              NginxProxySpec   `json:"spec"`
+	Status            NginxProxyStatus `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 type NginxProxyList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitzero"`
-	Items []NginxProxy `json:"items"`
+	Items           []NginxProxy `json:"items"`
 }
 
 func init() {

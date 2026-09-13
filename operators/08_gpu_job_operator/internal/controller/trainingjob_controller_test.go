@@ -54,7 +54,11 @@ var _ = Describe("TrainingJob Controller", func() {
 						Name:      resourceName,
 						Namespace: resourceNamespace,
 					},
-					// TODO(user): Specify other spec details if needed.
+					Spec: aiv1.TrainingJobSpec{
+						Image:    "pytorch/pytorch:2.3.0-cuda12.1-cudnn8-runtime",
+						Command:  []string{"sleep", "1"},
+						GPUCount: 1,
+					},
 				}
 				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
 			}

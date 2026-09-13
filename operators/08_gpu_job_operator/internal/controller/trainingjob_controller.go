@@ -24,8 +24,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -69,7 +69,7 @@ func (r *TrainingJobReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		job := &batchv1.Job{
 			ObjectMeta: metav1.ObjectMeta{Name: jobName, Namespace: tj.Namespace},
 			Spec: batchv1.JobSpec{
-				BackoffLimit: &[]int32{3}[0],
+				BackoffLimit:            &[]int32{3}[0],
 				TTLSecondsAfterFinished: tj.Spec.TTLSecondsAfterFinished,
 				Template: corev1.PodTemplateSpec{
 					Spec: corev1.PodSpec{
@@ -98,7 +98,7 @@ func (r *TrainingJobReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		}
 		meta.SetStatusCondition(&tj.Status.Conditions, metav1.Condition{
 			Type: "Created", Status: metav1.ConditionTrue, Reason: "JobCreated",
-			Message: fmt.Sprintf("Job %s created with %d GPU", jobName, tj.Spec.GPUCount),
+			Message:            fmt.Sprintf("Job %s created with %d GPU", jobName, tj.Spec.GPUCount),
 			ObservedGeneration: tj.Generation, LastTransitionTime: metav1.Now(),
 		})
 		tj.Status.Phase = "Running"
@@ -120,7 +120,7 @@ func (r *TrainingJobReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		tj.Status.Phase = "Running"
 	}
 	tj.Status.JobName = jobName
-	changed := tj.Status.Phase != "" 
+	changed := tj.Status.Phase != ""
 	if changed {
 		if err := r.Status().Update(ctx, &tj); err != nil {
 			return ctrl.Result{}, err
@@ -134,7 +134,6 @@ func (r *TrainingJobReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 func int32ToQuantity(n int32) resource.Quantity {
 	return resource.MustParse(fmt.Sprintf("%d", n))
 }
-
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *TrainingJobReconciler) SetupWithManager(mgr ctrl.Manager) error {

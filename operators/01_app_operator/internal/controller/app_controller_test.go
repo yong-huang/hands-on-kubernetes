@@ -49,12 +49,16 @@ var _ = Describe("App Controller", func() {
 			By("creating the custom resource for the Kind App")
 			err := k8sClient.Get(ctx, typeNamespacedName, app)
 			if err != nil && errors.IsNotFound(err) {
+				replicas := int32(1)
 				resource := &appv1.App{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      resourceName,
 						Namespace: resourceNamespace,
 					},
-					// TODO(user): Specify other spec details if needed.
+					Spec: appv1.AppSpec{
+						Image:    "nginx:1.27",
+						Replicas: &replicas,
+					},
 				}
 				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
 			}

@@ -69,17 +69,17 @@ type KafkaTopicStatus struct {
 
 // KafkaTopic is the Schema for the kafkatopics API
 type KafkaTopic struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
-	Spec KafkaTopicSpec `json:"spec"`
-	Status KafkaTopicStatus `json:"status,omitempty"`
+	Spec              KafkaTopicSpec   `json:"spec"`
+	Status            KafkaTopicStatus `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 type KafkaTopicList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items []KafkaTopic `json:"items"`
+	Items           []KafkaTopic `json:"items"`
 }
 
 func init() {

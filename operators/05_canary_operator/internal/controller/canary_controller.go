@@ -165,9 +165,9 @@ func (r *CanaryReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 func canaryLabels(name, role string) map[string]string {
 	return map[string]string{
-		"app.kubernetes.io/name":     name,
+		"app.kubernetes.io/name":       name,
 		"app.kubernetes.io/managed-by": "canary-operator",
-		"app.kubernetes.io/role":     role,
+		"app.kubernetes.io/role":       role,
 	}
 }
 

@@ -63,17 +63,17 @@ type TrainingJobStatus struct {
 
 // TrainingJob is the Schema for the trainingjobs API
 type TrainingJob struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
-	Spec TrainingJobSpec `json:"spec"`
-	Status TrainingJobStatus `json:"status,omitempty"`
+	Spec              TrainingJobSpec   `json:"spec"`
+	Status            TrainingJobStatus `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 type TrainingJobList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitzero"`
-	Items []TrainingJob `json:"items"`
+	Items           []TrainingJob `json:"items"`
 }
 
 func init() {
