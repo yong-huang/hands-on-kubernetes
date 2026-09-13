@@ -28,6 +28,10 @@ header "0. 环境检查"
 kubectl cluster-info | head -1
 kubectl get nodes -o wide
 
+# ---------- 0. 清理残留 Pod ----------
+# 上次运行的残留 Pod（旧 spec）会让 apply 报 Forbidden，先删干净
+kubectl delete pod nginx-sidecar-pod -n "$NS" --ignore-not-found
+
 # ---------- 1. 应用清单并观察状态变化 ----------
 header "1. 创建 Pod（apply）"
 step "应用 pod.yaml，包含 4 个 Pod 示例"

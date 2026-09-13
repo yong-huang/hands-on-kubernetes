@@ -26,7 +26,7 @@ deploy() {
     kubectl get svc
     # 预期：
     #   nginx-clusterip     ClusterIP   10.96.x.x    80/TCP
-    #   nginx-nodeport      NodePort    10.96.x.x    80:30080/TCP
+    #   nginx-nodeport      NodePort    10.96.x.x    80:30090/TCP
     #   nginx-loadbalancer  LoadBalancer 10.96.x.x   80:31xxx/TCP (EXTERNAL-IP <pending> 本地环境)
     #   nginx-headless      ClusterIP   None         80/TCP  ← 无 VIP！
 }
@@ -44,10 +44,10 @@ test_access() {
     kubectl logs curl-test 2>/dev/null || true
     kubectl delete pod curl-test --ignore-not-found=true >/dev/null
 
-    step "2) NodePort 访问：通过节点 IP:30080（需要本地集群，minikube/kind）"
+    step "2) NodePort 访问：通过节点 IP:30090（需要本地集群，minikube/kind）"
     NODE_IP=$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}' 2>/dev/null || true)
     if [ -n "${NODE_IP}" ]; then
-        curl -s -o /dev/null -w "HTTP %{http_code}\n" "http://${NODE_IP}:30080/" || warn "节点 IP 不可达（可能是 kind/docker 网络）"
+        curl -s -o /dev/null -w "HTTP %{http_code}\n" "http://${NODE_IP}:30090/" || warn "节点 IP 不可达（可能是 kind/docker 网络）"
     else
         warn "拿不到节点 InternalIP，可用 kubectl port-forward svc/nginx-nodeport 8080:80 自行验证"
     fi
