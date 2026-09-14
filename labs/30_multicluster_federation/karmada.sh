@@ -9,6 +9,20 @@ set -euo pipefail
 cd "$(dirname "$0")"   # 切到实验根目录, 使 manifests/ 相对路径生效
 step() { echo; echo "=====> [$1] $2"; }
 
+# 访问成员集群: 优先用默认 kubeconfig 里的 <cluster> context;
+# 没有则回退到 kind export 出来的 ~/.kube/kind-config-<cluster> (context 名为 kind-<cluster>)
+member_kubectl() {
+    local cluster="$1"; shift
+    if kubectl config get-contexts -o name 2>/dev/null | grep -qx "$cluster"; then
+        kubectl --context "$cluster" "$@"
+    elif [ -f "$HOME/.kube/kind-config-$cluster" ]; then
+        kubectl --kubeconfig "$HOME/.kube/kind-config-$cluster" "$@"
+    else
+        echo "[error] 找不到成员集群 $cluster 的 kubeconfig" >&2
+        return 1
+    fi
+}
+
 do_install() {
     step "install" "安装 Karmada 控制面 (karmadactl 一键)"
     # curl -s https://raw.githubusercontent.com/karmada-io/karmada/master/hack/local-up-karmada.sh | bash
@@ -25,10 +39,30 @@ do_join() {
     kubectl --context karmada-apiserver get clusters
 }
 
+# OrbStack/Docker 重启后容器 IP 会变, 成员端点会失效 -> READY=False。
+# 本步骤自动探测成员 control-plane 容器的当前 IP 并回写 Cluster.apiEndpoint。
+do_endpoints() {
+    step "endpoints" "自动修正成员集群端点 (应对容器 IP 变化)"
+    for cluster in member-us member-ap; do
+        local cid="${cluster}-control-plane" ip
+        ip="$(docker inspect "$cid" --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' 2>/dev/null || true)"
+        if [ -z "$ip" ]; then
+            echo "  [warn] 探测不到容器 $cid (集群是否已创建?)" >&2
+            continue
+        fi
+        kubectl --context karmada-apiserver patch cluster "$cluster" --type merge \
+            -p "{\"spec\":{\"apiEndpoint\":\"https://${ip}:6443\"}}" >/dev/null
+        echo "  ${cluster} -> https://${ip}:6443"
+    done
+    echo "  等 15s 让状态控制器刷新..."
+    sleep 15
+    kubectl --context karmada-apiserver get clusters
+}
+
 do_apply() {
     step "apply" "提交应用 + 分发策略 (只提交一次)"
     kubectl --context karmada-apiserver create ns federation-demo \
-        --dry-run=client -o yaml | kubectl apply -f -
+        --dry-run=client -o yaml | kubectl --context karmada-apiserver apply -f -
     kubectl --context karmada-apiserver apply -f manifests/karmada.yaml
 
     step "apply" "ResourceBinding 展示调度结果 (us=4, ap=2)"
@@ -36,8 +70,8 @@ do_apply() {
         -n federation-demo -o wide
 
     step "apply" "分别到两个成员集群验证实际副本"
-    kubectl --context member-us -n federation-demo get deploy geo-app
-    kubectl --context member-ap -n federation-demo get deploy geo-app
+    member_kubectl member-us -n federation-demo get deploy geo-app
+    member_kubectl member-ap -n federation-demo get deploy geo-app
 }
 
 do_scale() {
@@ -66,7 +100,7 @@ do_failover() {
 }
 
 case "${1:-all}" in
-    install) do_install ;; join) do_join ;; apply) do_apply ;;
-    scale)   do_scale   ;; failover) do_failover ;;
-    all)     do_install; do_join; do_apply ;;
+    install) do_install ;; join) do_join ;; endpoints) do_endpoints ;;
+    apply)   do_apply  ;; scale) do_scale  ;; failover) do_failover ;;
+    all)     do_install; do_join; do_endpoints; do_apply ;;
 esac

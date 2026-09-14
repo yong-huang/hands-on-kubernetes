@@ -107,7 +107,9 @@ do_pause() {
 # ----------------------------- 6. 清理 -----------------------------
 do_clean() {
     step "clean" "删除本演示创建的所有资源"
-    kubectl delete -f manifests/deploy.yaml --wait=true
+    kubectl delete -f manifests/deploy.yaml --wait=true --ignore-not-found=true
+    # --wait 只覆盖清单里的 Deployment；级联删除的 Pod 是异步的，等它们真正消失
+    kubectl wait --for=delete pod -l "${LABEL}" -n "${NAMESPACE}" --timeout=120s || true
     kubectl get deploy,rs,pods -l "${LABEL}" -n "${NAMESPACE}" || true
 }
 

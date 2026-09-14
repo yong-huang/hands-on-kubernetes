@@ -19,9 +19,16 @@ step() { echo; echo "=====> [$1] $2"; }
 do_install() {
     step "install" "安装 trivy-operator (漏洞扫描器)"
     helm repo add aqua https://aquasecurity.github.io/helm-charts >/dev/null 2>&1 || true
+    # 默认 DB 源 mirror.gcr.io 在国内常下载失败 (unexpected EOF)。
+    # 改用 ghcr.io 上的正确仓库名 aquasecurity/trivy-db (注意不是 aquasec!)。
+    # 若 ghcr.io 也不可达, 可换成你的镜像源 (如 <mirror>/aquasecurity/trivy-db)。
     helm upgrade --install trivy-operator aqua/trivy-operator \
         --namespace trivy-system --create-namespace \
-        --set trivy.ignoreUnfixed=true          # 只报有修复版本的 CVE
+        --set trivy.ignoreUnfixed=true \
+        --set trivy.dbRegistry=ghcr.io \
+        --set trivy.dbRepository=aquasecurity/trivy-db \
+        --set trivy.javaDbRegistry=ghcr.io \
+        --set trivy.javaDbRepository=aquasecurity/trivy-java-db
 
     step "install" "安装 kyverno (策略引擎)"
     helm repo add kyverno https://kyverno.github.io/kyverno >/dev/null 2>&1 || true

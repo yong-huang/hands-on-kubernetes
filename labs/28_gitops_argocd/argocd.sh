@@ -125,6 +125,15 @@ do_app() {
 # ----------------------------- 2. 查看状态 -----------------------------
 do_status() {
     step "status" "ArgoCD 视角的应用健康/同步状态"
+    # Application 刚创建时 status 还为空, 等同步结果出现 (Git 仓库在墙外, 首次拉取可能较慢)
+    echo "[info] 等待 ArgoCD 完成首次同步 (最多 180s)..."
+    for i in $(seq 1 36); do
+        local sync_status
+        sync_status="$(kubectl -n "${ARGOCD_NS}" get application guestbook \
+            -o jsonpath='{.status.sync.status}' 2>/dev/null || true)"
+        [[ -n "${sync_status}" ]] && break
+        sleep 5
+    done
     kubectl get applications -n "${ARGOCD_NS}" \
         -o custom-columns='NAME:.metadata.name,SYNC:.status.sync.status,HEALTH:.status.health.status'
 

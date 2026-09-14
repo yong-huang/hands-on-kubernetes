@@ -43,7 +43,9 @@ spec:
             limits: {memory: 128Mi}
 ---
 # 2. Trivy Operator 扫描产物示例: VulnerabilityReport (节选字段)
-#    真实报告由 trivy-operator 自动生成, 这里手工展示其数据结构
+#    真实报告由 trivy-operator 自动生成, 这里仅作结构示意。
+#    注意: 标签用 tier=example 而非 tier=app —— 否则会被
+#    `kubectl apply -l tier=app` 选中, 而新版 CRD 要求字段齐全导致 apply 失败。
 apiVersion: aquasecurity.github.io/v1alpha1
 kind: VulnerabilityReport
 metadata:
@@ -51,7 +53,7 @@ metadata:
   namespace: imgsec-demo
   labels:
     resource-spec-vendor: trivy-operator
-    tier: app
+    tier: example
 report:
   artifact: {repository: library/nginx, tag: "1.14.2"}
   summary:

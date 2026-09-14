@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 # ============================================================
 # 01_setup_env: 使用 kind 搭建本地 Kubernetes 学习环境
-# 流程: 检查依赖 -> 生成集群配置 -> 创建集群 -> 验证 -> 部署测试负载
-# 用法: ./setup.sh [up|down|test]
+# 流程: 检查依赖 -> 生成集群配置(含 containerd 镜像源) -> 创建集群 -> 验证 -> 部署测试负载
+# 用法: ./setup.sh [up|down|load]
+#   up   完整搭建 (默认)
+#   down 删除集群
+#   load 离线兜底: 宿主机拉镜像再灌入节点 (镜像源不可用时用)
 # ============================================================
 set -euo pipefail
 
@@ -40,16 +43,25 @@ check_deps() {
 # ---------- Step 2: 生成 kind 集群配置 ----------
 gen_config() {
     echo "========== Step 2: 生成 ${CONFIG_FILE} =========="
+    # containerdConfigPatches: 给节点内的 containerd 配国内镜像源。
+    # 实测 kind 节点只有 docker.io 不可达(直连 TLS 超时); quay.io/ghcr.io/
+    # gcr.io/registry.k8s.io 均可直连, 无需镜像源(反而拖慢)。配好 docker.io
+    # 镜像源后 kubelet 可直接拉镜像, 摆脱 "宿主机 save -> ctr import"。
+    # 个别仍不稳定的仓库(如 quay.io cert-manager), 用 scripts/load_images.sh 预载。
     cat > "${CONFIG_FILE}" <<EOF
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 name: ${CLUSTER_NAME}
+containerdConfigPatches:
+  - |-
+    [plugins."io.containerd.grpc.v1.cri".registry.mirrors."docker.io"]
+      endpoint = ["https://docker.m.daocloud.io"]
 nodes:
   - role: control-plane   # 1 个控制面节点
   - role: worker          # 2 个工作节点
   - role: worker
 EOF
-    echo "[done] 配置已写入 ${CONFIG_FILE}"
+    echo "[done] 配置已写入 ${CONFIG_FILE} (含 containerd 镜像源)"
 }
 
 # ---------- Step 3: 创建集群 ----------
@@ -71,9 +83,9 @@ verify() {
     kubectl wait --for=condition=Ready nodes --all --timeout=180s
 }
 
-# ---------- Step 5: 预加载镜像 (国内网络绕过 Docker Hub) ----------
-# kind 节点内拉取 docker.io 会 TLS 超时。改为: 宿主机从镜像源拉取 -> 导入节点。
-# 非 latest 标签的 imagePullPolicy 默认 IfNotPresent, 节点有镜像就不会再拉。
+# ---------- Step 5: 预加载测试镜像 (离线兜底, 平时无需执行) ----------
+# 集群已通过 containerdConfigPatches 配好镜像源, kubelet 能直接拉取。
+# 仅当镜像源不可用(如完全离线)才需要: 宿主机拉镜像 -> ctr import 灌入节点。
 load_test_image() {
     echo "========== Step 5: 预加载测试镜像 ${TEST_IMAGE} =========="
     # 5.1 宿主机从镜像源拉取 (已存在则跳过)

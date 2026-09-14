@@ -93,8 +93,9 @@ clusterTolerations:
 
 ```bash
 # 1. 两个成员集群 (kubeconfig 落到独立文件, 供 karmadactl join 使用)
-kind create cluster --name member-us --kubeconfig ~/.kube/kind-config-member-us
-kind create cluster --name member-ap --kubeconfig ~/.kube/kind-config-member-ap
+#    用仓库根的 kind-cluster.sh 建集群, 自动注入 containerd 镜像源避免节点拉镜像超时
+../../scripts/kind-cluster.sh member-us 1 1
+../../scripts/kind-cluster.sh member-ap 1 1
 
 # 2. 在 host 集群(k8s-learn)上安装 Karmada 控制面 (需 karmadactl)
 karmadactl init --kubeconfig ~/.kube/config --context kind-k8s-learn \
@@ -110,7 +111,9 @@ KUBECONFIG=~/.karmada-data/karmada-apiserver.config \
 
 # 4. OrbStack 注意: 容器网络宿主机可达性因环境而异
 #    - 成员集群 kubeconfig 里的 127.0.0.1:PORT 端点 host 集群内的控制器够不着,
-#      需把 Cluster 对象与 karmada-cluster/<name> secret 的端点改成控制面容器 IP:6443
+#      需把 Cluster 对象端点改成控制面容器 IP:6443
+#    - 已内置自动修正: ./karmada.sh endpoints 会探测容器 IP 并回写端点
+#      (OrbStack/Docker 重启后容器 IP 会变, 重跑这一步即可恢复 READY=True)
 #    - karmada-apiserver 若不可直达, 可 port-forward 后把 kubeconfig 的 server 指到 127.0.0.1
 #    验证: kubectl --context karmada-apiserver get clusters  # READY=True 才算成功
 ```

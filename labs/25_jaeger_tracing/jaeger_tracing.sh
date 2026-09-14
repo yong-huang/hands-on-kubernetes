@@ -13,14 +13,39 @@ OTEL_OPERATOR_VER="v0.158.0"
 step() { echo; echo "=====> [$1] $2"; }
 
 do_install() {
+    # GitHub 直连在国内常超时; 优先用本目录缓存清单, 无缓存才联网下载。
+    # 缓存获取方式 (任选):
+    #   curl -L -o cert-manager-cache.yaml \
+    #     https://github.com/cert-manager/cert-manager/releases/download/v1.18.2/cert-manager.yaml
+    #   curl -L -o otel-operator-cache.yaml \
+    #     https://github.com/open-telemetry/opentelemetry-operator/releases/download/v0.158.0/opentelemetry-operator.yaml
+    local cm_yaml="cert-manager-cache.yaml" otel_yaml="otel-operator-cache.yaml"
+    if [ ! -s "$cm_yaml" ]; then
+        cm_yaml="https://github.com/cert-manager/cert-manager/releases/download/${CERT_MANAGER_VER}/cert-manager.yaml"
+    else
+        echo "  (使用本地缓存 $cm_yaml)"
+    fi
     step "install" "安装 cert-manager (OTel Operator 的 webhook 依赖它签证书)"
-    kubectl apply -f \
-        "https://github.com/cert-manager/cert-manager/releases/download/${CERT_MANAGER_VER}/cert-manager.yaml"
+    kubectl apply -f "$cm_yaml"
+    # 必须等 webhook 也就绪, 否则后续带 cert-manager 注解的资源会因
+    # "failed calling webhook ... connection refused" 创建失败
     kubectl -n cert-manager rollout status deploy/cert-manager --timeout=300s
+    kubectl -n cert-manager rollout status deploy/cert-manager-webhook --timeout=300s
+    kubectl -n cert-manager rollout status deploy/cert-manager-cainjector --timeout=300s
 
+    if [ ! -s "$otel_yaml" ]; then
+        otel_yaml="https://github.com/open-telemetry/opentelemetry-operator/releases/download/${OTEL_OPERATOR_VER}/opentelemetry-operator.yaml"
+    else
+        echo "  (使用本地缓存 $otel_yaml)"
+    fi
     step "install" "安装 OpenTelemetry Operator"
-    kubectl apply -f \
-        "https://github.com/open-telemetry/opentelemetry-operator/releases/download/${OTEL_OPERATOR_VER}/opentelemetry-operator.yaml"
+    # webhook 就绪后仍可能短暂不可达, 重试 apply 直到成功
+    for i in 1 2 3 4 5; do
+        if kubectl apply -f "$otel_yaml"; then break; fi
+        echo "  [retry $i] cert-manager webhook 暂不可达, 8s 后重试..."
+        sleep 8
+        [ "$i" = "5" ] && { echo "[error] OTel Operator 安装失败" >&2; exit 1; }
+    done
     kubectl -n opentelemetry-operator-system rollout status \
         deploy/opentelemetry-operator-controller-manager --timeout=300s
 }

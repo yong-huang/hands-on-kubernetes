@@ -64,7 +64,7 @@ spec:
     - tracecontext          # W3C traceparent 头传播
     - baggage
   python:
-    image: ghcr.io/open-telemetry/opentelemetry-operator/auto-instrumentation-python:1.33.0
+    image: ghcr.io/open-telemetry/opentelemetry-operator/autoinstrumentation-python:0.64b0
 ---
 # 3. 三个服务共用的 Python 代码 (ConfigMap 挂载, 避免自建镜像)
 #    - http.server 起服务; 入口手动 extract traceparent 挂 server span

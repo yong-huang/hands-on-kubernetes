@@ -12,6 +12,10 @@ step() { echo; echo "=====> [$1] $2"; }
 do_deploy() {
     step "deploy" "安装 Database CRD 与示例 CR"
     kubectl create ns "$NS" --dry-run=client -o yaml | kubectl apply -f -
+    # CRD 与 CR 在同一文件: 首次 apply 建 CRD (CR 可能因端点未注册而失败),
+    # 等 CRD Established 后再次 apply 把 CR 建出来 (apply 幂等)
+    kubectl apply -f manifests/database_crd.yaml || true
+    kubectl wait --for=condition=Established crd/databases.demo.example.com --timeout=60s
     kubectl apply -f manifests/database_crd.yaml
 
     step "deploy" "kubectl 现在认识新资源类型了"

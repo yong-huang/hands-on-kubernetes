@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # ============================================================
-# 通用镜像预载脚本: 解决节点内拉取 docker.io TLS 超时问题
+# 通用镜像预载脚本(离线兜底): 仅当 containerd 镜像源不可用时使用
+# 说明: 集群创建时已通过 scripts/kind-cluster.sh 注入 containerd 镜像源,
+#       节点可直接拉镜像, 正常情况下无需本脚本。
 # 流程: 宿主机从镜像源拉取 -> docker save | ctr import 灌入所有节点
 #       -> 逐节点校验, 有缺失则以非零码退出
 # 用法: ./load_images.sh [image1 image2 ...]   (无参数时加载下面默认列表)

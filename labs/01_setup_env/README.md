@@ -95,20 +95,20 @@ kubectl wait --for=condition=Ready nodes --all --timeout=180s
 
 `kubectl wait` 是比 `sleep` 优雅得多的等待原语：轮询直到条件满足，满足即返回，不浪费一秒。
 
-### Step 5: 预载测试镜像（国内网络适配）
+### Step 5: containerd 镜像源（根治节点拉镜像超时）
 
-```bash
-docker pull docker.m.daocloud.io/library/nginx:alpine
-docker tag  docker.m.daocloud.io/library/nginx:alpine nginx:alpine
-docker save nginx:alpine | docker exec --privileged -i <node> ctr --namespace=k8s.io images import -
+kind 节点内的 containerd 直连 `docker.io` 在国内会 TLS 超时。**实测只有 docker.io 不可达**，`quay.io` / `ghcr.io` / `gcr.io` / `registry.k8s.io` 均能直连。因此只需给 `docker.io` 配 daocloud 镜像源——集群一建好，kubelet 就能直接拉 docker.io 镜像，无需任何手工导入。配置写在 `kind-config.yaml` 的 `containerdConfigPatches`（由 `setup.sh` 自动生成）：
+
+```yaml
+containerdConfigPatches:
+  - |-
+    [plugins."io.containerd.grpc.v1.cri".registry.mirrors."docker.io"]
+      endpoint = ["https://docker.m.daocloud.io"]
 ```
 
-kind 节点内直连 registry-1.docker.io 会 TLS 超时（国内网络）。绕法：宿主机从镜像源拉取 → `docker save` + `ctr images import` 灌进每个节点。非 latest 标签的 `imagePullPolicy` 默认 IfNotPresent，节点里有镜像就不会再去拉。
+验证：集群建好后 `kubectl create deployment nginx --image=nginx:alpine`，Pod 直接 Running——节点自己就把镜像拉下来了。
 
-两点细节：
-
-- 没用 `kind load docker-image`，是因为它对部分镜像源导出的 manifest 会报 digest not found，`ctr images import` 最稳。
-- 全系列通用的预载脚本在仓库根：`scripts/load_images.sh`（带默认镜像列表，也可 `./load_images.sh img1 img2` 自定义）。本实验脚本内联了单镜像版本，方便看清原理。
+> **个别仍不稳定的仓库**（如 quay.io 的 cert-manager / argocd，即便有镜像源也可能时好时坏）：若节点拉取超时，用仓库根 `scripts/load_images.sh` 从宿主机预载（宿主机直连那些仓库通常可达）。离线兜底同理——宿主机拉 → `docker save` + `ctr images import` 灌入每个节点。
 
 ### Step 6: 部署测试负载
 
@@ -165,5 +165,5 @@ NodePort 也无法直接从宿主机访问（节点在容器网络里，端口�
 - kind = Docker 容器当节点的真实 kubeadm 集群，官方 CI 同款，学习/CI 首选
 - 多节点拓扑只是配置文件里多几行 `role: worker`；多集群本质是 kubeconfig 里的多个 context
 - `set -euo pipefail` + 函数分步 + `kubectl wait`，让脚本可重复执行、失败即停
-- 国内网络的镜像问题用"镜像源拉取 + `ctr import` 灌节点"统一解决，全系列复用 `scripts/load_images.sh`
+- 国内网络的镜像问题用 containerd 镜像源根治（`kind-config.yaml` 里的 `containerdConfigPatches`），无需逐镜像导入
 - 环境搭好只是起点：后续实验从 Pod 出发，逐层深入 Deployment / Service / 存储与生态组件

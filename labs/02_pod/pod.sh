@@ -109,7 +109,7 @@ kubectl get pod probe-demo-pod -n "$NS" \
 # ---------- 7. 清理 ----------
 header "7. 清理资源"
 step "删除本次创建的所有 Pod"
-kubectl delete -f "$MANIFEST" -n "$NS"
+kubectl delete -f "$MANIFEST" -n "$NS" --wait=true   # 等 Pod 真正消失，不留 Terminating
 
 step "确认清理完成"
 kubectl get pods -n "$NS"
