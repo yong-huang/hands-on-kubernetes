@@ -93,7 +93,7 @@ Command: []string{
     └── redis_replication.svg                # 双主题矢量版（本文档 §2 内嵌）
 ```
 
-## 7. 面试要点
+## 7. 深入要点
 
 1. **为什么主库用 Deployment、从库用 StatefulSet**：主库单副本无状态身份需求，
    Deployment 够用；从库用 STS 是为了稳定序号 + 有序扩缩——虽然本例从库无持久化，

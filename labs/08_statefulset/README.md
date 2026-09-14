@@ -106,7 +106,7 @@ PVC 名 = <模板名>-<Pod名>   =>   data-web-0 / data-web-1 / data-web-2
     └── sts_ordering.svg          # 双主题矢量版   
 ```
 
-## 9. 面试要点
+## 9. 深入要点
 
 1. **三大保证**：(a) 稳定网络标识——Pod 名与 `<pod>.<svc>.<ns>.svc.cluster.local` 域名跨重建不变；(b) 稳定持久化标识——每副本专属 PVC，重建后重新绑回原 PV；(c) 有序部署/删除——正序创建（前一个 Ready 才建下一个）、逆序删除。
 2. **为什么必须 Headless Service**：普通 Service 的 VIP 随机分发，无法指定实例；有状态应用必须按名寻址（连主库 web-0、从库连指定主库）。Headless 让 DNS 直接解析出每个 Pod 的 A 记录，"按 Pod 名寻址"才成为可能。

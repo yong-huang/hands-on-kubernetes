@@ -100,7 +100,7 @@ spec:
 
 > 🌐 **交互版**：[在线打开（GitHub Pages）](https://yong-huang.github.io/hands-on-kubernetes/labs/20_pod_security/images/psa_matrix.html)（或本地打开 [`images/psa_matrix.html`](images/psa_matrix.html)）。
 
-## 7. 面试要点
+## 7. 深入要点
 
 1. **enforce vs audit vs warn**：enforce 违规直接拒绝（Forbidden）；audit 照常创建但在审计日志记录事件；warn 照常创建但通过 API 响应的 warnings 字段提示调用方。三者可同时配置不同等级，例如 enforce=baseline + warn=restricted，先硬挡最危险的、再软提示更高的目标。
 2. **baseline 禁了什么**：面向"明显越权"——特权容器、宿主命名空间（hostNetwork/hostPID/hostIPC）、hostPath 及 /proc、/sys 等危险挂载、新增 capabilities、hostPorts。注意 baseline **不管** root 运行、capabilities 保留集和 seccomp，这些是 restricted 的职责。

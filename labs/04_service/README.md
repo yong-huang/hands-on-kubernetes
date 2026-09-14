@@ -106,7 +106,7 @@ ports:
     └── service_dns.svg          # 双主题矢量版        
 ```
 
-## 7. 面试要点
+## 7. 深入要点
 
 **Q1：Service 如何找到 Pod？**
 通过 `selector` 匹配 Pod label → Endpoints Controller 把 Ready Pod 的 IP:port 写入 Endpoints 对象 → kube-proxy 依据 Endpoints 在节点上同步转发规则。排查时先看 `kubectl get endpoints`。

@@ -100,7 +100,7 @@ kind 集群自带的 `standard` StorageClass 由 rancher/local-path-provisioner 
 
 > 🌐 **交互版**：[在线打开（GitHub Pages）](https://yong-huang.github.io/hands-on-kubernetes/labs/16_storageclass/images/sc_provisioning.html)（或本地打开 [`images/sc_provisioning.html`](images/sc_provisioning.html)）。
 
-## 7. 面试要点
+## 7. 深入要点
 
 1. **动态绑定的完整流程**：用户创建 PVC（指定 SC 或留空用默认）→ PV controller 发现该 PVC 无 PV 可绑且 SC 有 provisioner → 等待绑定条件满足（WFFC 时等 Pod 调度）→ external-provisioner/CSI sidecar 调供给器建卷 → 生成 PV 对象 → 控制器把 PV 与 PVC 绑定（claimRef）→ kubelet 挂载。全程无人工介入。
 2. **WaitForFirstConsumer 为什么存在**：为了拓扑正确。云盘绑定可用区、local 盘绑定节点，只有先知道 Pod 调度到哪，才能把卷建在"够得着"的地方；Immediate 先建卷后调度，可能跨区导致永久挂载失败。

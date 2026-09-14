@@ -149,7 +149,7 @@ kubectl -n kube-system rollout status ds/calico-node
 
 > 🌐 **交互版**：[在线打开（GitHub Pages）](https://yong-huang.github.io/hands-on-kubernetes/labs/12_network_policy/images/netpol_isolation.html)（或本地打开 [`images/netpol_isolation.html`](images/netpol_isolation.html)）。
 
-## 7. 面试要点
+## 7. 深入要点
 
 1. **NetworkPolicy 由谁执行？** CNI 插件（Calico/Cilium 等），不是 API server、不是 kube-proxy。API server 只负责存储和校验对象；节点上的 CNI 把策略编程成 iptables/IPSet 或 eBPF 规则。所以 kindnet 这类不支持策略的 CNI 下，对象能创建但毫无效果——"写了策略≠有隔离"，换 CNI 前需验证。
 2. **Pod 一旦被 Ingress 策略选中，其他流量全拒绝吗？** 是的。该方向一旦存在选中它的策略，就从"默认全放行"切换为"只放行规则匹配的流量"；多条策略之间是并集叠加，且 K8s 原生没有 deny 规则（黑名单需 CNI 扩展实现）。没有被任何策略选中的 Pod 该方向保持全放行。

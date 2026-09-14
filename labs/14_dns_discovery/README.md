@@ -126,7 +126,7 @@ nslookup kube-dns.kube-system.svc.cluster.local -> 10.96.0.10
 
 > 🌐 **交互版**：[在线打开（GitHub Pages）](https://yong-huang.github.io/hands-on-kubernetes/labs/14_dns_discovery/images/dns_resolution.html)（或本地打开 [`images/dns_resolution.html`](images/dns_resolution.html)）。
 
-## 7. 面试要点
+## 7. 深入要点
 
 1. **ndots:5 的坑**：外部域名如 `api.github.com` 只有 2 个点 < 5，解析器会先把它拼上 3 个搜索域各查一遍（全部 NXDOMAIN），最后才查绝对域名——一次本可直接命中的解析变成了 4 次查询。高频外部调用的优化手段：用 `dnsConfig` 调低 ndots、写全 FQDN、或结尾加点（`api.github.com.`）表示绝对域名。
 2. **Headless 的使用场景**① 有状态集群的节点间互相发现（MySQL 主从、Cassandra、Kafka broker 用 `<pod>.<headless-svc>` 找到固定对端）；② 客户端自己做负载均衡（gRPC 长连接会粘住 VIP 后的单个 Pod，Headless 让客户端拿到全量 IP 列表自选）；③ Service Mesh 中 sidecar 直连。

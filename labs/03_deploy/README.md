@@ -135,7 +135,7 @@ kubectl rollout resume deployment/nginx-rolling       # 恢复后一次性发布
     └── deploy_rolling.svg          # 双主题矢量版     
 ```
 
-## 6. 面试要点
+## 6. 深入要点
 
 1. **滚动更新原理**：Deployment 不直接动 Pod；改模板 → 新建 RS → 控制循环按 maxSurge/maxUnavailable 约束同步地"扩新 RS、缩旧 RS"→ 旧 RS 保留在 0 副本供回滚。
 2. **maxSurge / maxUnavailable 的作用**：控制更新速度与可用容量的折中。maxSurge 允许临时超额（多占资源），maxUnavailable 允许临时欠额（容量下降）；两者共同决定任意时刻新旧 Pod 总数的上下限 `[replicas - maxUnavailable, replicas + maxSurge]`。

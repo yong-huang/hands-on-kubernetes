@@ -131,7 +131,7 @@ volumes:
     └── secret_base64.svg          # 双主题矢量版      
 ```
 
-## 9. 面试要点
+## 9. 深入要点
 
 1. **Secret 到底安全吗？** base64 只是编码不是加密。真正的安全性靠：etcd 静态加密（`EncryptionConfiguration`）、RBAC、审计日志。默认安装下 Secret 在 etcd 里就是 base64 裸奔，生产集群必须开启加密。
 2. **ConfigMap 大小限制 1MB**：etcd 的限制。大配置应拆分，或放对象存储/配置中心，ConfigMap 只存引用。

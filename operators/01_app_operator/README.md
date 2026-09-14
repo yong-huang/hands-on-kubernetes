@@ -84,7 +84,7 @@ op, err := controllerutil.CreateOrPatch(ctx, r.Client, cm, func() error {
     └── app_reconcile.svg                # 双主题矢量版（本文档 §2 内嵌）
 ```
 
-## 7. 面试要点
+## 7. 深入要点
 
 1. **Reconcile 为什么必须幂等**：水平触发模型下同一对象可能被重复调谐（重启/事件丢失），只有幂等才安全；
 2. **Owns() 的作用**：等价于手动 watch 子资源 + ownerRef 映射回主资源，是"派生资源变化触发调谐"的声明式写法；

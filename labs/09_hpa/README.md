@@ -101,7 +101,7 @@ spec:
 
 > 三类产物同源：`hpa_control_loop.architecture.json` 是图源（Typed JSON IR），`.html` 是交付的交互成品，`.svg` 是从交互版 Export 菜单导出的双主题矢量图（跟随系统深浅色，任意缩放不糊）。
 
-## 7. 面试要点
+## 7. 深入要点
 
 1. **扩容算法**：`desired = ceil(currentReplicas × currentValue / targetValue)`；利用率按就绪 Pod 平均、以 requests 为分母；多指标取最大 desired；±10% tolerance 内不动作；默认 15s 一个控制周期。
 2. **为什么缩容慢**：300s 稳定窗口 + -25%/15s 步长限制。缩容错误代价高——流量回升要重新调度、拉镜像、预热（分钟级）；扩容错误只是暂时多占资源，所以非对称设计是刻意的。

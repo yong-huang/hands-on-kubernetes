@@ -105,7 +105,7 @@ sts.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{{
     └── mysql_stack.svg                # 双主题矢量版（本文档 §2 内嵌）
 ```
 
-## 7. 面试要点
+## 7. 深入要点
 
 1. **volumeClaimTemplates vs 引用 PVC**：VCT 为每副本生成专属 PVC（data-mysql-0），
    副本间隔离；引用同一个 PVC 则所有副本共享（适合只读）；

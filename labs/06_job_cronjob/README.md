@@ -116,7 +116,7 @@ spec:
     └── cronjob_policy.svg          # 双主题矢量版     
 ```
 
-## 7. 面试要点
+## 7. 深入要点
 
 1. **Job vs CronJob vs Deployment**：分别对应"跑完即退的一次性任务"、"按 cron 周期触发的任务"、"永不结束的常驻服务"。判断标准是生命周期：会结束且要追踪成败用 Job；周期性触发用 CronJob；要自愈和持续可用用 Deployment。有状态用 StatefulSet，每节点一个用 DaemonSet。
 2. **Never vs OnFailure 对 Job 的影响**：Never 失败后 Pod 标 Failed、Job 新建 Pod 重试（保留现场）；OnFailure 在原 Pod 内重启容器（省资源，现场被覆盖）。两者都受 backoffLimit 约束。Always 对 Job 非法——Job 的语义就是靠"Pod 结束"来判断成败的。

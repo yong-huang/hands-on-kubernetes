@@ -100,7 +100,7 @@ spec:
 
 > 🌐 **交互版**：[在线打开（GitHub Pages）](https://yong-huang.github.io/hands-on-kubernetes/labs/17_csi_snapshot/images/snapshot_chain.html)（或本地打开 [`images/snapshot_chain.html`](images/snapshot_chain.html)）。
 
-## 6. 面试要点
+## 6. 深入要点
 
 1. **快照 vs 备份**：快照存在存储后端，通常是增量 COW/ROW 实现，创建秒级、空间省，但与源卷同生命周期、同故障域（存储阵列挂了快照也没了）；备份是把数据复制到独立介质，慢且占空间，但能对抗存储级故障。正确姿势是"快照保 RPO + 定期把快照导出到备份存储"。
 2. **快照存在哪**：不在 etcd（那里只有 VolumeSnapshot/Content 这些元数据对象），不在节点，而在存储后端（EBS 快照、Ceph RBD snapshot、Longhorn 快照链）。`kubectl get volumesnapshot` 看到的只是后端快照的"句柄"。

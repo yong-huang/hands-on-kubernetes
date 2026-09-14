@@ -103,7 +103,7 @@ spec:
 
 > 🌐 **交互版**：[在线打开（GitHub Pages）](https://yong-huang.github.io/hands-on-kubernetes/labs/28_gitops_argocd/images/gitops_loop.html)（或本地打开 [`images/gitops_loop.html`](images/gitops_loop.html)）。
 
-## 7. 面试要点
+## 7. 深入要点
 
 1. **GitOps vs 传统 CI/CD**：Pull 模型，Agent 在集群内自己拉取期望状态并收敛，集群凭据不出集群；CI 只管构建镜像与提交 YAML，部署与构建解耦。安全边界从"信任 CI"变成"信任 Git + 审计链"。
 2. **selfHeal 的作用**：检测并纠正集群侧漂移（有人 `kubectl edit/scale` 手改），保证 Git 是唯一可信源；配合 `prune` 让"删除"也是声明式的。需要合法手改时用 `ignoreDifferences` 精确豁免字段。

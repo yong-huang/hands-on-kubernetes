@@ -138,7 +138,7 @@ docker tag  docker.m.daocloud.io/istio/proxyv2:${ISTIO_VERSION} docker.io/istio/
 
 > 🌐 **交互版**：[在线打开（GitHub Pages）](https://yong-huang.github.io/hands-on-kubernetes/labs/13_service_mesh/images/istio_canary.html)（或本地打开 [`images/istio_canary.html`](images/istio_canary.html)）。
 
-## 7. 面试要点
+## 7. 深入要点
 
 1. **Service Mesh 解决什么问题**：把微服务的流量治理（灰度、重试、超时、熔断、mTLS、遥测）从业务代码/SDK 下沉到基础设施层，业务无侵入、语言无关。代价是每 Pod 多一个代理（资源 + 一跳延迟）和更高的运维复杂度——小团队用 K8s 原生能力往往够了。
 2. **Sidecar 注入原理**：Namespace 打 `istio-injection=enabled` 标签 → Istio 注册的 MutatingWebhook 在 **Pod 创建时**改写 Pod spec，追加 istio-proxy 容器和配置 iptables 的 init 容器；存量 Pod 不受影响，需重启重建。数据面拦截靠 iptables 把进出流量重定向到 envoy 的 15001 等端口。

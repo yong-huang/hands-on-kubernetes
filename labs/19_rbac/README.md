@@ -88,7 +88,7 @@ roleRef:                           # 创建后不可修改（immutable），换�
 
 > 🌐 **交互版**：[在线打开（GitHub Pages）](https://yong-huang.github.io/hands-on-kubernetes/labs/19_rbac/images/rbac_model.html)（或本地打开 [`images/rbac_model.html`](images/rbac_model.html)）。
 
-## 7. 面试要点
+## 7. 深入要点
 
 1. **Role 和 ClusterRole 的区别**：作用域不同——Role 的规则只在所在 ns 生效，ClusterRole 面向集群级资源（Node/PV/Namespace）或做跨 ns 复用的规则模板。注意"规则定义在哪"和"权限生效在哪"由 Binding 决定：ClusterRole + RoleBinding 依然只在本 ns 生效，ClusterRole + ClusterRoleBinding 才是全集群生效。
 2. **RBAC 的判断流程**：apiserver 收到请求后先认证出用户（含组、SA 信息），再遍历所有匹配该用户的 Binding（RoleBinding + ClusterRoleBinding），累加其引用 Role 的规则，任一规则的 apiGroups/resources/verbs（及 resourceNames）匹配请求即放行；全部不匹配返回 403 Forbidden。权限只加不减（并集）。

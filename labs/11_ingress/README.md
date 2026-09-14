@@ -85,7 +85,7 @@ cd ../../scripts && ./load_images.sh \
 
 > 🌐 **交互版**：[在线打开（GitHub Pages）](https://yong-huang.github.io/hands-on-kubernetes/labs/11_ingress/images/ingress_routing.html)（或本地打开 [`images/ingress_routing.html`](images/ingress_routing.html)）。
 
-## 7. 面试要点
+## 7. 深入要点
 
 **Q1: Ingress 和 Service 的区别？**
 Service 是四层负载均衡（IP:Port），Ingress 在其之上提供七层路由（域名/路径/TLS）。Ingress 转发的目标仍然是 Service——它是"Service 的前台网关"。

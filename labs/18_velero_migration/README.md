@@ -71,7 +71,7 @@ metadata:
 
 > 🌐 **交互版**：[在线打开（GitHub Pages）](https://yong-huang.github.io/hands-on-kubernetes/labs/18_velero_migration/images/velero_planes.html)（或本地打开 [`images/velero_planes.html`](images/velero_planes.html)）。
 
-## 7. 面试要点
+## 7. 深入要点
 
 1. **Velero vs CSI 快照 vs etcd 备份**：Velero——应用级（按 namespace/label），API 对象 + 文件级卷数据，可跨集群，恢复粒度细；CSI 快照——存储级，同集群同存储的快速 PITR，不能跨存储厂商；etcd 备份——整集群最后手段（`etcdctl snapshot save`），恢复即回滚整个控制面，无应用粒度，且不含容器镜像/外部数据。
 2. **跨集群迁移的完整步骤**：目标集群装 Velero 并指向**同一个** BackupStorageLocation → `velero backup create --include-namespaces X --wait`（确认 Completed、无 volume 错误）→ 目标集群 `velero restore create --from-backup ... --namespace-mappings` → 验证 Pod Ready 与数据 → 切流量（DNS/Ingress）。前提：两边 StorageClass 名字匹配（可在 restore 时 `--snapshot-move-data` 或改 SC）。

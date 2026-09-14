@@ -105,7 +105,7 @@ volumes:
 
 > 🌐 **交互版**：[在线打开（GitHub Pages）](https://yong-huang.github.io/hands-on-kubernetes/labs/15_pv_pvc/images/pvc_binding.html)（或本地打开 [`images/pvc_binding.html`](images/pvc_binding.html)）。
 
-## 6. 面试要点
+## 6. 深入要点
 
 1. **PVC 和 PV 的绑定条件有哪些**：① PV capacity ≥ PVC 请求量；② PV 的 accessModes 包含 PVC 请求的模式；③ storageClassName 一致（PVC 留空则用默认 SC，走动态供给）；此外 PVC 还可用 label selector 和 `volumeName` 进一步约束挑选范围。绑定一对一独占，记录在 PV 的 claimRef 里。
 2. **Retain vs Delete 的语义**：Retain——删 PVC 后 PV 进入 Released，数据和 claimRef 保留，需管理员手动删 PV 并清数据才能复用，最安全；Delete——PV 连同底层存储一起删（动态供给默认），依赖 CSI 插件。Released 不是 Available，不会再被自动绑走。

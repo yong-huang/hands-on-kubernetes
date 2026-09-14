@@ -114,7 +114,7 @@ volumes:
     └── daemonset_hostpath.svg          # 双主题矢量版   
 ```
 
-## 8. 面试要点
+## 8. 深入要点
 
 1. **如何保证每节点一个**：daemon pod controller 为每个"匹配且可调度"的节点确保恰好一个 Pod——缺失则建、多余则删；节点加入/移除或标签变化时自动增删。DESIRED 永远等于合格节点数。
 2. **为什么需要 toleration 才能上 master**：控制面默认打 `node-role.kubernetes.io/control-plane:NoSchedule` 污点保护关键组件；Agent 要全覆盖所以必须容忍。`operator: Exists` 容忍一切，一般只有 CNI/kube-proxy 需要。

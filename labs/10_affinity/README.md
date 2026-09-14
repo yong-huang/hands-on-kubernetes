@@ -168,7 +168,7 @@ nodeAffinity:
 
 > 三类产物同源：`*.workflow.json` / `*.architecture.json` 是图源（Typed JSON IR），`.html` 是交付的交互成品，`.svg` 是从交互版 Export 菜单导出的双主题矢量图（跟随系统深浅色，任意缩放不糊）。
 
-## 8. 面试要点
+## 8. 深入要点
 
 1. **如何保证副本跨节点分布**：① 硬性 podAntiAffinity（每节点最多 1 个，副本超节点数会 Pending）；② topologySpreadConstraints（maxSkew=1 + DoNotSchedule，均匀且支持副本数大于节点数）；③ 软性版本尽量打散但不阻塞。跨可用区高可用一般用 `topologyKey: topology.kubernetes.io/zone`。
 2. **affinity 和 toleration 的区别**：亲和性是 Pod 对节点的**主动选择偏好**；污点/容忍度是节点对 Pod 的**准入限制**。一个从 Pod 视角拉，一个从节点视角推，同时生效时都要满足。
