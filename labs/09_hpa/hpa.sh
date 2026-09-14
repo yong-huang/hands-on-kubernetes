@@ -85,8 +85,10 @@ do_unload() {
 # ----------------------------- 5. 清理 -----------------------------
 do_clean() {
     step "clean" "删除本演示创建的所有资源 (HPA 与应用一并清掉)"
-    kubectl delete -f manifests/hpa.yaml --wait=true
+    kubectl delete -f manifests/hpa.yaml --wait=true --ignore-not-found=true
     kubectl delete pod load-gen --ignore-not-found -n "${NAMESPACE}" || true
+    # --wait 只覆盖清单里的 Deployment/HPA；级联删除的 Pod 是异步的，等它们真正消失
+    kubectl wait --for=delete pod -l "${LABEL}" -n "${NAMESPACE}" --timeout=120s || true
     kubectl get deploy,hpa,pods -l "${LABEL}" -n "${NAMESPACE}" || true
 }
 

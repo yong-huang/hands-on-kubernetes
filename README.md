@@ -72,6 +72,17 @@ hands-on-kubernetes/
 | 30 | [Karmada](labs/30_multicluster_federation/README.md) | 多集群联邦管理 |
 | 31 | [Fake GPU Operator](labs/31_fake_gpu_operator/README.md) | GPU Operator 与 AI Ops 体验 |
 
+## 📋 学习清单（docs/）
+
+三条学习线的项目清单 Todo 文档（含逐项验收标准、AI 开始提示词、踩坑记录）：
+
+| 清单 | 内容 | 状态 |
+|:--|:--|:--|
+| [kubernetes.md](docs/kubernetes.md) | 31 个实验的总清单（与 labs/ 一一对应） | ✅ 31/31 |
+| [kubernetes_operator.md](docs/kubernetes_operator.md) | 10 个 Operator 开发项目（kubebuilder） | 🚧 8/10 |
+| [microservices.md](docs/microservices.md) | mini-mart 微服务开发（Go/Python 双栈） | ✅ 10/10 |
+| [TESTING.md](TESTING.md) | 全仓测试报告与回归指南 | ✅ |
+
 ## 建议学习路线
 
 1. **基础（01–09）**：环境 → 工作负载 → 网络 → 配置 → 弹性，理解"声明式 API + 控制循环"这条主线

@@ -87,7 +87,10 @@ do_label() {
 # ----------------------------- 5. 清理 -----------------------------
 do_clean() {
     step "clean" "删除本演示创建的所有资源"
-    kubectl delete -f manifests/daemonset.yaml --wait=true
+    kubectl delete -f manifests/daemonset.yaml --wait=true --ignore-not-found=true
+    # --wait 只覆盖 DaemonSet 本身；级联删除的 Pod 是异步的，等它们真正消失
+    kubectl wait --for=delete pod -l app=log-collector -n "${NAMESPACE}" --timeout=120s || true
+    kubectl wait --for=delete pod -l app=ssd-cache-agent -n "${NAMESPACE}" --timeout=120s || true
     kubectl get daemonset,pods -n "${NAMESPACE}" || true
 }
 

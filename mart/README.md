@@ -1,6 +1,6 @@
 # 🛒 mini-mart：Kubernetes 微服务开发动手系列
 
-`microservices.md` 清单的落地代码库。10 个项目共同生长为一个迷你电商系统：
+`docs/microservices.md` 清单的落地代码库。10 个项目共同生长为一个迷你电商系统：
 商品（Python/FastAPI）、订单（Go）、库存（Python）、通知（Go 消费者）+ API 网关，
 全部跑在本机 kind 集群的 `mart` 命名空间里。
 

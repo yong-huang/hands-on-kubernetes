@@ -108,7 +108,10 @@ do_test() {
 # ----------------------------- 4. 清理 -----------------------------
 do_clean() {
     step "clean" "删除路由与后端 (保留 ingress-nginx Controller)"
-    kubectl delete -f "${MANIFEST}" --ignore-not-found
+    kubectl delete -f "${MANIFEST}" --ignore-not-found --wait=true
+    # 级联删除的 Pod 是异步的，等它们真正消失再收尾
+    kubectl wait --for=delete pod -l app=web-a -n "${NAMESPACE}" --timeout=120s || true
+    kubectl wait --for=delete pod -l app=web-b -n "${NAMESPACE}" --timeout=120s || true
     echo "(如需卸载 Controller: kubectl delete -n ${CONTROLLER_NS} --all)"
 }
 
