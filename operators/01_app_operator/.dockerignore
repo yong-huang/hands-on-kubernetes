@@ -9,3 +9,6 @@
 # Re-include Go module files
 !go.mod
 !go.sum
+
+# 部署脚本（operators/deploy.sh）用宿主机构建的二进制打包镜像，需放行
+!bin/manager-local
