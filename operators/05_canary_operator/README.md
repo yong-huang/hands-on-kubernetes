@@ -1,10 +1,10 @@
-# 金丝雀发布 Operator（项目 5）
+# 05 · 金丝雀发布 Operator：状态机驱动发布
 
-> 一个 `Canary` CR 声明稳定/金丝雀两版镜像和 steps 权重序列（25% → 50% → 100%），
-> Controller 编排两个 Deployment，按权重计算副本数比例模拟流量切分，
-> 以**状态机**（Progressing → Completed/Rollback）驱动整个发布流程。
+> 一个 `Canary` CR 声明稳定/金丝雀两版镜像和 steps 权重序列（25% → 50% → 100%），Controller 编排两个 Deployment，按权重计算副本数比例模拟流量切分，以**状态机**（Progressing → Completed/Rollback）驱动整个发布流程。
 
-## 1. 它做什么
+## What
+
+一个 `Canary` CR 长这样：
 
 ```yaml
 apiVersion: delivery.example.com/v1
@@ -21,22 +21,13 @@ spec:
     - { weight: 100 }
 ```
 
-创建 CR 后：金丝雀版按第一步权重接入 → 推进 step 流量比例变化 → 100% 即发布完成。
-任一步骤不健康可回滚到稳定版。
+创建 CR 后：金丝雀版按第一步权重接入 → 推进 step 流量比例变化 → 100% 即发布完成；任一步骤不健康可回滚到稳定版。一句话心智模型：**发布流程 = 状态机**——`status.currentStep` 是状态，Reconcile 是转移函数，Controller 重启也不丢进度。
 
-## 2. 架构总览
+## Why
 
-![Canary 发布](images/canary_flow.svg)
+手工金丝雀要盯着时间点改副本数、记住发布到第几步、出问题手工切回——发布进度存在人脑和聊天记录里，重启、换班、并行发布都会乱。把发布序列写进 CR、把进度写进 status，发布就从"操作"变成"状态收敛"：任何人任何时候看 CR 都知道发布在哪一步，Controller 挂了重启后从 status 恢复继续推进。
 
-Reconcile 是一台小状态机：读 `status.currentStep` → 按 `steps[step].weight` 计算
-`canaryReplicas = total × weight / 100`（不足 1 时保底 1，避免金丝雀永远 0 副本）、
-`stableReplicas = total - canaryReplicas` → CreateOrPatch 两套 Deployment →
-status 上报当前阶段。Finalizer 保证发布中不被误删。
-
-> 🌐 **交互版**：[在线打开（GitHub Pages）](https://yong-huang.github.io/hands-on-kubernetes/operators/05_canary_operator/images/canary_flow.html)
-> （或本地打开 [`images/canary_flow.html`](images/canary_flow.html)）。
-
-## 3. 快速开始
+## How
 
 ```bash
 cd operators/05_canary_operator
@@ -46,7 +37,9 @@ kubectl get canary demo-canary -w          # 观察 phase/step 推进
 kubectl get deploy -w                      # 观察两套 Deployment 副本数此消彼长
 ```
 
-## 4. Reconcile 代码走读
+## Deep Dive
+
+Reconcile 是一台小状态机：读 `status.currentStep` → 按 `steps[step].weight` 计算 `canaryReplicas = total × weight / 100`（不足 1 时保底 1，避免金丝雀永远 0 副本）、`stableReplicas = total - canaryReplicas` → CreateOrPatch 两套 Deployment → status 上报当前阶段。Finalizer 保证发布中不被误删。
 
 ```go
 // 幂等补 Finalizer（发布中防误删）
@@ -58,14 +51,9 @@ stableReplicas := total - canaryReplicas
 // CreateOrPatch 两套 Deployment（镜像来自 stableImage/canaryImage）
 ```
 
-## 5. 已知限制（诚实预期）
+**已知限制（诚实预期）**：当前版本 stable 的副本数在 step 推进时**未实际缩减**（只改了 status 报告）。生产实现需要：① 每步 CreateOrPatch 两个 Deployment 的 replicas；② 等待 canary Ready 后才缩减 stable。已在代码 TODO 标注——这也是本项目的进阶练习：把"报告流量比例"补全成"真实流量比例"。
 
-当前版本 stable 的副本数在 step 推进时**未实际缩减**（只改了 status 报告）。
-生产实现需要：① 每步 CreateOrPatch 两个 Deployment 的 replicas；
-② 等待 canary Ready 后才缩减 stable。已在代码 TODO 标注——这也是本项目的
-进阶练习：把"报告流量比例"补全成"真实流量比例"。
-
-## 6. 验收记录（2026-09-05，kind v1.36）
+验收记录（2026-09-05，kind v1.36）：
 
 | 验收项 | 结果 |
 |:---|:---|
@@ -73,19 +61,13 @@ stableReplicas := total - canaryReplicas
 | status 按 steps 报告当前权重与阶段 | ✅ |
 | stable 缩减 | ⚠️ 待修（见上"已知限制"） |
 
-## 7. 文件结构
+## Q&A
 
-```
-05_canary_operator/
-├── internal/controller/canary_controller.go   # 状态机 + 双 Deployment 编排
-├── config/samples/delivery_v1_canary.yaml
-└── images/canary_flow.*                       # 架构图三件套
-```
+**Q1: 金丝雀和蓝绿发布怎么选？**
+金丝雀按比例渐进、回滚粒度细（回退一步权重即可），适合有监控反馈的持续发布；蓝绿是一次性切换、回滚快（切回旧环境）但资源双倍，适合变更少、验证窗口集中的场景。金丝雀是更通用的默认选择，蓝绿适合"要么全新要么全旧"的强一致性需求。
 
-## 8. 深入要点
+**Q2: 副本数比例等于流量比例吗？**
+只是近似。本实验用副本数比例模拟流量切分（4 副本 25% = 1 个金丝雀 Pod），但 Service 的轮询分发并不严格按副本比例。生产应接 Service Mesh 或 Ingress 权重做真流量切分（如 Istio VirtualService 的 weight，见 lab 13）——Operator 的价值在于把"何时推进到下一步"的发布状态机管起来，流量执行层可以换。
 
-1. **金丝雀 vs 蓝绿**：金丝雀按比例渐进、可回滚粒度细；蓝绿是一次性切换、回滚快但资源双倍；
-2. **权重模拟 vs 真流量**：副本数比例只是流量比例的近似；生产应接 Service Mesh 或
-   Ingress 权重（如 Istio VirtualService）做真流量切分；
-3. **发布状态机为什么要落 status**：Controller 重启后能从 status.currentStep 恢复，
-   而不是从头再放一遍。
+**Q3: 发布状态机为什么必须落在 status 里？**
+Controller 是水平触发的，随时可能重启、重调度。进度只在内存里的话，重启后要么从头再放一遍（重复发布），要么卡死在中间。`status.currentStep` 让状态机持久化在 etcd 里，重启后读 status 恢复现场——spec 是用户给的期望，status 是流程自己的记忆。

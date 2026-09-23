@@ -1,10 +1,10 @@
-# PyTorch 分布式训练 Operator（项目 9）
+# 09 · PyTorch 分布式训练 Operator：多 Pod 成员发现
 
-> 编排 1 Master + N Worker 的分布式训练：Headless Service 提供 stable DNS，
-> 环境变量注入 MASTER_ADDR/MASTER_PORT/RANK/WORLD_SIZE，torchrun 据此
-> 完成成员发现与集合通信，训练完成后全部回收。
+> 编排 1 Master + N Worker 的分布式训练：Headless Service 提供 stable DNS，环境变量注入 MASTER_ADDR/MASTER_PORT/RANK/WORLD_SIZE，torchrun 据此完成成员发现与集合通信，训练完成后全部回收。
 
-## 1. 它做什么
+## What
+
+一个 `PyTorchJob` CR 长这样：
 
 ```yaml
 apiVersion: ai.example.com/v1
@@ -16,22 +16,13 @@ spec:
   workers: 2          # 1 Master + (workers-1) Worker
 ```
 
-apply 后：Headless Service → Master Pod（rank 0）先起 → Worker Deployment 逐个加入 →
-环境变量让所有进程互相发现 → 训练完成全部回收。
+apply 后：Headless Service → Master Pod（rank 0）先起 → Worker Deployment 逐个加入 → 环境变量让所有进程互相发现 → 训练完成全部回收。一句话心智模型：**分布式训练的"鸡生蛋"问题靠两件东西化解——Headless Service 给成员发现，环境变量给身份分配**；训练代码零改动。
 
-## 2. 架构总览
+## Why
 
-![PyTorch flow](images/pytorch_flow.svg)
+分布式训练的每个进程都要知道"其他人在哪、我是第几号"才能开始集合通信——这是所有 MPI/torchrun 类框架的先决条件。手工搭这套拓扑要自己写 DNS 约定、算 RANK、保证启动顺序，换个人跑就散架。Operator 把这套约定固化成编排逻辑：用户声明 `workers: 2`，成员发现与启动顺序全部由 Controller 保证。
 
-分布式训练的"鸡生蛋"问题——每个进程都要知道其他人在哪——靠两件东西化解：
-**Headless Service**（集群内 DNS 直接返回全部 Pod IP，提供稳定成员发现）和
-**有序启动**（Master 先起，Worker Deployment 随后加入）。Controller 把这套
-约定翻译成环境变量注入，训练代码零改动。
-
-> 🌐 **交互版**：[在线打开（GitHub Pages）](https://yong-huang.github.io/hands-on-kubernetes/operators/09_pytorch_operator/images/pytorch_flow.html)
-> （或本地打开 [`images/pytorch_flow.html`](images/pytorch_flow.html)）。
-
-## 3. 快速开始
+## How
 
 ```bash
 cd operators/09_pytorch_operator
@@ -41,7 +32,11 @@ kubectl get pods -l app=pytorch-job -w      # Master 先 Running，Worker 陆续
 kubectl logs -l job-name=torch-sample-master # 看 torchrun 集合通信日志
 ```
 
-## 4. Reconcile 代码走读
+诚实预期：Worker 不是同时就位的——Master 先 Running，Worker 逐个加入并在启动时等待集合；`kubectl logs` 里看到 rendezvous 成功（所有 RANK 到齐）才算组网完成。
+
+## Deep Dive
+
+Controller 编排四件套：
 
 ```go
 // ① Headless Service：clusterIP: None，DNS 返回全部 Pod IP
@@ -54,7 +49,9 @@ workers := &appsv1.Deployment{ ... }   // MASTER_ADDR=master, RANK=i, WORLD_SIZE
 // ④ status Condition 上报就绪状态
 ```
 
-## 5. 验收记录（2026-09-05，kind v1.36）
+环境变量是 torchrun 的标准约定：`MASTER_ADDR` 指向 Master（Headless DNS 保证名字稳定）、`RANK` 标识进程序号、`WORLD_SIZE` 声明总成员数——训练代码读这几个变量即可完成初始化，对编排方式一无所知。
+
+验收记录（2026-09-05，kind v1.36）：
 
 | 验收项 | 结果 |
 |:---|:---|
@@ -62,20 +59,13 @@ workers := &appsv1.Deployment{ ... }   // MASTER_ADDR=master, RANK=i, WORLD_SIZE
 | Worker 环境变量正确指向 Master（MASTER_ADDR/RANK/WORLD_SIZE） | ✅ |
 | 训练完成全部 Pod Succeeded 并回收 | ✅ |
 
-## 6. 文件结构
+## Q&A
 
-```
-09_pytorch_operator/
-├── internal/controller/pytorchjob_controller.go   # 三件套编排 + 环境变量注入
-├── config/samples/ai_v1_pytorchjob.yaml
-└── images/pytorch_flow.*                          # 架构图三件套
-```
+**Q1: 为什么 Headless Service 是分布式训练的标配？**
+`clusterIP: None` 让 DNS 直接返回全部 Pod IP（见 lab 14），MPI/torchrun 这类需要"点对点互连"的框架靠它做成员发现——普通 Service 的 VIP 会随机转发，进程之间根本连不上指定对端。
 
-## 7. 深入要点
+**Q2: Worker 用 StatefulSet 还是 Deployment？**
+需要稳定网络标识（RANK 绑定主机名、断线重连按名找对端）用 StatefulSet；无状态可互换的 Worker 用 Deployment 更简单——本项目选后者，因为每个 Worker 的 RANK 由环境变量显式分配，不依赖主机名。生产框架（如 Kubeflow Training Operator）多为 StatefulSet 方案。
 
-1. **Headless Service 为什么是分布式训练的标配**：clusterIP: None 让 DNS 直出
-   全部 Pod IP，MPI/torchrun 这类需要"点对点互连"的框架靠它做成员发现；
-2. **StatefulSet vs Deployment 跑 Worker**：需要稳定网络标识（RANK 绑定主机名）用
-   StatefulSet；无状态可互换的 Worker 用 Deployment 更简单——本项目选后者；
-3. **与项目 8 的关系**：单卡（扩展资源调度）→ 多卡协同（多 Pod 编排 + 成员发现），
-   AI 工作负载 Operator 的两条主线。
+**Q3: 它和 lab 08 的 TrainingJob 是什么关系？**
+AI 工作负载 Operator 的两条主线：单卡走扩展资源调度（lab 08，"给我一张卡"），多卡走多 Pod 编排 + 成员发现（本实验，"给我们组网"）。完整平台两者都要——先用 lab 08 的模式按卡排队，多卡任务再由本实验的模式组网。

@@ -1,10 +1,10 @@
-# GPU 训练任务 Operator（项目 8）
+# 08 · GPU 训练任务 Operator：扩展资源调度
 
-> 联动 labs/31 的 fake GPU：普通节点模拟 `nvidia.com/gpu` 扩展资源，`TrainingJob` CR
-> 按 gpuCount 自动调度到"有卡"节点，任务生命周期（Pending → Running → Succeeded）
-> 全程 status 上报，完成后按 TTL 自动清理——无需真卡即可体验 AI Ops 完整流程。
+> 联动 labs/31 的 fake GPU：普通节点模拟 `nvidia.com/gpu` 扩展资源，`TrainingJob` CR 按 gpuCount 自动调度到"有卡"节点，任务生命周期（Pending → Running → Succeeded）全程 status 上报，完成后按 TTL 自动清理——无需真卡即可体验 AI Ops 完整流程。
 
-## 1. 它做什么
+## What
+
+一个 `TrainingJob` CR 长这样：
 
 ```yaml
 apiVersion: ai.example.com/v1
@@ -17,23 +17,13 @@ spec:
   ttlSecondsAfterFinished: 60
 ```
 
-apply 后：Job 被创建且 `resources.requests` 带 `nvidia.com/gpu: 1` → 只能调度到
-"有卡"节点 → status 逐阶段上报（Pending/Running/Succeeded）→ 完成后 TTL 到期自动清理。
+apply 后：Job 被创建且 `resources.requests` 带 `nvidia.com/gpu: 1` → 只能调度到"有卡"节点 → status 逐阶段上报（Pending/Running/Succeeded）→ 完成后 TTL 到期自动清理。一句话心智模型：**CR 翻译成带扩展资源的 Job，再把 Job 状态翻译回 CR 的 phase**——用户面对的是"训练任务"，不是 Job 和调度细节。
 
-## 2. 架构总览
+## Why
 
-![GPU Job](images/gpu_job.svg)
+AI 训练任务的运维动作高度雷同：申请 N 张卡、调度到有卡的节点、盯生命周期、跑完清理。裸 Job 每次都要手写资源请求、清理策略和状态轮询；把这些固化进 Operator，算法同学只需要提交一个 CR——卡的申请量、生命周期、清理全部声明式，且平台可以统一演进（换调度器、接真卡集群）而 CR 不变。
 
-扩展资源调度的关键只有一行：Job Pod 的 `resources.requests` 里声明
-`nvidia.com/gpu: N`，调度器就会把"有足够 GPU 余量"作为可调度前提。
-labs/31 的 fake GPU DaemonSet 在指定节点 `patch --overwrite` 上报这个
-扩展资源，于是普通节点摇身一变成了"GPU 节点"。Operator Owns 这个 Job，
-读 Job 状态翻译成 CR 的 phase。
-
-> 🌐 **交互版**：[在线打开（GitHub Pages）](https://yong-huang.github.io/hands-on-kubernetes/operators/08_gpu_job_operator/images/gpu_job.html)
-> （或本地打开 [`images/gpu_job.html`](images/gpu_job.html)）。
-
-## 3. 快速开始
+## How
 
 ```bash
 # 前置：先跑 labs/31 给节点上报 fake GPU
@@ -44,7 +34,11 @@ kubectl get trainingjob train-sample -w     # Pending → Running → Succeeded
 kubectl get pods -l job-name=train-sample-trainer
 ```
 
-## 4. Reconcile 代码走读
+诚实预期：`gpuCount` 超过节点上报的假卡数时任务会 Pending（FailedScheduling）——这与真卡集群行为完全一致，正好可以用来验证调度约束。
+
+## Deep Dive
+
+扩展资源调度的关键只有一行：Job Pod 的 `resources.requests` 里声明 `nvidia.com/gpu: N`，调度器就会把"有足够 GPU 余量"作为可调度前提。labs/31 的 fake GPU DaemonSet 在指定节点 `patch --overwrite` 上报这个扩展资源，普通节点摇身一变成了"GPU 节点"——调度器只做算术，不辨真伪。
 
 ```go
 // 幂等：按固定名找 Trainer Job，没有才创建（CreateOrPatch 同效）
@@ -58,7 +52,9 @@ TTLSecondsAfterFinished: tj.Spec.TTLSecondsAfterFinished,
 // Owns(&batchv1.Job{})：Job 状态变化触发 Reconcile → 翻译成 CR 的 phase
 ```
 
-## 5. 验收记录（2026-09-05，kind v1.36 + labs/31 fake GPU）
+`nvidia.com/gpu` 只是名字，调度器只做算术（节点上报多少、请求多少），真正的设备分配由各节点的 Device Plugin 完成——fake GPU 钻的就是这个空子。
+
+验收记录（2026-09-05，kind v1.36 + labs/31 fake GPU）：
 
 | 验收项 | 结果 |
 |:---|:---|
@@ -66,20 +62,10 @@ TTLSecondsAfterFinished: tj.Spec.TTLSecondsAfterFinished,
 | status 逐阶段上报 Pending/Running/Succeeded | ✅ |
 | TTL 到期自动清理 | ✅ |
 
-## 6. 文件结构
+## Q&A
 
-```
-08_gpu_job_operator/
-├── internal/controller/trainingjob_controller.go   # Job 编排 + 扩展资源 + phase 翻译
-├── config/samples/ai_v1_trainingjob.yaml
-└── images/gpu_job.*                                # 架构图三件套
-```
+**Q1: 有了 Job，为什么还要 TrainingJob Operator？**
+裸 Job 把运维知识摊给每个用户：扩展资源怎么写、TTL 怎么设、状态怎么查。Operator 把这些固化成领域 API——`gpuCount` 和 `ttlSecondsAfterFinished` 两个字段就是全部心智负担，且平台侧可以在不惊动用户的情况下升级实现（换 gang 调度器、接真实 GPU 集群、加配额管控）。
 
-## 7. 深入要点
-
-1. **扩展资源调度原理**：`nvidia.com/gpu` 只是名字，调度器只做算术（节点上报多少、
-   请求多少），真正的设备分配由各节点的 Device Plugin 完成——fake GPU 钻的就是这个空子；
-2. **Operator vs 裸 Job**：裸 Job 自己写调度亲和、自己清理；Operator 把这些固化成
-   可复用的领域 API（一个 CR 搞定）；
-3. **phase 翻译模式**：CR status 不存细节，只把子资源状态翻译成语义阶段
-   （Pending/Running/Succeeded），消费方无需理解 Job 机制。
+**Q2: CR 的 phase 为什么要"翻译"而不是直接透传 Job 状态？**
+status 是 CR 的对外契约：消费方（流水线、面板、告警）只需要 Pending/Running/Succeeded 这三个语义阶段，不应该被迫理解 Job 的Conditions 细节。翻译层还隔离了实现变化——哪天把 Job 换成 Volcano 或 RayJob，phase 语义不变，消费方无感。

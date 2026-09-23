@@ -1,10 +1,10 @@
-# MySQL Operator（项目 2）
+# 02 · MySQL Operator：有状态应用编排
 
-> 第一个**有状态应用** Operator：一个 `MySQL` CR 声明存储大小、密码引用与备份计划，
-> Controller 编排 Headless Service + ClusterIP Service + StatefulSet（volumeClaimTemplates
-> 持久化）+ 备份 CronJob，Finalizer 保证删 CR 时连 PVC 一起清理——数据安全不将就。
+> 第一个**有状态应用** Operator：一个 `MySQL` CR 声明存储大小、密码引用与备份计划，Controller 编排 Headless Service + ClusterIP Service + StatefulSet（volumeClaimTemplates 持久化）+ 备份 CronJob，Finalizer 保证删 CR 时连 PVC 一起清理——数据安全不将就。
 
-## 1. 它做什么
+## What
+
+一个 `MySQL` CR 长这样：
 
 ```yaml
 apiVersion: mysql.example.com/v1
@@ -16,22 +16,13 @@ spec:
   backupSchedule: "*/2 * * * *"                              # 留空 = 不备份
 ```
 
-apply 后：MySQL 单实例自动部署且数据持久化；备份 CronJob 按计划 mysqldump 到独立
-备份 PVC；删 CR 时 Finalizer 清理全部 PVC——**宁可 Terminating 慢，不可留孤儿数据卷**。
+apply 后：MySQL 单实例自动部署且数据持久化；备份 CronJob 按计划 mysqldump 到独立备份 PVC；删 CR 时 Finalizer 清理全部 PVC。一句话心智模型：**一个 CR 管数据库从生到死的全部家当**——部署、持久化、备份、销毁都是 Reconcile 的事。
 
-## 2. 架构总览
+## Why
 
-![MySQL 全栈](images/mysql_stack.svg)
+有状态应用是 Operator 模式的试金石：Pod 可以随便重建，数据卷不能；组件可以随手删，PVC 删错了就是事故。把数据库交给 Operator，本质是把三条纪律固化成代码——网络标识稳定（Headless DNS）、数据跟着身份走（VCT 专属 PVC）、销毁必须干净（Finalizer 清卷）。这些纪律靠人守迟早破，靠 Controller 守才靠得住。
 
-图中三条主线：**稳定网络**（Headless Service 给 Pod 稳定 DNS，ClusterIP 给应用连接）→
-**数据持久化**（StatefulSet 的 volumeClaimTemplates 供给数据 PVC，Pod 重建绑回原卷）→
-**备份**（CronJob 定时 mysqldump 写入独立备份 PVC）。Finalizer 保证删 CR 时按标签清理
-全部 PVC，防止数据孤儿。
-
-> 🌐 **交互版**：[在线打开（GitHub Pages）](https://yong-huang.github.io/hands-on-kubernetes/operators/02_mysql_operator/images/mysql_stack.html)
-> （或本地打开 [`images/mysql_stack.html`](images/mysql_stack.html)）。
-
-## 3. 快速开始
+## How
 
 ```bash
 cd operators/02_mysql_operator
@@ -58,7 +49,11 @@ kubectl create job --from=cronjob/mysql-sample-backup backup-test
 kubectl logs job/backup-test | tail -1       # backup-ok
 ```
 
-## 4. Reconcile 代码走读
+## Deep Dive
+
+**三条编排主线**：**稳定网络**——Headless Service 给 Pod 稳定 DNS（`mysql-0.mysql-h.ns.svc`），ClusterIP 给应用连接，主从复制和客户端直连实例都靠前者；**数据持久化**——StatefulSet 的 volumeClaimTemplates 供给数据 PVC（`data-mysql-0`），Pod 重建绑回原卷；**备份**——CronJob 定时 mysqldump 写入独立备份 PVC。
+
+代码走读——VCT 直接在 StatefulSet spec 里声明：
 
 ```go
 // Headless Service：clusterIP: None，给 Pod 稳定 DNS（mysql-h）
@@ -72,16 +67,14 @@ sts.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{{
 }}
 ```
 
-- **Finalizer 清理 PVC**：VCT 产的 PVC 不会随 CR 删除自动消失（防止数据误删），
-  Controller 在删除分支按标签 `app.kubernetes.io/managed-by=mysql-operator`
-  显式删除——宁可 Terminating 慢，不可留孤儿数据卷；
-- **密码不进 CR**：`rootPasswordSecret` 引用 Secret，CR 进 etcd 与审计日志也不泄露。
+- **Finalizer 清理 PVC**：VCT 产的 PVC 不会随 CR 删除自动消失（防止数据误删），Controller 在删除分支按标签 `app.kubernetes.io/managed-by=mysql-operator` 显式删除——宁可 Terminating 慢，不可留孤儿数据卷；
+- **密码不进 CR**：`rootPasswordSecret` 引用 Secret，CR 进 etcd 与审计日志也不泄露；且密码可独立轮换，CR 无需变更。
 
-**实测踩坑（最有价值的一条）**：备份 CronJob 引用的 `mysql-sample-backup` PVC
-忘了由 controller 创建——CronJob 的卷引用**不会触发动态供给**，Pod 永远
-`FailedScheduling: pvc not found`。静态检查全绿，只有真机跑到才暴露。
+踩坑清单：
 
-## 5. 验收记录（2026-09-05，kind v1.36）
+- **备份 CronJob 引用的 `mysql-sample-backup` PVC 忘了由 controller 创建**——CronJob 的卷引用**不会触发动态供给**，Pod 永远 `FailedScheduling: pvc not found`。静态检查全绿，只有真机跑到才暴露：任何被引用的 PVC 必须有供给来源。
+
+验收记录（2026-09-05，kind v1.36）：
 
 | 验收项 | 结果 |
 |:---|:---|
@@ -90,28 +83,10 @@ sts.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{{
 | 备份 CronJob 手动触发 Job 成功，日志 backup-ok，dump 在独立 PVC | ✅ |
 | 删 CR → Finalizer 清理全部 PVC，集群零残留 | ✅ |
 
-## 6. 文件结构
+## Q&A
 
-```
-02_mysql_operator/
-├── README.md                        # 本文档
-├── cmd/main.go                      # kubebuilder 入口
-├── api/v1/                          # MySQL 类型定义 + deepcopy
-├── internal/controller/             # Reconcile 核心（mysql_controller.go）
-├── config/                          # CRD / RBAC / manager 部署清单
-└── images/
-    ├── mysql_stack.architecture.json  # 图源（Typed JSON IR）
-    ├── mysql_stack.html               # 交互版架构图
-    └── mysql_stack.svg                # 双主题矢量版（本文档 §2 内嵌）
-```
+**Q1: volumeClaimTemplates 和引用现成 PVC 怎么选？**
+VCT 为每副本生成专属 PVC（`data-mysql-0`），副本间数据隔离，重建绑回原卷——有状态应用的默认选择；引用同一个 PVC 则所有副本共享一份数据，只适合只读场景（如挂载模型文件）。数据库类 CRD 一律走 VCT。
 
-## 7. 深入要点
-
-1. **volumeClaimTemplates vs 引用 PVC**：VCT 为每副本生成专属 PVC（data-mysql-0），
-   副本间隔离；引用同一个 PVC 则所有副本共享（适合只读）；
-2. **Headless Service 的作用**：给每个 Pod 稳定 DNS（mysql-0.mysql-h.ns.svc），主从复制
-   和客户端直连实例都靠它；
-3. **密码为什么用 Secret 引用**：CR 明文进 etcd 与审计日志；Secret 引用让密码独立轮换，
-   CR 无需变更；
-4. **Finalizer 清理 PVC 的权衡**：不清理 = 数据孤儿占空间；清理 = 删 CR 就删数据。
-   生产做法是 CR 上加开关（`deleteData: true`）或依赖备份先行。
+**Q2: Finalizer 清 PVC 是不是太激进了？删 CR 就删数据？**
+确实是个权衡：不清理 = 数据孤儿占空间且无人认领；清理 = 删 CR 就删数据。本实验选择"删干净"是教学语义下的正确取向；生产做法是 CR 上加开关（如 `deleteData: true`），或规定删除前必须先有备份（lab 17 的 CSI 快照 / lab 18 的 Velero 都能兜底）——无论如何，策略必须是显式声明的，不能靠"忘了删"来保留数据。

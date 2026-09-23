@@ -1,10 +1,10 @@
-# Nginx 反向代理 Operator（项目 6）
+# 06 · Nginx 反向代理 Operator：配置即资源
 
-> 声明式 Nginx 配置：一个 `NginxProxy` CR 定义 upstreams 和 locations，
-> Controller 把它们**渲染成 nginx.conf**、写入 ConfigMap 并挂载到 nginx Deployment——
-> 改 CR = 改 Nginx 配置，无需手动编辑文件或重启。
+> 声明式 Nginx 配置：一个 `NginxProxy` CR 定义 upstreams 和 locations，Controller 把它们**渲染成 nginx.conf**、写入 ConfigMap 并挂载到 nginx Deployment——改 CR = 改 Nginx 配置，无需手动编辑文件或重启。
 
-## 1. 它做什么
+## What
+
+一个 `NginxProxy` CR 长这样：
 
 ```yaml
 apiVersion: web.example.com/v1
@@ -17,22 +17,13 @@ spec:
     - { path: "/", upstream: "app" }
 ```
 
-apply 后：nginx.conf 自动渲染 → ConfigMap → Deployment 挂载 → Service 暴露。
-改 CR 里的 upstream，配置自动更新并滚动生效。
+apply 后：nginx.conf 自动渲染 → ConfigMap → Deployment 挂载 → Service 暴露；改 CR 里的 upstream，配置自动更新并滚动生效。一句话心智模型：**配置即资源**——nginx.conf 不再是机器上的一个文件，而是 CR 渲染出的产物，版本、回滚、审计全部复用 CR 的工作流。
 
-## 2. 架构总览
+## Why
 
-![Nginx flow](images/nginx_flow.svg)
+手工管 Nginx 配置的经典困境：配置文件散在各处、改了谁记不清、reload 之前不知道配置对不对。渲染-指纹模式把这些问题一次性解决：CR 是唯一事实源，渲染是可单测的纯函数，confHash 是"配置是否已部署"的幂等哨兵——`status` 里一句 `config <hash> deployed` 就能对账。这一模式同样适用于 Prometheus、Envoy、HAProxy 的配置管理类 Operator，是配置类 Operator 的通用套路。
 
-渲染-比对的经典模式：`renderNginxConf()` 纯函数把 CR 渲染成配置文本 →
-SHA256 取 12 位 `confHash` → CreateOrPatch ConfigMap、Deployment（confHash 写入
-Pod 模板注解 `config-hash`）、Service → **hash 变化 = 配置变化**，Pod 模板注解变更
-触发滚动更新，新配置随新 Pod 生效；status 上报 `config <hash> deployed`。
-
-> 🌐 **交互版**：[在线打开（GitHub Pages）](https://yong-huang.github.io/hands-on-kubernetes/operators/06_nginx_operator/images/nginx_flow.html)
-> （或本地打开 [`images/nginx_flow.html`](images/nginx_flow.html)）。
-
-## 3. 快速开始
+## How
 
 ```bash
 cd operators/06_nginx_operator
@@ -42,7 +33,9 @@ kubectl get nginxproxy,cm,deploy,svc -l app.kubernetes.io/name=reverse-proxy
 # 改 CR 里的 upstream 再观察 Pod 逐个滚动（config-hash 变化驱动）
 ```
 
-## 4. Reconcile 代码走读
+## Deep Dive
+
+渲染-比对的经典模式：`renderNginxConf()` 纯函数把 CR 渲染成配置文本 → SHA256 取 12 位 `confHash` → CreateOrPatch ConfigMap、Deployment（confHash 写入 Pod 模板注解 `config-hash`）、Service → **hash 变化 = 配置变化**，Pod 模板注解变更触发滚动更新，新配置随新 Pod 生效；status 上报 `config <hash> deployed`。
 
 ```go
 // 纯函数渲染：CR → nginx.conf 文本（无副作用，好测试）
@@ -53,33 +46,25 @@ dep.Spec.Template.Annotations = map[string]string{"config-hash": confHash}
 cond := metav1.Condition{ Message: fmt.Sprintf("config %s deployed", confHash), ... }
 ```
 
-- **配置渲染为什么用纯函数**：输入 CR 输出文本，单测不需要 mock K8s；
-- **hash 做幂等哨兵**：文本级 diff 转成一个 12 位指纹，status 对比即可判断"配置是否已部署"；
-- **滚动更新 vs nginx -s reload**：滚动更稳妥（新配置新 Pod），reload 更快但要求共享
-  ConfigMap 且旧 Pod 能收到信号——教学实现选前者。
+踩坑清单：
 
-## 5. 验收记录（2026-09-05，kind v1.36）
+- **ConfigMap 热加载的延迟**：kubelet 同步 ConfigMap 有约 1 分钟延迟且文件是符号链接原子替换（见 lab 05），依赖"改了 ConfigMap 立即生效"必然踩坑——应用要么轮询、要么 `nginx -s reload`、要么滚动更新，三选一必须明确；本实验选择滚动。
+
+验收记录（2026-09-05，kind v1.36）：
 
 | 验收项 | 结果 |
 |:---|:---|
 | CR 声明的 upstream/location 路由生效 | ✅ |
 | 改 CR 后 config-hash 变化、Pod 滚动、新配置生效 | ✅ |
-| 删 CR 级联清理（复用项目 1 的 OwnerReference 模式） | ✅ |
+| 删 CR 级联清理（复用 lab 01 的 OwnerReference 模式） | ✅ |
 
-## 6. 文件结构
+## Q&A
 
-```
-06_nginx_operator/
-├── internal/controller/nginxproxy_controller.go   # 渲染 + 三件套编排 + hash 上报
-├── config/samples/web_v1_nginxproxy.yaml
-└── images/nginx_flow.*                            # 架构图三件套
-```
+**Q1: 为什么用滚动更新而不是 `nginx -s reload`？**
+滚动更稳妥——新配置跑在新 Pod 里，出问题回滚就是模板回滚；reload 更快（不换 Pod）但要求 Pod 能看到新 ConfigMap 且能收到信号，时序依赖多。教学实现选前者；生产高流量场景可用 reload + 共享 ConfigMap，但要把"reload 失败怎么办"也纳入 Reconcile。
 
-## 7. 深入要点
+**Q2: 为什么把 confHash 写进 Pod 模板注解，而不是只写 status？**
+注解是 Pod 模板的一部分——注解变化必然触发滚动更新，等于把"配置版本"物化成了工作负载的定义。只写 status 的话，配置变了但 Pod 模板没变，K8s 不会做任何事。顺带的收益：回滚 = 模板回滚，hash 就是配置的版本号。
 
-1. **声明式配置管理的通用套路**：CR（期望）→ 渲染（纯函数）→ 指纹（hash）→ 子资源收敛，
-   这一模式同样适用于 Prometheus/Envoy/Haproxy 的配置管理类 Operator；
-2. **ConfigMap 热加载的坑**：kubelet 同步 ConfigMap 有约 1 分钟延迟且文件是符号链接
-   原子替换，应用要么轮询、要么 nginx -s reload、要么滚动——三选一必须明确；
-3. **为什么把 hash 写进 Pod 注解**：注解变化必然触发滚动，把"配置版本"变成
-   Pod 模板的一部分，回滚 = 模板回滚。
+**Q3: 渲染函数为什么要写成纯函数？**
+输入 CR、输出文本，没有 K8s API 调用和副作用——单元测试直接喂 CR 对象断言输出文本，不需要 fake client 和环境。配置渲染逻辑最容易藏边角案例（转义、空列表、重复 key），可单测性决定了它的可靠性上限。
