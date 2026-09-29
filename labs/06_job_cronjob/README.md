@@ -1,10 +1,20 @@
 # 06 · Job 与 CronJob：会结束的工作
 
-> Deployment 假设 Pod 应该永远活着，挂了就重建；但有一大类工作**天生要结束**——跑完就该退出，而且要"论成败"。Job / CronJob 就是为它们设计的。
+> Deployment 假设 Pod 应该永远活着，挂了就重建；但有一大类工作**天生要结束**——跑完就该退出，而且要"论成败"。Job / CronJob 就是为它们设计的。读完本篇，你将掌握 completions × parallelism 的组合语义、两种失败处理路径的差异，以及 CronJob 错过调度点的真实行为。
+
+## Background
+
+批处理任务（转码 100 个视频、跑一次数据清洗）和定时任务（每小时备份、每天报表）最早的做法是：找台机器挂个 crontab，或起一个"伪装成长驻服务"的容器循环执行。前者的问题是没有执行记录、失败无人知晓；
+
+后者更尴尬——任务进程正常退出（exit 0）会被 Deployment 当成"崩溃"无脑重启，任务陷入死循环。
+
+根本矛盾在于：Deployment 以"存活"论成败，而这批工作以"退出码"论成败。Kubernetes 为后者提供了专门的工作负载类型——Job 保证 N 个 Pod 成功结束，CronJob 按 cron 表达式周期性创建 Job。
 
 ## What
 
-**Job** 创建一个或多个 Pod，保证指定数量的 Pod **成功结束**（exit 0）；**CronJob** 按 cron 表达式周期性地创建 Job——真正干活的还是 Job，它只是调度器。一句话心智模型：**Deployment 以"存活"论成败，Job 以"退出码"论成败**。
+**Job** 创建一个或多个 Pod，保证指定数量的 Pod **成功结束**（exit 0）；**CronJob** 按 cron 表达式周期性地创建 Job——真正干活的还是 Job，它只是调度器。
+
+一句话心智模型：**Deployment 以"存活"论成败，Job 以"退出码"论成败**——但和 crontab 不同的是，Job 有重试上限、并发控制和完整的历史记录，失败的执行有迹可循。
 
 Job 的语义由三个字段共同决定：
 
@@ -28,13 +38,23 @@ CronJob 关键在 `concurrencyPolicy`——上一次的 Job 还没跑完，新�
 | Forbid | 跳过本次调度 | 任务可能耗时超过周期（如备份），绝不允许重叠 |
 | Replace | 杀掉正在跑的旧 Job，用新的替代 | 只关心最新一次结果 |
 
-## Why
+## When to Use
 
-批处理任务（转码 100 个视频、跑一次数据清洗）和定时任务（每小时备份、每天报表）用 Deployment 跑有两个致命问题：任务进程正常退出（exit 0）会被当成"崩溃"，Deployment 无脑重启容器，任务陷入死循环；且没有"成功/失败"的概念——副本数永远是 3，但你永远不知道任务跑完没有。
+典型场景：跑一次数据迁移或报表生成（Job）；每小时备份数据库（CronJob + Forbid）；把 1000 个待处理 item 分给 10 个 worker 消费（completions + parallelism 工作队列）。
 
-Job 把"任务跑完了吗"变成一等公民：K8s 替你数成功数、控制并发、按退避重试、超时强杀，CronJob 再加上"到点自动触发"。
+何时不用：需要常驻对外服务的应用（那是 Deployment 的事）；依赖"精确到秒"的触发（CronJob 的 tick 是分钟级精度）。
 
-## How
+同类方案对比：
+
+| 方案 | 差异 | 什么时候选它 |
+|---|---|---|
+| crontab / 手工脚本 | 无重试、无并发控制、无记录 | 一次性个人脚本 |
+| Deployment | 以存活论成败 | 常驻服务 |
+| Job / CronJob | 以退出码论成败，有重试与历史 | 会结束的批处理与定时任务 |
+
+## Quick Start
+
+前置条件：kind 集群已就绪（见 [labs/01](../01_setup_env/README.md)）。
 
 ```bash
 cd labs/06_job_cronjob
@@ -45,6 +65,8 @@ cd labs/06_job_cronjob
 ./job_cronjob.sh suspend    # 挂起 / 恢复 CronJob
 ./job_cronjob.sh clean
 ```
+
+成功判据：`parallel` 步骤里 work-queue 的 Pod 分三批出现（每批 2 个：2 → 2 → 2）；`failure` 步骤里 Job 重试数次后变为 Failed（退避间隔逐次拉长）——看到这两点即演示到位（以实际运行为准）。
 
 关键字段（`manifests/job_cronjob.yaml`）：
 
@@ -71,9 +93,11 @@ spec:
     spec: { ... }                 # 结构与普通 Job 的 spec 相同
 ```
 
-## Deep Dive
+## How It Works
 
-**restartPolicy：Never vs OnFailure**：Job 的 Pod 模板里 `restartPolicy` 只允许 `Never` 或 `OnFailure`（Deployment 默认的 `Always` 对 Job 非法——Job 的语义就是靠"Pod 结束"来判断成败的），失败处理路径完全不同：
+**restartPolicy：Never vs OnFailure**：Job 的 Pod 模板里 `restartPolicy` 只允许 `Never` 或 `OnFailure`（Deployment 默认的 `Always` 对 Job 非法——Job 的语义就是靠"Pod 结束"来判断成败的），
+
+失败处理路径完全不同：
 
 - **Never**：容器一失败，整个 Pod 标记 Failed，**Job 新建一个 Pod** 重试；失败 Pod 保留现场，方便 `kubectl describe` 排查
 - **OnFailure**：**在同一个 Pod 里重启容器**，RESTARTS +1，不产生新的 Failed Pod
@@ -82,18 +106,25 @@ spec:
 
 **重试与死线**：重试按**指数退避**（10s → 20s → 40s…）；`activeDeadlineSeconds` 给 Job 整体设"死线"，超时强制终止——它优先于 backoffLimit，任务可能还没重试完就被判超时。
 
-**CronJob 的调度语义**：schedule 是标准五段 cron（分 时 日 月 周），注意**时区取决于控制器所在时区，通常 UTC**。`startingDeadlineSeconds` 决定"错过调度点多久内还能补启动"——控制器宕机恢复后可能连错好几个 tick，期限内逐个补跑（可能连补多次），超期直接跳过；补跑时若上一轮还在跑，按 `concurrencyPolicy` 处理。所以"至少一次触发"是常态，**任务必须幂等**。`successfulJobsHistoryLimit` / `failedJobsHistoryLimit` 控制保留多少历史 Job 供查日志。
+你在 `failure` 步骤看到的"重试几次后变 Failed"，就是 backoffLimit 到顶的结果。
+
+**CronJob 的调度语义**：schedule 是标准五段 cron（分 时 日 月 周），注意**时区取决于控制器所在时区，通常 UTC**。
+
+`startingDeadlineSeconds` 决定"错过调度点多久内还能补启动"——控制器宕机恢复后可能连错好几个 tick，期限内逐个补跑（可能连补多次），超期直接跳过；补跑时若上一轮还在跑，按 `concurrencyPolicy` 处理。
+
+所以"至少一次触发"是常态，**任务必须幂等**。`successfulJobsHistoryLimit` / `failedJobsHistoryLimit` 控制保留多少历史 Job 供查日志。
+
+## Pitfalls & Q&A
 
 踩坑清单：
 
-- Job 的 Pod **退出码 0 才算成功**；exit 非 0 都会触发重试
-- `kubectl scale job` 只能临时调大 parallelism，**不能改 completions**
-- Job 完成后 Pod 默认保留（可看日志），但 Job 对象堆积会占用 etcd——用 `ttlSecondsAfterFinished` 或历史上限清理
-- CronJob 的 tick 是分钟级精度，控制器恢复后可能**连续补跑**错过的 tick，任务必须幂等
-
-## Q&A
+- Job 的 Pod **退出码 0 才算成功**；exit 非 0 都会触发重试。
+- `kubectl scale job` 只能临时调大 parallelism，**不能改 completions**。
+- Job 完成后 Pod 默认保留（可看日志），但 Job 对象堆积会占用 etcd——用 `ttlSecondsAfterFinished` 或历史上限清理。
+- CronJob 的 tick 是分钟级精度，控制器恢复后可能**连续补跑**错过的 tick，任务必须幂等。
 
 **Q1: Job / CronJob / Deployment / StatefulSet / DaemonSet 怎么选？**
+
 按生命周期判断：跑完即退且要论成败用 Job；周期性触发用 CronJob；永不结束、要自愈和持续可用的无状态服务用 Deployment；有状态用 StatefulSet（lab 08）；每节点跑一个的守护进程用 DaemonSet（lab 07）。
 
 **Q2: 如何"暂停"一个 CronJob 而不丢配置？**

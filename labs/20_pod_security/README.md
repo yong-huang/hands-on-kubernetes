@@ -1,17 +1,29 @@
 # 20 · Pod Security：PSS 三等级与 PSA 准入控制
 
-> 默认情况下，容器里的进程一旦配上 `privileged: true`，就等于拿到了节点内核的全部能力：可以挂载宿主磁盘、改内核参数、读写其他容器的内存。哪怕不提权，一个 hostPath 挂到 `/` 的容器也能把整台节点搬走。Pod 安全需要**在创建时刻**就把这些越权行为挡在门外。
+> 默认情况下，容器里的进程一旦配上 `privileged: true`（特权模式，共享节点内核全部能力），就可以挂载宿主磁盘、改内核参数、读写其他容器的内存。哪怕不提权，一个 hostPath 挂到 `/` 的容器也能把整台节点搬走。Pod 安全需要**在创建时刻**就把这些越权行为挡在门外。读完本篇，你将掌握 PSS 三等级的包含关系，并看到"同一个特权 Pod 在三个命名空间命运迥异"的演示。
+
+## Background
+
+容器安全的传统防线是事后审计：镜像扫一遍、运行时告警。但特权容器的危害发生在创建那一刻——进程拿到节点内核能力后，事后驱逐只是止损，节点边界已经破了。
+
+更早的方案 Pod Security Policy（PSP）用"集群级策略对象 + RBAC 授权"实现创建时拦截，但配置极其繁琐，默认拒绝模式容易把整个集群锁死，K8s 在 v1.21 弃用、v1.25 彻底移除了它。
+
+官方替代是 PSS + PSA 的两层设计：标准定义"什么算安全"（三套官方策略），准入控制决定"怎么执行"（按 namespace 标签拒绝/警告/审计）。配置从"一坨策略对象"简化成"namespace 上打标签"。
 
 ## What
 
-Kubernetes 的现代答案是 **PSS + PSA 两层设计**：Pod Security Standards（PSS）定义"什么算安全"——三套官方策略；Pod Security Admission（PSA）负责"怎么执行"——内置准入控制器，按 namespace 标签决定拒绝/警告/审计。一句话心智模型：**安全策略跟着 namespace 走，namespace 上打标签就是全部配置**。
+Kubernetes 的现代答案是 **PSS + PSA 两层设计**：Pod Security Standards（PSS）定义"什么算安全"——三套官方策略；
+
+Pod Security Admission（PSA）负责"怎么执行"——内置准入控制器，按 namespace 标签决定拒绝/警告/审计。
+
+一句话心智模型：**安全策略跟着 namespace 走，namespace 上打标签就是全部配置**——但和"全局开关"不同的是，不同 namespace 可以有不同等级，特权系统组件可以集中在专属 namespace。
 
 三个等级（**包含关系**：restricted 的要求 ⊇ baseline ⊇ 无，合规于 restricted 的 Pod 在任何等级下都合规）：
 
 | 等级 | 定位 | 典型禁/要求项 |
 |------|------|--------------|
 | **privileged** | 无限制 | 全部放开；仅给 CNI/CSI/监控这类真正需要特权的系统组件 |
-| **baseline** | 中等 | 禁特权容器、禁宿主命名空间（hostNetwork/hostPID/hostIPC）、禁 hostPath 与 /proc、/sys 挂载、禁新增 capabilities（如 CAP_SYS_ADMIN） |
+| **baseline** | 中等 | 禁特权容器、禁宿主命名空间（hostNetwork/hostPID/hostIPC）、禁 hostPath 与 /proc、/sys 挂载、禁新增 capabilities |
 | **restricted** | 最严格 | 包含 baseline 全部要求，另加：必须 `runAsNonRoot`、必须 drop ALL capabilities、必须 `seccompProfile: RuntimeDefault`、禁止 `allowPrivilegeEscalation` |
 
 同一个等级标签可配三种模式（六种标签的组合：`{enforce,audit,warn}[-version]`）：
@@ -22,11 +34,23 @@ Kubernetes 的现代答案是 **PSS + PSA 两层设计**：Pod Security Standard
 | **audit** | 照常创建，审计日志记一条 `PodSecurityAudit` 事件 | 留痕评估违规面 |
 | **warn** | 照常创建，kubectl 打印警告（写入 API 响应的 warnings 字段） | 给调用方提前感知 |
 
-## Why
+## When to Use
 
-Pod 安全必须"创建时拦截"而不是"运行后补救"：特权容器一旦起来，节点的内核边界就破了，事后驱逐只是止损。而旧方案 Pod Security Policy（PSP）是集群级策略对象 + RBAC 授权，配置极其繁琐、默认拒绝容易把整个集群锁死——PSP 在 **v1.21 弃用、v1.25 移除**，官方替代就是 PSA：零 API 对象、按 namespace 天然隔离、warn/audit 提供平滑灰度路径。
+典型场景：业务 namespace 逐步收紧到 restricted（先 warn 后 enforce 的灰度路径）；给平台组件留一个 privileged namespace 并严控部署权限；存量业务合规改造前用 audit 统计违规面。
 
-## How
+何时不用：需要按"请求者身份"区分策略（PSA 只认 namespace 不认人——那要 Kyverno/OPA）；需要限制只读根文件系统等 PSP 细粒度能力（PSA 未覆盖）。
+
+同类方案对比：
+
+| 方案 | 差异 | 什么时候选它 |
+|---|---|---|
+| 无 Pod 安全策略 | 任何 Pod 都能特权 | 不要在生产用 |
+| PSA（PSS 三等级） | namespace 标签、零额外组件 | 大多数集群的基线 |
+| Kyverno / OPA Gatekeeper | 策略即代码、更细粒度 | 需要自定义规则（禁 latest 标签等） |
+
+## Quick Start
+
+前置条件：kind 集群已就绪（见 [labs/01](../01_setup_env/README.md)）。
 
 ```bash
 cd labs/20_pod_security
@@ -64,22 +88,46 @@ spec:
           type: RuntimeDefault
 ```
 
-把普通业务 Pod 改造成 restricted 合规的四件套：① `runAsNonRoot: true`（必要时显式 `runAsUser: 1000`，root 镜像需要重打或换基础镜像）；② `capabilities.drop: ["ALL"]`——确需个别能力（如绑定 80 端口的 `NET_BIND_SERVICE`）再单独 add 回来；③ `allowPrivilegeEscalation: false`——同时意味着不能 setuid；④ `seccompProfile.type: RuntimeDefault`——Pod 级或容器级均可。偷懒办法：`kubectl label --dry-run` 先验证，或用社区脚本批量给 Deployment 打补丁。
+把普通业务 Pod 改造成 restricted 合规的四件套：① `runAsNonRoot: true`（必要时显式 `runAsUser: 1000`，root 镜像需要重打或换基础镜像）；
 
-## Deep Dive
+② `capabilities.drop: ["ALL"]`——确需个别能力（如绑定 80 端口的 `NET_BIND_SERVICE`）再单独 add 回来；③ `allowPrivilegeEscalation: false`——同时意味着不能 setuid；
 
-**三模式的软硬组合**：enforce 违规直接拒绝（Forbidden）；audit 照常创建但在审计日志记录事件；warn 照常创建但通过 API 响应的 warnings 字段提示调用方。三者可同时配置不同等级，例如 enforce=baseline + warn=restricted——先硬挡最危险的、再软提示更高的目标。
+④ `seccompProfile.type: RuntimeDefault`——Pod 级或容器级均可。偷懒办法：`kubectl label --dry-run` 先验证，或用社区脚本批量给 Deployment 打补丁。
 
-**baseline 的边界**：面向"明显越权"——特权容器、宿主命名空间（hostNetwork/hostPID/hostIPC）、hostPath 及 /proc、/sys 等危险挂载、新增 capabilities、hostPorts。注意 baseline **不管** root 运行、capabilities 保留集和 seccomp，这些是 restricted 的职责。
+## How It Works
 
-**招牌演示**：**同一个特权测试 Pod**，提交到三个 PSA 标签不同的命名空间——`enforce=restricted` 直接 403 拒绝、`warn=restricted` 带着警告创建成功、`audit=restricted` 静默创建但审计留痕。同一份 YAML，命运完全由目标 namespace 的标签决定。
+**三模式的软硬组合**：enforce 违规直接拒绝（Forbidden）；audit 照常创建但在审计日志记录事件；warn 照常创建但通过 API 响应的 warnings 字段提示调用方。
 
-**PSP → PSA 迁移的可行路径**：① 盘点现有 PSP 与实际使用面；② 对每个 namespace 先打 `warn` + `audit` 标签跑一两周，收集违规；③ 修复工作负载（securityContext 全家桶）；④ 逐 namespace 升级 enforce，从低风险业务开始；⑤ 真需要特权的组件集中到专用 privileged namespace。局限：PSA 不支持 PSP 的部分能力（如按 RBAC 授权不同策略、限制只读 root FS），复杂需求需配 Kyverno/OPA。
+三者可同时配置不同等级，例如 enforce=baseline + warn=restricted——先硬挡最危险的、再软提示更高的目标。
 
-## Q&A
+**baseline 的边界**：面向"明显越权"——特权容器、宿主命名空间（hostNetwork/hostPID/hostIPC）、hostPath 及 /proc、/sys 等危险挂载、新增 capabilities、hostPorts。
+
+注意 baseline **不管** root 运行、capabilities 保留集和 seccomp，这些是 restricted 的职责。
+
+**招牌演示**：**同一个特权测试 Pod**，提交到三个 PSA 标签不同的命名空间——`enforce=restricted` 直接 403 拒绝、`warn=restricted` 带着警告创建成功、`audit=restricted` 静默创建但审计留痕。
+
+你在 `test` 步骤看到的三种不同结局，全部来自目标 namespace 的标签——同一份 YAML，命运由准入规则决定。
+
+**PSP → PSA 迁移的可行路径**：① 盘点现有 PSP 与实际使用面；② 对每个 namespace 先打 `warn` + `audit` 标签跑一两周，收集违规；③ 修复工作负载（securityContext 全家桶）；
+
+④ 逐 namespace 升级 enforce，从低风险业务开始；⑤ 真需要特权的组件集中到专用 privileged namespace。局限：PSA 不支持 PSP 的部分能力（如按 RBAC 授权不同策略、限制只读 root FS），复杂需求需配 Kyverno/OPA。
+
+## Pitfalls & Q&A
+
+踩坑清单：
+
+- enforce 直接上线全量业务：存量 Pod 多半不合规，发布会被大面积拦死——按灰度路径走。
+- 忘写 `-version` 标签：集群升级后策略可能悄悄变严，显式固定版本。
+- 平台组件（CNI/CSI）被业务 ns 的 enforce 拦住：它们应集中到 privileged 专属 ns。
 
 **Q1: PSA、RBAC、NetworkPolicy 三者的分工？**
-三者正交，共同构成纵深防御：RBAC 管"谁能对哪些资源做什么操作"（API 访问控制，挡住人，见 lab 19）；PSA 管"Pod 本身能有多大的越权配置"（工作负载安全基线，挡住危险 Pod）；NetworkPolicy 管"Pod 能跟谁通信"（网络层，挡住横向移动，见 lab 12）。任何一层都不是银弹——RBAC 挡不住容器逃逸，PSA 挡不住两个合法 Pod 之间的攻击。
+
+三者正交，共同构成纵深防御：RBAC 管"谁能对哪些资源做什么操作"（API 访问控制，挡住人，见 lab 19）；PSA 管"Pod 本身能有多大的越权配置"（工作负载安全基线，挡住危险 Pod）；
+
+NetworkPolicy 管"Pod 能跟谁通信"（网络层，挡住横向移动，见 lab 12）。任何一层都不是银弹——RBAC 挡不住容器逃逸，PSA 挡不住两个合法 Pod 之间的攻击。
 
 **Q2: 集群里所有业务 namespace 都该直接上 enforce=restricted 吗？**
-不该一刀切。restricted 要求 securityContext 四件套齐全，存量业务多半不合规，直接 enforce 会把发布全部拦死。按灰度路径走：先全量打 `warn=restricted` 让调用方在 kubectl 输出里看到差距，再对低风险 namespace 升 enforce；平台型基础设施（CNI/CSI/监控 Agent）集中到 privileged namespace，并严格控制谁能往里部署。
+
+不该一刀切。restricted 要求 securityContext 四件套齐全，存量业务多半不合规，直接 enforce 会把发布全部拦死。
+
+按灰度路径走：先全量打 `warn=restricted` 让调用方在 kubectl 输出里看到差距，再对低风险 namespace 升 enforce；平台型基础设施（CNI/CSI/监控 Agent）集中到 privileged namespace，并严格控制谁能往里部署。
