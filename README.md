@@ -1,6 +1,6 @@
 # hands-on-kubernetes
 
-> Kubernetes 动手学习系列：31 个实验与 10 个微服务项目已全部在本地 kind 集群验证过，10 个 Operator 项目完成并验证 7 个（进行中）。读完这个仓库的任意一篇，你都能照着脚本跑通并理解背后的机制。
+> Kubernetes 动手学习系列：34 个实验与 10 个微服务项目已全部在本地 kind 集群验证过，10 个 Operator 项目完成并验证 7 个（进行中）。读完这个仓库的任意一篇，你都能照着脚本跑通并理解背后的机制。
 
 ## Background
 
@@ -16,7 +16,7 @@ hands-on-kubernetes 是一个动手学习系列仓库，包含三条学习线：
 
 | 线 | 目录 | 内容 | 状态 |
 |---|---|---|---|
-| 实验线 | `labs/` | 31 个实验（00 是工具准备）：工作负载、网络、存储、安全、可观测、平台工程 | ✅ 全部完成 |
+| 实验线 | `labs/` | 34 个实验（00 是工具准备，32-34 为进阶扩展）：工作负载、网络、存储、安全、可观测、平台工程 | ✅ 全部完成 |
 | Operator 线 | `operators/` | 10 个 kubebuilder 项目：资源编排到 AI 工作负载 | 🚧 7/10 |
 | 微服务线 | `mart/` | mini-mart 迷你电商：10 个项目共同生长的系统 | ✅ 10/10 |
 
@@ -24,7 +24,7 @@ hands-on-kubernetes 是一个动手学习系列仓库，包含三条学习线：
 
 但和三本独立教材不同的是，三条线共享同一个集群和一套脚本约定，operator 与微服务实验会直接引用 labs 里建立的机制（如 labs/31 的 fake GPU 设备插件、labs/02 的探针健康检查）。
 
-每个实验的统一结构：教程 README、K8s 清单（manifests/）、一键演示脚本（xxx.sh，支持分步执行）、架构图（images/，可交互 HTML + 双主题 SVG，共 41 张；README 均为纯文字，不内嵌图）。
+每个实验的统一结构：教程 README、K8s 清单（manifests/）、一键演示脚本（xxx.sh，支持分步执行）、架构图（images/，可交互 HTML + 双主题 SVG，共 44 张；README 均为纯文字，不内嵌图）。
 
 GitHub Pages 开启后可[在线查看架构图](https://yong-huang.github.io/hands-on-kubernetes/)，本地用浏览器打开 `images/*.html` 也可以。
 
@@ -105,21 +105,28 @@ scripts/load_images.sh [image1 image2 ...]   # 无参数时加载默认列表
 | 29 | [CRD Controller](labs/29_crd_controller/README.md) | 自定义资源与调谐循环 |
 | 30 | [Karmada](labs/30_multicluster_federation/README.md) | 多集群联邦管理 |
 | 31 | [Fake GPU Operator](labs/31_fake_gpu_operator/README.md) | GPU Operator 与 AI Ops 体验 |
+| 32 | [Kustomize](labs/32_kustomize_overlay/README.md) | base/overlay 多环境管理与哈希滚动 |
+| 33 | [Gateway API](labs/33_gateway_api/README.md) | Ingress 继任者：三层模型与权重分流 |
+| 34 | [cert-manager](labs/34_cert_manager/README.md) | 两级 CA 信任链与证书自动续期 |
 
-**建议学习路线**（labs 内部的六段坡道）：
+**建议学习路线**（labs 主线按序号走，三篇进阶实验在对应位置插读）：
 
 1. **基础（01–09）**：环境 → 工作负载 → 网络 → 配置 → 弹性，理解"声明式 API + 控制循环"这条主线
-2. **调度与网络进阶（10–14）**：调度约束、七层路由、网络隔离、服务网格、DNS 内幕
-3. **存储（15–18）**：从静态 PV 到动态供给、快照、备份迁移
-4. **安全（19–22）**：RBAC、Pod 准入、镜像供应链、密钥管理
-5. **可观测性（23–26）**：监控、日志、追踪、排障
-6. **平台工程（27–31）**：Helm、GitOps、CRD 扩展、多集群、Operator
+2. **调度与网络（10–12）**：调度约束、七层路由、网络隔离 → 插读 **32·Gateway API**（Ingress 的官方继任者，趁 Ingress 记忆新鲜对照着读）
+3. **服务治理（13–14）**：服务网格、DNS 内幕
+4. **存储（15–18）**：从静态 PV 到动态供给、快照、备份迁移
+5. **安全（19–20）**：RBAC、Pod 准入 → 插读 **34·cert-manager**（给 11 的 TLS 字段补上自动签发与续期）
+6. **镜像与密钥（21–22）**：镜像供应链、Vault 动态凭证
+7. **可观测性（23–26）**：监控、日志、追踪、排障
+8. **平台工程（27，插读 32·Kustomize，再 28–31）**：Helm → Kustomize（Helm 的另一半，ArgoCD 常见前置）→ GitOps、CRD 扩展、多集群、Operator
+
+> 编号是实验的身份证（= 创建顺序），不是阅读顺序——按本路线读，三篇进阶实验会出现在它们最有参照价值的位置。
 
 **三条学习线的清单文档**（含逐项验收标准、AI 开始提示词、踩坑记录），落地代码分别在 `labs/`、`operators/`、`mart/`：
 
 | 清单 | 内容 | 状态 |
 |:--|:--|:--|
-| [kubernetes.md](docs/kubernetes.md) | 31 个实验的总清单（与 labs/ 一一对应） | ✅ 31/31 |
+| [kubernetes.md](docs/kubernetes.md) | 34 个实验的总清单（与 labs/ 一一对应） | ✅ 34/34 |
 | [kubernetes_operator.md](docs/kubernetes_operator.md) | 10 个 Operator 开发项目（kubebuilder） | 🚧 7/10（项目 5 代码完成待修，7、10 未勾选） |
 | [microservices.md](docs/microservices.md) | mini-mart 微服务开发（Go/Python 双栈） | ✅ 10/10 |
 | [TESTING.md](docs/TESTING.md) | 全仓测试报告与回归指南 | ✅ |

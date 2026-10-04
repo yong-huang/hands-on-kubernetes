@@ -1,0 +1,27 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: kustomize-demo
+resources:
+  - ../../base
+  - namespace.yaml
+labels:
+  - pairs:
+      environment: dev
+    includeSelectors: true   # 把新标签并进 selector——两个 overlay 的 Deployment 互不认领对方的 Pod
+nameSuffix: -dev
+images:
+  - name: nginx
+    newTag: "1.27"
+patches:
+  - target:
+      kind: Deployment
+      name: web
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 1
+configMapGenerator:
+  - name: web-config
+    behavior: replace        # 整体替换 base 的 web-config (对照 merge 的局部合并)
+    files:
+      - default.conf

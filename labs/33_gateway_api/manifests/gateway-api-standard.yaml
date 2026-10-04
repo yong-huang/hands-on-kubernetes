@@ -1,0 +1,3 @@
+# Gateway API 官方标准通道 CRD 清单的本地缓存位。
+# 脚本优先联网安装(带版本号), 直连失败时手动下载后放到这里:
+#   https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.2.1/standard-install.yaml

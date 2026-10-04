@@ -1,0 +1,21 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: a-example-com
+  namespace: default
+spec:
+  secretName: a-example-com-tls   # 签出的证书/私钥落进这个 Secret (lab 11 Ingress 的 tls.secretName 引用的就是它)
+  duration: 2160h                 # 证书有效期 90 天
+  renewBefore: 1440h              # 到期前 60 天自动续期 (续期窗口)
+  subject:
+    organizations: ["hands-on-kubernetes"]
+  commonName: a.example.com
+  dnsNames:
+    - a.example.com
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    name: demo-ca-issuer
+    kind: ClusterIssuer
+    group: cert-manager.io

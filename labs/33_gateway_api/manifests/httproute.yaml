@@ -1,0 +1,24 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: demo-route
+spec:
+  parentRefs:
+    - name: demo-gateway        # 挂到哪个 Gateway
+      kind: Gateway
+  hostnames:
+    - "a.example.com"           # 域名路由 (对照 lab 11 Ingress 的 host)
+  rules:
+    - matches:                  # 路径路由: /api 固定进 v2 (金丝雀路径)
+        - path: {type: PathPrefix, value: /api}
+      backendRefs:
+        - name: route-v2
+          port: 80
+    - matches:                  # 其余路径按 90/10 权重分流
+      backendRefs:
+        - name: route-v1
+          port: 80
+          weight: 90
+        - name: route-v2
+          port: 80
+          weight: 10

@@ -1,6 +1,6 @@
-# ☸️ Kubernetes 开发运维 31 小项目学习清单 · Todo List
+# ☸️ Kubernetes 开发运维 34 小项目学习清单 · Todo List
 
-> 通过 31 个小项目（每项目 50-300 行代码/配置）系统掌握 Kubernetes 开发、运维和架构设计
+> 通过 34 个小项目（每项目 50-300 行代码/配置）系统掌握 Kubernetes 开发、运维和架构设计（1-31 为核心路线，32-34 为进阶扩展）
 > 预计周期：5-6 周（每天有效学习 3-4 小时）
 > 每个项目都配有 🤖 AI 提示词，复制发给 AI 即可获得完整代码
 
@@ -20,7 +20,7 @@
 
 ## 📊 总进度
 
-进度：████████████████████ 31/31 (100%)
+进度：██████████████████████ 34/34 (100%)
 
 | 阶段 | 项目数 | 已完成 |
 |:---|:---:|:---:|
@@ -31,6 +31,7 @@
 | 第五阶段：安全与配置管理 | 4 | 4 |
 | 第六阶段：可观测性与排障 | 4 | 4 |
 | 第七阶段：CI/CD 与 GitOps | 4 | 4（另含项目31） |
+| 第八阶段：进阶扩展 | 3 | 3 |
 | **合计** | **31** | **31** |
 
 ---
@@ -580,6 +581,81 @@
 
 ---
 
+## 🗂️ 第八阶段：进阶扩展（项目 32-34）
+
+> **目标**：补齐当代 K8s 默认技术选型的三块空白——配置管理双子星的另一半、Ingress 的官方继任者、证书自动化
+
+---
+
+### [x] 项目 32：Kustomize 与 Overlay 多环境管理
+
+| 项目信息 | 详情 |
+|:---|:---|
+| **行数** | ~120 行 YAML |
+| **核心知识点** | base/overlay 结构、patchesStrategicMerge（patches）、images 变换、configMapGenerator 哈希、`kubectl apply -k` |
+| **验收标准** | dev/staging 两个 overlay 渲染出不同副本数与镜像 tag；改 ConfigMap 内容后 Pod 因哈希变化自动滚动 |
+| **前置知识** | 项目 3 (Deployment)、项目 5 (ConfigMap)、项目 27 (Helm，用于选型对比) |
+
+**🤖 开始提示词**：
+> `我要开始 Kubernetes 项目「Kustomize 多环境管理」，目标是构建 base + dev/staging overlay 结构。请给我完整目录：base（Deployment+Service+ConfigMap）、overlays/dev（replicas=1, 镜像 tag 区分）、overlays/staging（replicas=2, configMapGenerator），以及 `kubectl kustomize`/`apply -k` 验证命令。只输出代码。`
+
+**体验流程**：
+1. `kustomize build overlays/dev` 与 `overlays/staging` 对比渲染产物（副本数/镜像/配置哈希）
+2. `kubectl apply -k overlays/dev` 部署，观察 configMapGenerator 生成的哈希名
+3. 修改 base 的 ConfigMap 内容 → 重新 build → 哈希变化 → Pod 自动滚动
+4. 与项目 27 的 Helm 对照：模板引擎 vs 补丁叠加的选型判断
+
+**完成日期**：2026-10-02
+**踩坑记录**：________
+
+---
+
+### [x] 项目 33：Gateway API 与 HTTPRoute
+
+| 项目信息 | 详情 |
+|:---|:---|
+| **行数** | ~90 行 YAML |
+| **核心知识点** | GatewayClass/Gateway/HTTPRoute 三层模型、角色分离、跨命名空间引用、按权重分流 |
+| **验收标准** | 同一 Gateway 下按域名 + 路径路由到不同 Service；HTTPRoute 按 90/10 权重在两个后端间分流 |
+| **前置知识** | 项目 4 (Service)、项目 11 (Ingress，用于对比) |
+
+**🤖 开始提示词**：
+> `我要开始 Kubernetes 项目「Gateway API 入门」，目标是在 kind 集群用 Envoy Gateway 实现 Gateway API 路由。请给我完整清单：GatewayClass+Gateway 安装、两个后端 Deployment（v1/v2）、HTTPRoute 按域名+路径路由并带 90/10 权重分流，以及 port-forward 验证命令。只输出代码。`
+
+**体验流程**：
+1. 安装 Gateway API CRD + Envoy Gateway → 观察 GatewayClass 就绪
+2. 创建 Gateway（监听 80）→ HTTPRoute 声明域名与路径规则
+3. curl 带 Host 头验证域名/路径路由（对照项目 11 的 Ingress 写法）
+4. 修改 HTTPRoute 权重 90/10 → 多次请求统计命中比（对照项目 13 的 mesh 灰度）
+
+**完成日期**：2026-10-02
+**踩坑记录**：________
+
+---
+
+### [x] 项目 34：cert-manager 证书自动化
+
+| 项目信息 | 详情 |
+|:---|:---|
+| **行数** | ~60 行 YAML |
+| **核心知识点** | ClusterIssuer/Issuer、self-signed → CA 两级签发、Certificate 资源、Secret 落盘、renewBefore 续期窗口 |
+| **验收标准** | Certificate READY=True；从 Secret 里用 openssl 验证签发者与有效期；改 Certificate 触发重新签发 |
+| **前置知识** | 项目 11 (Ingress TLS 字段)、项目 19 (RBAC，cert-manager 部署含大量 RBAC) |
+
+**🤖 开始提示词**：
+> `我要开始 Kubernetes 项目「cert-manager 证书自动化」，目标是在 kind 集群安装 cert-manager 并演示两级签发。请给我完整清单：cert-manager 安装、self-signed ClusterIssuer、用 CA Issuer 签发 a.example.com 的 Certificate（renewBefore 720h）、openssl 验证命令。只输出代码。`
+
+**体验流程**：
+1. 安装 cert-manager → 三个 Pod（controller/webhook/cainjector）就绪
+2. 创建 self-signed ClusterIssuer → 用它签出 CA → 再建 CA Issuer（两级信任链）
+3. 声明 Certificate → 观察 Secret 自动生成 → `openssl x509` 验证签发者/域名/有效期
+4. 理解 renewBefore 续期窗口——证书快到期时 cert-manager 自动重签
+
+**完成日期**：2026-10-02
+**踩坑记录**：________
+
+---
+
 ## 📅 周计划
 
 | 周次 | 内容 | 项目数 |
@@ -603,6 +679,7 @@
 - [x] **完成项目 19-22** → 安全与配置管理能力
 - [x] **完成项目 23-26** → 可观测性与排障能力
 - [x] **完成项目 27-30** → 自动化交付与 GitOps 能力
+- [x] **完成项目 32-34** → 进阶扩展：Kustomize 多环境、Gateway API、cert-manager 证书自动化
 
 ---
 

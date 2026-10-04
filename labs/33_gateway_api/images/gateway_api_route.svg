@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 300" font-family="Helvetica,Arial,sans-serif">
+<style>.b{fill:#eef4ff;stroke:#4a6fa5;stroke-width:1.5}.g{fill:#e8f6ec;stroke:#3d8b57;stroke-width:1.5}.y{fill:#fdf3e0;stroke:#c9962e;stroke-width:1.5}.t{fill:#1a2b45;font-size:13px}.s{fill:#4a5a70;font-size:11px}@media(prefers-color-scheme:dark){.b{fill:#1d2a40;stroke:#7da2d8}.g{fill:#17301f;stroke:#6cbf8e}.y{fill:#33290f;stroke:#d8b25e}.t{fill:#e8eef7}.s{fill:#a8b8cc}}</style>
+<rect class="y" x="30" y="120" width="150" height="60" rx="8"/><text class="t" x="55" y="145">客户端</text><text class="s" x="48" y="165">Host: a.example.com</text>
+<rect class="b" x="250" y="30" width="170" height="46" rx="8"/><text class="t" x="272" y="52">GatewayClass: eg</text><text class="s" x="272" y="70">controllerName → Envoy</text>
+<rect class="b" x="250" y="95" width="170" height="46" rx="8"/><text class="t" x="285" y="117">Gateway: demo-gateway</text><text class="s" x="285" y="135">监听 :80 (基础设施方管)</text>
+<rect class="g" x="250" y="160" width="170" height="46" rx="8"/><text class="t" x="272" y="182">HTTPRoute: demo-route</text><text class="s" x="272" y="200">域名/路径/权重 (应用方管)</text>
+<rect class="b" x="500" y="60" width="180" height="50" rx="8"/><text class="t" x="528" y="82">Envoy 数据面 Pod</text><text class="s" x="530" y="100">自动拉起, 监听 :10080</text>
+<rect class="g" x="500" y="150" width="85" height="50" rx="8"/><text class="t" x="525" y="172">route-v1</text><text class="s" x="533" y="190">weight 90</text>
+<rect class="g" x="595" y="150" width="85" height="50" rx="8"/><text class="t" x="620" y="172">route-v2</text><text class="s" x="628" y="190">weight 10</text>
+<path d="M180 150 L250 118" stroke="#4a6fa5" stroke-width="1.5" marker-end="url(#a)"/><path d="M335 76 L335 95" stroke="#4a6fa5" stroke-width="1.5"/><path d="M335 141 L335 160" stroke="#4a6fa5" stroke-width="1.5" marker-end="url(#a)"/><path d="M420 183 L500 95" stroke="#4a6fa5" stroke-width="1.5" marker-end="url(#a)"/><path d="M590 110 L545 150" stroke="#3d8b57" stroke-width="1.5" marker-end="url(#a)"/><path d="M620 110 L630 150" stroke="#3d8b57" stroke-width="1.5" marker-end="url(#a)"/>
+<defs><marker id="a" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8" fill="none" stroke="#4a6fa5" stroke-width="1.5"/></marker></defs>
+<text class="s" x="30" y="280">路由实测: / → 90/10 权重分流 (16:4)  ·  /api → 固定进 v2  ·  Gateway 由 Controller 自动映射为 Envoy 数据面</text>
+</svg

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 300" font-family="Helvetica,Arial,sans-serif">
+<style>.b{fill:#eef4ff;stroke:#4a6fa5;stroke-width:1.5}.g{fill:#e8f6ec;stroke:#3d8b57;stroke-width:1.5}.y{fill:#fdf3e0;stroke:#c9962e;stroke-width:1.5}.t{fill:#1a2b45;font-size:13px}.s{fill:#4a5a70;font-size:11px}@media(prefers-color-scheme:dark){.b{fill:#1d2a40;stroke:#7da2d8}.g{fill:#17301f;stroke:#6cbf8e}.y{fill:#33290f;stroke:#d8b25e}.t{fill:#e8eef7}.s{fill:#a8b8cc}}</style>
+<rect class="y" x="40" y="40" width="200" height="70" rx="8"/><text class="t" x="60" y="68">ClusterIssuer: selfsigned</text><text class="s" x="70" y="90">自签根 — 信任链的起点</text>
+<rect class="b" x="40" y="180" width="200" height="70" rx="8"/><text class="t" x="58" y="208">Certificate: demo-root-ca</text><text class="s" x="58" y="230">isCA: true → Secret demo-root-ca</text>
+<rect class="b" x="410" y="40" width="230" height="70" rx="8"/><text class="t" x="425" y="68">ClusterIssuer: demo-ca-issuer</text><text class="s" x="430" y="90">ca.secretName → 读根 CA 私钥</text>
+<rect class="g" x="410" y="180" width="230" height="70" rx="8"/><text class="t" x="432" y="208">Certificate: a-example-com</text><text class="s" x="432" y="230">SAN: a.example.com · 90 天 · 自动续期</text>
+<path d="M140 110 L140 180" stroke="#4a6fa5" stroke-width="1.5" marker-end="url(#a)"/><text class="s" x="150" y="150">签发根 CA</text>
+<path d="M240 215 L410 90" stroke="#4a6fa5" stroke-width="1.5" marker-end="url(#a)"/><text class="s" x="290" y="165">喂给 CA Issuer</text>
+<path d="M525 110 L525 180" stroke="#4a6fa5" stroke-width="1.5" marker-end="url(#a)"/><text class="s" x="535" y="150">签发业务证书</text>
+<defs><marker id="a" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8" fill="none" stroke="#4a6fa5" stroke-width="1.5"/></marker></defs>
+<text class="s" x="40" y="280">openssl 验证: issuer=CN=demo-root-ca  ·  renewBefore 窗口内自动重签, Secret 原地换新</text>
+</svg

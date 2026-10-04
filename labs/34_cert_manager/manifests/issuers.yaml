@@ -1,0 +1,35 @@
+# 第一级: self-signed ClusterIssuer —— 它只用来给"根 CA"签证书
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: selfsigned-issuer
+spec:
+  selfSigned: {}
+---
+# 根 CA 证书: 由 self-signed 签出, 存进 Secret (cert-manager 自动管理)
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: demo-root-ca
+  namespace: cert-manager
+spec:
+  isCA: true                  # 这张证书本身是 CA, 可继续签发他人
+  commonName: demo-root-ca
+  secretName: demo-root-ca
+  duration: 8760h             # 有效期 1 年
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    name: selfsigned-issuer
+    kind: ClusterIssuer
+    group: cert-manager.io
+---
+# 第二级: CA ClusterIssuer —— 业务证书都由这把 CA 签发 (形成信任链)
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: demo-ca-issuer
+spec:
+  ca:
+    secretName: demo-root-ca

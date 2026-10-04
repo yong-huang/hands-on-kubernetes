@@ -1,0 +1,8 @@
+# GatewayClass: 声明"由哪个 Controller 实现" (controllerName 指向 Envoy Gateway)
+# 对照 lab 11: Ingress 的 ingressClassName 也是同样的"类 -> 实现"两级设计
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: eg
+spec:
+  controllerName: gateway.envoyproxy.io/gatewayclass-controller
