@@ -89,13 +89,15 @@ kubectl logs job/backup-test | tail -1       # backup-ok
 ```go
 // Headless Service：clusterIP: None，给 Pod 稳定 DNS（mysql-h）
 // StatefulSet：serviceName 指向它，Pod 才有 web-0 式稳定网络标识
-sts.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{{
-    ObjectMeta: metav1.ObjectMeta{Name: "data", Labels: mysqlLabels(db.Name)},
-    Spec: corev1.PersistentVolumeClaimSpec{
-        AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-        Resources:   ...{Requests: {Storage: size}},
+sts.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{
+    {
+        ObjectMeta: metav1.ObjectMeta{Name: "data", Labels: mysqlLabels(db.Name)},
+        Spec: corev1.PersistentVolumeClaimSpec{
+            AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+            Resources:   ...{Requests: {Storage: size}},
+        },
     },
-}}
+}
 ```
 
 - **Finalizer 清理 PVC**：VCT 产的 PVC 不会随 CR 删除自动消失（防止数据误删），Controller 在删除分支按标签 `app.kubernetes.io/managed-by=mysql-operator` 显式删除——宁可 Terminating 慢，不可留孤儿数据卷；

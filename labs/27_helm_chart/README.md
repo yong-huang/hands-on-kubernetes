@@ -17,7 +17,7 @@ manifests/demo-chart/
   Chart.yaml      # version(chart) 与 appVersion(镜像默认 tag) 解耦
   values.yaml     # 默认值
   templates/      # Go template + K8s manifest
-  _helpers.tpl    # {{ include "demo-chart.fullname" . }}
+  _helpers.tpl    # {% raw %}{{ include "demo-chart.fullname" . }}{% endraw %}
 ```
 
 一句话心智模型：**用一个 Chart 部署一套应用，用 values 描述所有环境差异**——可以把 chart 想象成"应用安装器"；但和安装器不同的是，它输出的不是二进制而是一套 K8s 清单，且每次安装/升级都留下可回滚的版本快照（Release，见 How It Works）。
@@ -82,7 +82,7 @@ image.tag | default .Chart.AppVersion
 
 **_helpers.tpl：命名约定决定多租户安全**。
 
-所有资源名带 release 前缀（`fullname = {{ .Release.Name }}-{{ .Chart.Name }}`）、label 带标准标签（`app.kubernetes.io/{name,instance,version}`），
+所有资源名带 release 前缀（`fullname = {% raw %}{{ .Release.Name }}-{{ .Chart.Name }}{% endraw %}`）、label 带标准标签（`app.kubernetes.io/{name,instance,version}`），
 
 同一个 chart 才能以不同 release 名在同一命名空间（K8s 的资源分组单位）部署多份而互不干扰（selector 即按 label 筛选资源的查询器，精确匹配各自的 instance 标签）。
 

@@ -69,6 +69,7 @@ verifyImages:
           - keys: {publicKeys: ...}
 ```
 
+{% raw %}
 ```yaml
 validate:
   foreach:
@@ -83,6 +84,7 @@ exclude:
   any:
     - namespaces: ["kube-system", "kyverno", "trivy-system"]
 ```
+{% endraw %}
 
 **灰度路径**：拦截策略（`block-critical-vuln-images`）以 `validationFailureAction: Audit` 安装，先以 Audit 模式观察违规面；`deny` 步骤再 `kubectl patch` 切到 Enforce。
 
